@@ -20,7 +20,8 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
-[aberrated_plane_wave.webm](https://github.com/user-attachments/assets/c3b6af87-9895-4742-a2c4-048b8e87c40a)
+<img width="600" height="338" alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" />
+
 
 ## Why use Eiko?
 A few reasons to use Eiko:
