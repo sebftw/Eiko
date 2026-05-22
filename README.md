@@ -20,6 +20,8 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
+Eiko takes a slowness map (reciprocal of speed of sound), initial time-of-flight at a few points, and produces the time-of-flight map. For example, if the initial delays describe a plane-wave:
+
 <img width="600" height="338" alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" />
 
 
