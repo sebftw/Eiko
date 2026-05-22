@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eiko"
+version = "0.8.0"
+description = "Eiko: the GPU-accelerated Eikonal equation solver"
+readme = "README.md"
+requires-python = ">=3.8"  # Required for PyTorch 2.0.0
+license = { file = "LICENSE" }
+authors = [
+    {name = "Sebastian Kazmarek Præsius", email = "sebastian.devel@gmail.com"},
+]
+keywords = [
+    "gpu", "cuda", "pytorch", "jax", "automatic differentiation", "autodiff", 
+    "time of flight", "beamforming", "shortest path", 
+    "batch-processing", "fast iterative Method", "eikonal", "eikonal equation",
+    "PDE", "partial differential equations", "scientific computing"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Environment :: GPU",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Mathematics"
+]
+dependencies = [
+    "torch>=2.0.0",
+    "ninja"
+]
+
+[project.optional-dependencies]
+# Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
+# Dependencies required for JAX.
+jax = [
+    "jax[cuda12]",       # Installs the GPU-enabled JAX backend via pip.
+    "pybind11"
+]
+jax-local = [
+    "jax[cuda12_local]",  # This is only for HPC users ("modules load cuda/12.0").
+    "pybind11"
+]
+# Dependencies require to run examples.
+examples = [
+    "matplotlib>=3.5.0", 
+    "jax[cuda12_pip]",
+    "pybind11",
+    "optax",
+    "scipy>=1.7.0",
+    "numpy>=1.21.0",
+    "scikit-image",
+    "pyvista>=0.43.0",
+    "Pillow>=9.0.0"
+]
+# Dependencies required to run tests.
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov",  # Code coverage report.
+    "tox>=4.0.0",
+    "vermin"
+]
+
+[project.urls]
+Homepage = "https://github.com/sebftw/Eiko"
+
+[tool.setuptools]
+packages = ["eiko", "eiko.src"]
+
+[tool.setuptools.package-dir]
+"eiko" = "python/eiko"
+"eiko.src" = "src"
+
+[tool.setuptools.package-data]
+"eiko.src" = ["*.cuh", "bindings/*.cu"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/test"]
+addopts = "-v"
