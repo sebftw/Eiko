@@ -1,6 +1,10 @@
-% Generates eiko logo.
-
+%% Generates eiko logo.
 parallel.gpu.enableCUDAForwardCompatibility(true);
+
+% --- Toggle Features Here ---
+saveStaticLogo = true;  % Set to true to save 'eiko_logo.png'
+saveVideo = false;       % Set to true to save 'eiko_animation.mp4'
+% ----------------------------
 
 % --- 1. Setup Canvas and Solver ---
 canvasHeight = 200;
@@ -19,6 +23,29 @@ canvas = imresize(single(rgb2gray(canvas)), 1/supersample, 'nearest');
 
 % Slowness map: 1 in background, 3 inside text
 f = (single(canvas)/255)*2 + 1;
+
+if saveStaticLogo
+    padHeight = 90;
+    static_mask = [zeros(padHeight, size(canvas, 2), 'single'); canvas];
+    
+    % Insert the title text into the padded mask
+    static_mask = insertText(uint8(static_mask), [size(static_mask,2)/2, padHeight/2+5], ...
+                             'TIME OF FLIGHT CALCULATOR', ...
+                             'Font', 'Cascadia Code', ...
+                             'FontSize', 36, ...
+                             'TextColor', 'white', ...
+                             'BoxOpacity', 0, "AnchorPoint", "Center");
+                         
+    % Convert back to 2D grayscale array to use as an alpha map
+    static_alpha = rgb2gray(static_mask);
+    
+    % Create a flat gray RGB image (128, 128, 128) matching the new size
+    gray_img = repmat(uint8(128 * ones(size(static_alpha))), [1, 1, 3]);
+    
+    % Use the static_alpha (0 to 255) as the alpha channel for transparency
+    imwrite(gray_img, 'eiko_logo.png', 'Alpha', static_alpha);
+    disp('Static logo saved as eiko_logo.png');
+end
 
 u_init = inf(size(canvas), 'single');
 u_init(ceil(end/2), 1) = 0; % Start from middle-left edge
@@ -57,7 +84,20 @@ temp_x = linspace(-pulse_width/2, pulse_width/2, 400);
 temp_y = cos(freq * temp_x / pulse_width) .* hanning(400).';
 global_my = min(temp_y);
 
-for t = time_steps
+if saveVideo
+    frame_skip = 8;
+    vidObj = VideoWriter('eiko_animation.avi', 'Uncompressed AVI');
+    % vidObj = VideoWriter('eiko_animation.mp4', 'MPEG-4');
+    
+    vidObj.FrameRate = 60; % Adjust frame rate if the animation feels too fast/slow
+    if isfield('Quality', vidObj)
+        vidObj.Quality = 100;
+    end
+    open(vidObj);
+end
+
+for i = 1:numel(time_steps)
+    t = time_steps(i);
     diff_t = u_safe_gpu - t;
     active_mask = abs(diff_t) <= (pulse_width / 2);
     
@@ -84,5 +124,22 @@ for t = time_steps
     final_img = max(current_wave, visible_text);
     
     plt.CData = gather(final_img);
-    drawnow limitrate;
+    if saveVideo && mod(i-1, frame_skip) == 0
+        drawnow; % Standard drawnow ensures the figure updates fully before capture
+        frame = getframe(gcf);
+        writeVideo(vidObj, frame);
+    else
+        drawnow limitrate;
+    end
 end
+
+if saveVideo
+    close(vidObj);
+    disp('Animation saved as eiko_animation.mp4');
+
+    % The video can then be converted to webm using
+    % !ffmpeg -i eiko_animation.avi -c:v libvpx-vp9 -crf 20 -b:v 0 -an eiko_animation.webm
+    % or gif using
+    % !ffmpeg -i eiko_animation.avi -filter_complex "[0:v] split [a][b];[a] palettegen [p];[b][p] paletteuse" eiko_animation.gif
+end
+

@@ -2,6 +2,7 @@
 % This script demonstrates how to use the 'eiko' solver to simulate a 
 % steered plane wave from a transducer aperture. It then showcases how to 
 % perform aberration correction in an inhomogeneous medium using time-reversal.
+rng(1234);
 
 %% 1. Setup Canvas and Transducer Aperture
 canvasHeight = 1080/4;
@@ -67,7 +68,7 @@ u_init_bw = inf(canvasHeight, canvasWidth, 'single');
 u_init_bw(end, source_x) = -source_x * sin(theta);
 
 % We use flipud to propagate the wave from the bottom (end) back to the top (1)
-u_bw = eiko(flipud(u_init_bw), flipud(f_inhomo), 'msfm', msfm, 'gated', gated_x);
+u_bw = eiko(flipud(u_init_bw), flipud(f_inhomo), 'msfm', msfm);
 u_bw = flipud(u_bw);
 
 % Extract arrival times at the transducer

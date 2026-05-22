@@ -1,21 +1,42 @@
-# Eiko
+![Eiko Logo](/images/eiko_logo.png "Eiko")
+
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?style=flat-square&logo=python&color=blue)
+[![PyPI version](https://img.shields.io/pypi/v/eiko?style=flat-square&logo=pypi&color=blue)](https://pypi.org/project/eiko/)
+[![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases)
+![GitHub License](https://img.shields.io/github/license/sebftw/Eiko?style=flat-square&color=green)
+
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 
+- [Why use Eiko?](#why-use-eiko)
+- [Installation](#installation)
+  * [Requirements](#requirements)
+  * [Installing for MATLAB](#installing-for-matlab)
+  * [Installing for Python](#installing-for-python)
+- [Quick Start](#quick-start)
+  * [MATLAB example](#matlab-example)
+  * [Python example](#python-example)
+- [Project Layout](#project-layout)
+- [Citing](#citing)
+
+## Why use Eiko?
 A few reasons to use Eiko:
-1. Eiko is **fast** - up to 10x faster than comparable libraries.
+1. Eiko is **fast** - up to 100x faster than comparable libraries.
 2. Eiko is **differentiable**, allowing it to be used with PyTorch or JAX.
 3. Eiko supports **advection**, allowing it to compute apodizations through a lens.
 
-![Image of example](/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
+Additionally, Eiko supports batch processing (computing multiple problems in parallel).
+
+![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
+
 
 ## Installation
 ### Requirements
 Because Eiko compiles custom CUDA kernels during installation, your system must have the following:
-* **OS:** Linux or Windows
+* **OS:** Windows or Linux
 * **Hardware:** NVIDIA GPU
 * **Compiler:** 
-  * A C++ compiler (e.g., GCC for Linux, MSVC for Windows)
+  * A C++ compiler (e.g., MSVC for Windows, GCC for Linux)
   * The CUDA Toolkit (provides `nvcc`)
 
 ### Installing for MATLAB
@@ -65,7 +86,7 @@ imagesc(axis_mm, axis_mm, u_numerical * 1e6);
 axis image;
 
 % Format axes and text size.
-title('Time-of-Flight Field', 'FontSize', 14, 'FontWeight', 'bold');
+title('Time-of-Flight', 'FontSize', 14, 'FontWeight', 'bold');
 xlabel('x (mm)', 'FontSize', 12, 'FontWeight', 'bold');
 ylabel('y (mm)', 'FontSize', 12, 'FontWeight', 'bold');
 
@@ -74,7 +95,7 @@ cb = colorbar;
 cb.Label.String = 'Time (\mus)';
 cb.Label.FontSize = 12;
 ```
-For 3D inputs, call `eiko3d`.
+For 3D inputs, use `eiko3d`.
 
 ### Python example
 
