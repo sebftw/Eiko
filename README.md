@@ -1,5 +1,4 @@
-![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")
-
+![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?style=flat-square&logo=python&color=blue)
 [![PyPI version](https://img.shields.io/pypi/v/eiko?style=flat-square&logo=pypi&color=blue)](https://pypi.org/project/eiko/)
 [![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases)
@@ -21,7 +20,7 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
-<video src="/images/aberrated_plane_wave.webm" autoplay loop muted controls width="80%"></video>
+[aberrated_plane_wave.webm](https://github.com/user-attachments/assets/c3b6af87-9895-4742-a2c4-048b8e87c40a)
 
 ## Why use Eiko?
 A few reasons to use Eiko:
