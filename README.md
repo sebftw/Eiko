@@ -1,4 +1,4 @@
-![Eiko Logo](/images/eiko_logo.png "Eiko")
+![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")
 
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?style=flat-square&logo=python&color=blue)
 [![PyPI version](https://img.shields.io/pypi/v/eiko?style=flat-square&logo=pypi&color=blue)](https://pypi.org/project/eiko/)
@@ -8,6 +8,7 @@
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 
+<!-- START_MATLAB_ONLY -->
 - [Why use Eiko?](#why-use-eiko)
 - [Installation](#installation)
   * [Requirements](#requirements)
@@ -18,6 +19,9 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
   * [Python example](#python-example)
 - [Project Layout](#project-layout)
 - [Citing](#citing)
+<!-- END_MATLAB_ONLY -->
+
+<video src="/images/aberrated_plane_wave.webm" autoplay loop muted controls width="80%"></video>
 
 ## Why use Eiko?
 A few reasons to use Eiko:
@@ -34,13 +38,15 @@ Additionally, Eiko supports batch processing (computing multiple problems in par
 ### Requirements
 Because Eiko compiles custom CUDA kernels during installation, your system must have the following:
 * **OS:** Windows or Linux
-* **Hardware:** NVIDIA GPU
+* **Hardware:** A NVIDIA GPU
 * **Compiler:** 
   * A C++ compiler (e.g., MSVC for Windows, GCC for Linux)
   * The CUDA Toolkit (provides `nvcc`)
 
+<!-- START_MATLAB_ONLY -->
 ### Installing for MATLAB
 Run `setup.m` to install Eiko for MATLAB.
+<!-- END_MATLAB_ONLY -->
 
 ### Installing for Python
 Run
@@ -49,13 +55,16 @@ pip install eiko
 ```
 You now have Eiko installed and ready for use.
 
+<!-- START_MATLAB_ONLY -->
 See also [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md).
+<!-- END_MATLAB_ONLY -->
 
 ## Quick Start
 An example of how to use Eiko is shown below.
 <br>
 See [EXAMPLES](/examples/README.md) for many more examples.
 
+<!-- START_MATLAB_ONLY -->
 ### MATLAB example
 ```matlab
 % 1. Setup grid parameters.
@@ -96,7 +105,7 @@ cb.Label.String = 'Time (\mus)';
 cb.Label.FontSize = 12;
 ```
 For 3D inputs, use `eiko3d`.
-
+<!-- END_MATLAB_ONLY -->
 ### Python example
 
 ```python

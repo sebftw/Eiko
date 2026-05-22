@@ -227,9 +227,14 @@ function plt = animate_eikonal(u, varargin)
     % --- Video Setup ---
     export_video = ~isempty(opts.VideoFilename);
     if export_video
-        vidObj = VideoWriter(opts.VideoFilename, 'MPEG-4');
+        if true
+            vidObj = VideoWriter(opts.VideoFilename, 'MPEG-4');
+            vidObj.Quality = 100;
+        else
+            vidObj = VideoWriter(opts.VideoFilename, 'Uncompressed AVI');
+        end
         vidObj.FrameRate = 60;
-        vidObj.Quality = 100;
+        
         open(vidObj);
     end
 

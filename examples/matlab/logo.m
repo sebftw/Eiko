@@ -2,7 +2,7 @@
 parallel.gpu.enableCUDAForwardCompatibility(true);
 
 % --- Toggle Features Here ---
-saveStaticLogo = true;  % Set to true to save 'eiko_logo.png'
+saveStaticLogo = false;  % Set to true to save 'eiko_logo.png'
 saveVideo = false;       % Set to true to save 'eiko_animation.mp4'
 % ----------------------------
 

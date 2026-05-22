@@ -56,7 +56,7 @@ f_inhomo = ones(canvasHeight, canvasWidth, 'single') - (islands * 0.2);
 [u_uncorrected, v_uncorrected] = eiko(u_init, f_inhomo, 'v_init', v_init, 'msfm', msfm);
 
 animate_eikonal(u_uncorrected, v_uncorrected, 'Outline', outline, 'Style', 'real', ...
-    'Title', sprintf('Aberrated Plane Wave (%d° Steered)', steering_angle_deg));
+    'Title', sprintf('Aberrated Plane Wave (%d° Steered)', steering_angle_deg), 'VideoFilename', 'aberrated_plane_wave');
 
 %% 4. Aberration Correction via Time-Reversal
 fprintf('Performing aberration correction (time-reversal)...\n');
