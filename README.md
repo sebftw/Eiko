@@ -56,7 +56,7 @@ If you don't own a GPU, you can run Eiko for Python from Google Colab with zero 
 ### Installing for MATLAB
 Run `setup.m` to install Eiko in MATLAB.
 
-See also [the Eiko MATLAB installation guide](/python/PYTHON_INSTALLATION.md).
+See also [the Eiko MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md).
 <!-- END_MATLAB_ONLY -->
 
 ### Installing for Python
@@ -146,7 +146,7 @@ import matplotlib.pyplot as plt
 import torch
 
 # Create physical coordinate axes in millimeters using dx
-axis_mm = (torch.arange(N) - center_idx) * dx * 1000;
+axis_mm = (torch.arange(N) - center_idx) * dx * 1000
 
 # Set up plot (equivalent to 'figure')
 plt.figure(figsize=(6, 6))
@@ -175,15 +175,18 @@ For 3D inputs, use `from eiko import eiko3d`.
 
 The result should look something like this:
 
-![Image of example](/images/eiko_example.png "Result of the example code.")
+![Image of example](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_example.png "Result of the example code.")
 
 ### Visual examples
 Some visual examples of Eiko in action:
+<details>
+ <summary>Click to view visual examples</summary>
 | | | |
 | :---: | :---: | :---: |
 | <img alt="plane_wave1" src="https://github.com/user-attachments/assets/989bce3d-b3d7-4b4b-a735-e58d7e58524c" width="100%" /> | <img alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" width="100%" /> | <img alt="plane_wave3" src="https://github.com/user-attachments/assets/796f7cc5-4363-48d6-964d-76cb251377f9" width="100%" /> |
-| <img alt="plane_wave3D" src="https://github.com/user-attachments/assets/e94ac0cd-5e3e-4e90-a5d9-80d783a8ca00" width="100%" /> | <img alt="plane_wave3D_aberrated" src="https://github.com/user-attachments/assets/37a75203-b599-4ec6-9598-0dc62346692b" width="100%" /> | <img alt="aberation_correction" src="https://github.com/user-attachments/assets/e92c6f26-8bf7-4a38-ba0d-7978ad017d34" width="100%" /> |
+| <img alt="plane_wave3D" src="https://github.com/user-attachments/assets/e94ac0cd-5e3e-4e90-a5d9-80d783a8ca00" width="100%" /> | <img alt="plane_wave3D_aberrated" src="https://github.com/user-attachments/assets/37a75203-b599-4ec6-9598-0dc62346692b" width="100%" /> | <img alt="aberration_correction" src="https://github.com/user-attachments/assets/e92c6f26-8bf7-4a38-ba0d-7978ad017d34" width="100%" /> |
 | <img alt="maze" src="https://github.com/user-attachments/assets/a2b65417-1edc-4a10-9cef-3bac17b2e106" width="100%" /> | <img alt="tomography_inversion" src="https://github.com/user-attachments/assets/f9b2edce-409c-4fc4-97c1-3f2f804fd172" width="100%" /> | <img alt="lens_design2_hd" src="https://github.com/user-attachments/assets/c0dd15a9-eb56-4a8b-b27c-02332e7dbf0d" width="100%" /> |
+</details>
 
 
 ## Project Layout
@@ -196,6 +199,7 @@ Eiko/
 ├── matlab/         # MATLAB Eiko library
 ├── python/         # Python Eiko library
 ├── src/            # Core CUDA C++ Eiko implementation and interface
+├── images/         # Various image assets
 ├── pyproject.toml  # Python package configuration (for pip install)
 ├── setup.m         # MATLAB compilation and setup script
 ├── THEORY.md       # Mathematical background and Eikonal algorithm details
