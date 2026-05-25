@@ -28,8 +28,9 @@ time_of_flight = eiko(initial_delays, slowness_map)
 For example, if the initial delays describe a plane-wave:
 
 <p align="center">
-<img width="360" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/c5d6b9ac-3aad-4914-b66a-45b3dbecfac0" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
+<img width="360" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/77e62343-bde7-4614-a640-c5f33face1a7" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
 </p>
+
 
 ## Why use Eiko?
 A few reasons to use Eiko:
