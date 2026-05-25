@@ -66,7 +66,7 @@ Because Eiko compiles custom CUDA kernels during installation, your system must 
   * A C++ compiler (e.g., MSVC for Windows, GCC for Linux)
   * The CUDA Toolkit (provides `nvcc`)
 
-If you don't own a GPU, you can run Eiko for Python from Google Colab with zero installation required [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
+If you don't own a GPU, you can run Eiko for Python from Google Colab with zero installation [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
 
 <!-- START_MATLAB_ONLY -->
 ### Installing for MATLAB
