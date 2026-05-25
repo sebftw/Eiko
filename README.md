@@ -23,7 +23,7 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
-Eiko takes a sound-speed map and initial time-of-flight values at a few points and returns the time-of-flight map.
+Eiko takes a sound-speed map and initial time-of-flight values at a few points and returns the full time-of-flight map.
 ```
 time_of_flight = eiko(initial_delays, slowness_map)
 ```
