@@ -40,6 +40,7 @@ Eiko also supports batch processing, allowing many time-of-flight maps to be com
 
 ![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
 
+To learn more about how Eiko works, see [THEORY](THEORY.md).
 
 ## Installation
 This section describes how to install Eiko for MATLAB or Python.
@@ -208,7 +209,6 @@ Eiko/
 ├── THEORY.md       # Mathematical background and Eikonal algorithm details
 └── README.md       # This file
 ```
-To learn more about how Eiko works, see [THEORY](THEORY.md).
 
 ## Contributing
 Feel free to contribute to the project. Bug reports and feature requests may be submitted on the "Issues" page.
