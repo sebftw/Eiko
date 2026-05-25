@@ -19,12 +19,11 @@ The result is the shortest time-of-flight: $u(x)$ for all $x$.
 #### In human terms
 The Eikonal equation states that $\|\nabla u\|=\sqrt{u_x^2+u_y^2+u_z^2}$ (the change in time-of-flight when moving through a grid-point) must be equal to the slowness $f = 1/c$. The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
-Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU, and it keeps iterating until all points converge to the theoretically lowest travel time. It is somewhat similar to Dijkstra's algorithm.
+Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It is somewhat similar to Dijkstra's algorithm.
 
-Eiko can therefore be used for beamforming, signed distance functions (in a non-homogenous space), shortest path planning, and much more. It is similar to the MATLAB function `bwdist`, but with support for variable wave propagation speeds.
+Eiko can therefore be used for beamforming, signed distance functions (in a non-homogeneous space), shortest path planning, and much more. It is similar to the MATLAB function `bwdist`, but supports variable wave propagation speeds.
 
-**Limitations:** The calculated time-of-flight will always be an over-estimate, but usually accurate enough for most use cases as long as the grid spacing corresponds to half a wavelength or less. The accuracy also depends on the exact medium calculations are performed in (e.g., is there a lens?). No grid-based solver is perfect.
-
+**Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less. The accuracy also depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
 ## Advection Field
 
@@ -50,7 +49,7 @@ The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant alon
 
 ## MSFM (Multi-Stencil Fast Marching)
 
-Standard eikonal solvers only consider neighboring points in a stencil (area around the current pixel) with a `+` shape. 
+Standard eikonal solvers only consider neighboring points within a stencil (the area around the current pixel) with a `+` shape. 
 
 Enabling MSFM will make Eiko also consider the diagonal neighbors, expanding the stencil to an `x` shape:
 
@@ -62,7 +61,7 @@ Enabling MSFM will make Eiko also consider the diagonal neighbors, expanding the
     %             % % %
 ```
 
-The result is that enabling MSFM allows a wavefront to travel diagonally instead of having to zig-zag, producing a less overestimated, more accurate $u$.
+The result is that enabling MSFM allows a wavefront to travel diagonally rather than zigzag, producing a less overestimated, more accurate $u$.
 
 
 ## Gating
@@ -78,9 +77,9 @@ The result is a "shadowed" region behind any object that blocks the wavefront, i
     %               %            % % %
 ```
 
-Setting `gating = true` makes the code faster due to the smaller stencil. It may also be necessary in some imaging setups. For example, if a wave is blocked, one might expect a "shadow" behind the obscuring object in an acoustic setup, since most of the energy won't make it around a bend (even though some energy theoretically bends around the object via Huygens' principle in a wavelength-dependent diffraction process).
+Setting `gating = true` speeds up the code because the stencil is smaller. It may also be necessary in some imaging setups. For example, if a wave is blocked, one might expect a "shadow" behind the obscuring object in an acoustic setup, since most of the energy won't make it around a bend (even though some energy theoretically bends around the object via Huygens' principle in a wavelength-dependent diffraction process).
 
-Gating can usually be enabled in pulse-echo setups without issues, but **be careful** as gating is only implemented along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions are usually flipped compared to MATLAB (which uses column-major aka Fortran order), meaning the last axis is the leading dimension.
+Gating can usually be enabled in pulse-echo setups without issues, but **be careful** because gating is implemented only along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions is usually flipped compared to MATLAB (which uses column-major aka. Fortran order), so the last axis is the leading dimension.
 
 ## Gradients with respect to the loss $L$
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
@@ -97,7 +96,7 @@ Where:
 Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
 
 ### Gradient w.r.t. initial conditions ($u_{init}$)
-This is solved using the "adjoint" equation, which is a transport equation that takes an adjoint variable lambda ($\lambda$), and lets it flow backwards along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backwards along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). 
+This is solved using the "adjoint" equation, a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backward along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). 
 
 Mathematically, the equation for this backward pass is:
 
@@ -112,11 +111,11 @@ Where:
 *   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (this is distinct from $\Gamma$, which are the original source points).
 
 #### In human terms
-Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation runs this process in reverse.
+Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
-The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backwards up the streams ($n(x)$) the way they came. 
+The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ($n(x)$) the way they came. 
  
-The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values when the streams arrive back at the original spring ($\Gamma$) become the gradient w.r.t. the initial conditions ($u_{init}$).
+The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values when the streams return to the original spring ($\Gamma$) become the gradient w.r.t. the initial conditions ($u_{init}$).
 
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication.
@@ -126,7 +125,7 @@ Mathematically, the gradient is extracted via the optimality condition:
 $$\frac{dL}{df} = (\Delta x)^2 * \lambda(x) * f(x)$$
 
 #### In human terms
-If a lot of "error traffic" ($\lambda$) traveled backwards through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times. We scale it by $(\Delta x)^2$ to correctly account for the physical size of the grid cells during the discrete integration.
+If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times. We scale it by $(\Delta x)^2$ to correctly account for the physical size of the grid cells during the discrete integration.
 
 ## References
 *   [1] "Improved Fast Iterative Algorithm for Eikonal Equation for GPU Computing" by Yuhao Huang (2021), [arXiv:2106.15869](https://arxiv.org/abs/2106.15869).
