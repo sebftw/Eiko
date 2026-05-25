@@ -181,6 +181,7 @@ The result should look something like this:
 Some visual examples of Eiko in action:
 <details>
  <summary>Click to view visual examples</summary>
+ 
 | | | |
 | :---: | :---: | :---: |
 | <img alt="plane_wave1" src="https://github.com/user-attachments/assets/989bce3d-b3d7-4b4b-a735-e58d7e58524c" width="100%" /> | <img alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" width="100%" /> | <img alt="plane_wave3" src="https://github.com/user-attachments/assets/796f7cc5-4363-48d6-964d-76cb251377f9" width="100%" /> |
