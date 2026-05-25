@@ -41,7 +41,7 @@ end
 fprintf('Simulating 3D plane wave in a homogeneous medium...\n');
 f_homo = ones(canvasHeight, canvasWidth, canvasDepth, 'single'); % c=1
 
-[u_homo, v_homo] = eiko(u_init, f_homo, 'v_init', v_init, 'msfm', msfm, 'gated', gated_x);
+[u_homo, v_homo] = eiko(u_init, f_homo, 'v_init', v_init, 'msfm', msfm);
 
 animate_eikonal(u_homo, v_homo, 'RenderMode', 'slice', 'Style', 'real', ...
     'Title', sprintf('Plane Wave (%d° Steered)', steering_angle_deg));
@@ -94,7 +94,7 @@ for k = 1:numel(aperture_z)
 end
 
 % 4d. Run the corrected forward simulation
-[u_corrected, v_corrected] = eiko(u_init_corrected, f_inhomo, 'v_init', v_init, 'msfm', msfm, 'gated', gated_x);
+[u_corrected, v_corrected] = eiko(u_init_corrected, f_inhomo, 'v_init', v_init, 'msfm', msfm);
 
 animate_eikonal(u_corrected, v_corrected, 'RenderMode', 'slice', 'Outline', sphere_mask, 'Style', 'real', ...
     'Title', sprintf('Aberration Corrected Plane Wave (%d° Steered)', steering_angle_deg));

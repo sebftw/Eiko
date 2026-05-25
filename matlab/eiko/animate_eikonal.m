@@ -80,7 +80,7 @@ function plt = animate_eikonal(u, varargin)
     pulse_y = cast(pulse_y, 'like', u_safe);
 
     % --- Figure & Axis Setup ---
-    fig = figure('Color', [1 1 1], 'Position', [100, 100, size(u,2)*1.5, size(u,1)*1.5]); 
+    fig = figure('Color', [1 1 1], 'Position', [100, 100, size(u,2)*1.5*1.5, size(u,1)*1.5*1.5]); 
     set(fig, 'InvertHardcopy', 'off'); 
     
     ax = gca;
@@ -220,18 +220,18 @@ function plt = animate_eikonal(u, varargin)
     % title(opts.Title, 'Color', [0.2 0.2 0.2], 'Interpreter', 'latex', 'FontSize', 24);
     if not(isempty(ax))
         set(ax, 'FontName', 'Times New Roman', 'FontSize', 14, 'TickLabelInterpreter', 'latex');
-        title(ax, opts.Title, 'Color', [0 0 0], 'Interpreter', 'latex', 'FontSize', 22);
+        title(ax, opts.Title, 'Color', [0 0 0], 'Interpreter', 'latex', 'FontSize', 32);
         hold on;
     end
 
     % --- Video Setup ---
     export_video = ~isempty(opts.VideoFilename);
     if export_video
-        if true
+        if endsWith(opts.VideoFilename, '.avi')
+            vidObj = VideoWriter(opts.VideoFilename, 'Uncompressed AVI');
+        else
             vidObj = VideoWriter(opts.VideoFilename, 'MPEG-4');
             vidObj.Quality = 100;
-        else
-            vidObj = VideoWriter(opts.VideoFilename, 'Uncompressed AVI');
         end
         vidObj.FrameRate = 60;
         

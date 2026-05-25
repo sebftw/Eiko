@@ -4,7 +4,6 @@ function islandMask = generate_island(width, height, threshold)
     if nargin < 2 || isempty(height), height = 200; end
     if nargin < 3 || isempty(threshold), threshold = 0.3; end
     
-    rng('shuffle'); 
     rawNoise = rand(height, width);
     
     % Smooth the noise to create organic shapes

@@ -40,8 +40,8 @@ u_init(aperture_y, aperture_x) = delays_ideal;
 % Run forward solver
 [u_homo, v_homo] = eiko(u_init, f_homo, 'v_init', v_init, 'msfm', msfm);
 
-animate_eikonal(u_homo, v_homo, 'Style', 'real', ...
-    'Title', sprintf('Plane Wave (%d° Steered)', steering_angle_deg));
+%animate_eikonal(u_homo, v_homo, 'Style', 'real', ...
+%    'Title', sprintf('Plane Wave (%d° Steered)', steering_angle_deg));
 
 %% 3. Uncorrected Plane Wave in an Inhomogeneous Medium
 fprintf('Simulating uncorrected plane wave in an inhomogeneous medium...\n');
@@ -56,7 +56,7 @@ f_inhomo = ones(canvasHeight, canvasWidth, 'single') - (islands * 0.2);
 [u_uncorrected, v_uncorrected] = eiko(u_init, f_inhomo, 'v_init', v_init, 'msfm', msfm);
 
 animate_eikonal(u_uncorrected, v_uncorrected, 'Outline', outline, 'Style', 'real', ...
-    'Title', sprintf('Aberrated Plane Wave (%d° Steered)', steering_angle_deg), 'VideoFilename', 'aberrated_plane_wave');
+    'Title', sprintf('Aberrated Plane Wave (%d° Steered)', steering_angle_deg));
 
 %% 4. Aberration Correction via Time-Reversal
 fprintf('Performing aberration correction (time-reversal)...\n');
