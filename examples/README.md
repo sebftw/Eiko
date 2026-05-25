@@ -1,6 +1,12 @@
 # Examples
 This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover a range of applications, from simple visualization and validation to advanced tasks such as acoustic lens design and differentiable travel-time tomography.
 
+| | | |
+| :---: | :---: | :---: |
+| <img alt="plane_wave1" src="https://github.com/user-attachments/assets/989bce3d-b3d7-4b4b-a735-e58d7e58524c" width="100%" /> | <img alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" width="100%" /> | <img alt="plane_wave3" src="https://github.com/user-attachments/assets/796f7cc5-4363-48d6-964d-76cb251377f9" width="100%" /> |
+| <img alt="plane_wave3D" src="https://github.com/user-attachments/assets/e94ac0cd-5e3e-4e90-a5d9-80d783a8ca00" width="100%" /> | <img alt="plane_wave3D_aberrated" src="https://github.com/user-attachments/assets/37a75203-b599-4ec6-9598-0dc62346692b" width="100%" /> | <img alt="aberation_correction" src="https://github.com/user-attachments/assets/e92c6f26-8bf7-4a38-ba0d-7978ad017d34" width="100%" /> |
+| <img alt="maze" src="https://github.com/user-attachments/assets/a2b65417-1edc-4a10-9cef-3bac17b2e106" width="100%" /> | <img alt="tomography_inversion" src="https://github.com/user-attachments/assets/f9b2edce-409c-4fc4-97c1-3f2f804fd172" width="100%" /> | <img alt="lens_design2_hd" src="https://github.com/user-attachments/assets/c0dd15a9-eb56-4a8b-b27c-02332e7dbf0d" width="100%" /> |
+
 ## Prerequisites
 To run the Python examples, you will need additional visualization libraries such as `matplotlib`. You can install Eiko with these dependencies (or add them to your current installation) by running:
 ```
