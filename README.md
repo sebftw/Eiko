@@ -23,7 +23,11 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
-Eiko takes a sound-speed map and initial time-of-flight values at a few points and returns the time-of-flight map. For example, if the initial delays describe a plane-wave:
+Eiko takes a sound-speed map and initial time-of-flight values at a few points and returns the time-of-flight map.
+```
+time_of_flight = eiko(initial_delays, slowness_map)
+```
+For example, if the initial delays describe a plane-wave:
 
 <p align="center">
 <img width="480" height="410" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/0944ba3f-ffc9-47e7-8a42-ef26cf41e6d2" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
@@ -36,7 +40,6 @@ A few reasons to use Eiko:
 3. Eiko supports **advection**, allowing it to compute apodizations through a lens.
 
 Eiko also supports batch processing, allowing many time-of-flight maps to be computed efficiently in parallel.
-
 ![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
 
 
