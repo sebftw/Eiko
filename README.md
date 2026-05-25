@@ -1,3 +1,4 @@
+
 ![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko)
 [![PyPI version](https://img.shields.io/pypi/v/eiko)](https://pypi.org/project/eiko/)
@@ -27,7 +28,7 @@ time_of_flight = eiko(initial_delays, slowness_map)
 For example, if the initial delays describe a plane-wave:
 
 <p align="center">
-<img width="480" height="410" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/0944ba3f-ffc9-47e7-8a42-ef26cf41e6d2" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
+<img width="360" alt="Eikonal Plane Wave Aberration Animation" src="[https://github.com/user-attachments/assets/c5d6b9ac-3aad-4914-b66a-45b3dbecfac0](https://github.com/user-attachments/assets/d62b9a16-2345-4ad5-8005-649e377b4671)" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
 </p>
 
 ## Why use Eiko?
