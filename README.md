@@ -15,8 +15,6 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
   * [Installing for MATLAB](#installing-for-matlab)
   * [Installing for Python](#installing-for-python)
 - [Quick Start](#quick-start)
-  * [MATLAB example](#matlab-example)
-  * [Python example](#python-example)
 - [Project Layout](#project-layout)
 - [Contributing](#contributing)
 - [Citing](#citing)
@@ -75,11 +73,11 @@ See also [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md).
 
 ## Quick Start
 An example of how to use Eiko is shown below.
-<br>
-See [EXAMPLES](/examples/README.md) for many more examples.
 
 <!-- START_MATLAB_ONLY -->
-### MATLAB example
+<details>
+<summary><b>MATLAB Example</b> (Click to expand)</summary>
+
 ```matlab
 % 1. Setup grid parameters.
 N = 101;            % Number of grid points (NxN grid)
@@ -118,10 +116,18 @@ cb = colorbar;
 cb.Label.String = 'Time (\mus)';
 cb.Label.FontSize = 12;
 ```
-For 3D inputs, use `eiko3d`.
-<!-- END_MATLAB_ONLY -->
-### Python example
+The result should look something like this:
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_example.png" alt="Result of the example code" width="400" />
+</p>
+
+For 3D inputs, use `eiko3d`.
+</details>
+<!-- END_MATLAB_ONLY -->
+<details>
+<summary><b>Python Example</b> (Click to expand)</summary>
+ 
 ```python
 from eiko import eiko
 
@@ -175,12 +181,16 @@ cb.set_label(r'Time ($\mu$s)', fontsize=12)
 # Display the plot
 plt.show()
 ```
-For 3D inputs, use `from eiko import eiko3d`.
-
 The result should look something like this:
 
-![Image of example](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_example.png "Result of the example code.")
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_example.png" alt="Result of the example code" width="400" />
+</p>
 
+For 3D inputs, use `from eiko import eiko3d`.
+</details>
+
+See [EXAMPLES](/examples/README.md) for many more examples.
 
 ## Project Layout
 The files are as follows:
