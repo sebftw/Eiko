@@ -25,9 +25,9 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 
 Eiko takes a sound-speed map and initial time-of-flight values at a few points and returns the time-of-flight map. For example, if the initial delays describe a plane-wave:
 
-<div align="center">
-<img width="480" height="410" alt="plane_wave_aberrated_hd" src="https://github.com/user-attachments/assets/0944ba3f-ffc9-47e7-8a42-ef26cf41e6d2" />
-</div>
+<p align="center">
+<img width="480" height="410" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/0944ba3f-ffc9-47e7-8a42-ef26cf41e6d2" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
+</p>
 
 ## Why use Eiko?
 A few reasons to use Eiko:
