@@ -1,5 +1,5 @@
 # Examples
-This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover various applications, ranging from simple visualization and validation to advanced tasks like acoustic lens design and differentiable travel-time tomography.
+This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover a range of applications, from simple visualization and validation to advanced tasks such as acoustic lens design and differentiable travel-time tomography.
 
 ## Prerequisites
 To run the Python examples, you will need additional visualization libraries such as matplotlib. You can install Eiko with these dependencies (or add them to your current installation) by running:
