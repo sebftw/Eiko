@@ -17,6 +17,7 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Quick Start](#quick-start)
   * [MATLAB example](#matlab-example)
   * [Python example](#python-example)
+  * [Visual examples](#visual-examples)
 - [Project Layout](#project-layout)
 - [Contributing](#contributing)
 - [Citing](#citing)
@@ -176,7 +177,7 @@ The result should look something like this:
 
 ![Image of example](/images/eiko_example.png "Result of the example code.")
 
-## Visual examples
+### Visual examples
 Some visual examples of Eiko in action:
 | | | |
 | :---: | :---: | :---: |
