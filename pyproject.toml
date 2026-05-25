@@ -87,3 +87,30 @@ packages = ["eiko", "eiko.src"]
 [tool.pytest.ini_options]
 testpaths = ["python/test"]
 addopts = "-v"
+
+[tool.coverage.run]
+omit = [
+    # Catches the file when tested inside the tox virtual environments
+    "*/eiko/animate_eikonal.py",
+    # Catches the file if we ever run pytest locally outside of tox
+    "python/eiko/animate_eikonal.py"
+]
+
+[tool.coverage.paths]
+# Maps the tox installed package paths back to local source code 
+# so coverage reports show the correct local file paths.
+source = [
+    "python/eiko",
+    "*/site-packages/eiko",
+    "*\\site-packages\\eiko"
+]
+
+[tool.coverage.report]
+show_missing = true
+# You can also add other helpful report settings here:
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+]

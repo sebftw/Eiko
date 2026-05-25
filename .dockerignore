@@ -1,0 +1,37 @@
+# Git and Docker context
+.git/
+.github/
+.gitignore
+Dockerfile
+.dockerignore
+
+# Build distributions and caches
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+
+# Test and Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+tox.ini
+
+# Media and Visuals
+images/
+*.webm
+*.png
+*.jpg
+*.gif
+
+# MATLAB specific
+*.asv
+*.mex*
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp

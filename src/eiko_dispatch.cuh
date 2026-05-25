@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2026, Sebastian Kazmarek Præsius. All rights reserved.
+ * Licensed under the BSD 3-Clause License. See LICENSE file in the project root for details.
+ */
+
 #ifndef EIKO_DISPATCH_H
 #define EIKO_DISPATCH_H
 

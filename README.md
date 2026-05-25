@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/eiko?style=flat-square&logo=pypi&color=blue)](https://pypi.org/project/eiko/)
 [![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases)
 ![GitHub License](https://img.shields.io/github/license/sebftw/Eiko?style=flat-square&color=green)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
 
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
@@ -17,6 +18,7 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
   * [MATLAB example](#matlab-example)
   * [Python example](#python-example)
 - [Project Layout](#project-layout)
+- [Contributing](#contributing)
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
 
@@ -31,12 +33,14 @@ A few reasons to use Eiko:
 2. Eiko is **differentiable**, allowing it to be used with PyTorch or JAX.
 3. Eiko supports **advection**, allowing it to compute apodizations through a lens.
 
-Additionally, Eiko supports batch processing (computing multiple problems in parallel).
+Eiko also supports batch processing, allowing many time-of-flight maps to be computed efficiently in parallel.
 
 ![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
 
 
 ## Installation
+This section describes how to install Eiko for MATLAB or Python.
+
 ### Requirements
 Because Eiko compiles custom CUDA kernels during installation, your system must have the following:
 * **OS:** Windows or Linux
@@ -45,17 +49,20 @@ Because Eiko compiles custom CUDA kernels during installation, your system must 
   * A C++ compiler (e.g., MSVC for Windows, GCC for Linux)
   * The CUDA Toolkit (provides `nvcc`)
 
+If you don't own a GPU, you can run Eiko for Python from Google Colab with zero installation required [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
+
 <!-- START_MATLAB_ONLY -->
 ### Installing for MATLAB
-Run `setup.m` to install Eiko for MATLAB.
+Run `setup.m` to install Eiko in MATLAB.
+
+See also [the Eiko MATLAB installation guide](/python/PYTHON_INSTALLATION.md).
 <!-- END_MATLAB_ONLY -->
 
 ### Installing for Python
-Run
+Run the following command to install Eiko for Python.
 ```
 pip install eiko
 ```
-You now have Eiko installed and ready for use.
 
 <!-- START_MATLAB_ONLY -->
 See also [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md).
@@ -85,7 +92,7 @@ center_idx = ceil(N/2);
 u_init(center_idx, center_idx) = 0;
 
 % 4. Compute the numerical solution using eiko.
-u_numerical = eiko(u_init, f, dx);
+u = eiko(u_init, f, dx);
 
 % 5. Visualize the result.
 % Create physical coordinate axes in millimeters using dx
@@ -93,7 +100,7 @@ axis_mm = ((1:N) - center_idx) * dx * 1000;
 
 % Set up plot.
 figure;
-imagesc(axis_mm, axis_mm, u_numerical * 1e6);
+imagesc(axis_mm, axis_mm, u * 1e6);
 axis image;
 
 % Format axes and text size.
@@ -131,7 +138,37 @@ center_idx = N // 2
 u_init[center_idx, center_idx] = 0.0
 
 # 4. Compute the numerical solution.
-u_numerical = eiko(u_init, f, dx=dx)
+u = eiko(u_init, f, dx=dx)
+
+# 5. Visualize the result.
+import matplotlib.pyplot as plt
+import torch
+
+# Create physical coordinate axes in millimeters using dx
+axis_mm = (torch.arange(N) - center_idx) * dx * 1000;
+
+# Set up plot (equivalent to 'figure')
+plt.figure(figsize=(6, 6))
+
+# 'imagesc' equivalent with physical extents. 
+# 'extent' maps the data coordinates to the axes.
+extent = [axis_mm[0], axis_mm[-1], axis_mm[0], axis_mm[-1]]
+plt.imshow(u.cpu() * 1e6, extent=extent, origin='lower', cmap='viridis')
+
+# 'axis image' equivalent (forces equal pixel aspect ratio)
+plt.gca().set_aspect('equal', adjustable='box')
+
+# Format axes and text size
+plt.title('Time-of-Flight', fontsize=14, fontweight='bold')
+plt.xlabel('x (mm)', fontsize=12, fontweight='bold')
+plt.ylabel('y (mm)', fontsize=12, fontweight='bold')
+
+# Format colorbar
+cb = plt.colorbar()
+cb.set_label(r'Time ($\mu$s)', fontsize=12)
+
+# Display the plot
+plt.show()
 ```
 For 3D inputs, use `from eiko import eiko3d`.
 
@@ -157,6 +194,9 @@ Eiko/
 ```
 To learn more about how Eiko works, see [THEORY](THEORY.md).
 
+## Contributing
+Feel free to contribute to the project. Bug reports and feature requests may be submitted on the "Issues" page.
+
 ## Citing
 You can cite Eiko as
 ```
@@ -169,3 +209,13 @@ You can cite Eiko as
   howpublished = {\url{https://github.com/sebftw/Eiko}}
 }
 ```
+
+## Trademarks
+This project is an independent open-source software project and is not affiliated with, endorsed by, or sponsored by any of the companies mentioned. 
+* **MATLAB** is a registered trademark of The MathWorks, Inc.
+* **NVIDIA** and **CUDA** are registered trademarks of NVIDIA Corporation.
+* **PyTorch** is a trademark of the Linux Foundation.
+* **Ubuntu** is a registered trademark of Canonical Ltd.
+* **Windows** is a registered trademark of Microsoft Corporation.
+
+All other trademarks, service marks, and company names are the property of their respective owners.

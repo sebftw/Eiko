@@ -33,6 +33,9 @@ _fim_cuda_impl = load(
     verbose=False
 )
 
+if not is_cached:
+    print("Congratulations, you are now ready to use Eiko! :)")
+
 #------------------------------------------------------------------------
 # Global Solver Cache
 # ------------------------------------------------------------------------

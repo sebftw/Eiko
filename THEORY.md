@@ -10,7 +10,7 @@ $$u(x) = u_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)
 
 Where:
 *   $u(x)$ is the time-of-flight map (the solution).
-*   $f(x)$ is the slowness map (the inverse of speed, $c(x) = 1/f(x)$).
+*   $f(x)$ is the slowness map (the inverse of speed, $c(x) = 1/f(x)$ ).
 *   $\Omega$ is the entire grid of points.
 *   $\Gamma$ is the set of points with a known arrival time ("sources").
 
@@ -28,7 +28,7 @@ Eiko can therefore be used for beamforming, signed distance functions (in a non-
 
 ## Advection Field
 
-When $v_{init}$ is provided, the Eiko solver couples the Eikonal equation ($\|\nabla u\| = f$) with a steady-state advection (transport) equation. Note that the ray-path-of-fastest-travel is always perpendicular to the wavefront $u(x)$. Thus, its direction is given by the gradient vector:
+When $v_{init}$ is provided, Eiko couples the Eikonal equation ($\|\nabla u\| = f$) with a steady-state advection (transport) equation. Note that the ray-path-of-fastest-travel is always perpendicular to the wavefront $u(x)$. Thus, its direction is given by the normalized gradient vector:
 
 $$n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$$
 
@@ -41,7 +41,7 @@ Where:
 *   $v(x)$ is the advected field (the solution).
 
 #### In human terms
-$\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{init}$ at the boundary of the known values in $u_{init}$, the values will simply be pulled with the flow.
+The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{init}$ at the boundary of the known values in $u_{init}$, the values will simply be pulled with the flow.
 
 ### Example use cases of advection:
 *   **Apodization:** Initialize $v$ with apodization weights near the source to drag those weights along the acoustic rays.
@@ -50,9 +50,9 @@ $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction
 
 ## MSFM (Multi-Stencil Fast Marching)
 
-Standard methods for solving the Eikonal equation only consider neighboring points in a stencil (the area around the current pixel) with a `+` shape. 
+Standard eikonal solvers only consider neighboring points in a stencil (area around the current pixel) with a `+` shape. 
 
-However, enabling MSFM will make Eiko also consider the diagonal neighbors, expanding the stencil into an `x` shape, taking the minimum of the two:
+Enabling MSFM will make Eiko also consider the diagonal neighbors, expanding the stencil to an `x` shape:
 
 ```text
  Default          MSFM
@@ -64,11 +64,11 @@ However, enabling MSFM will make Eiko also consider the diagonal neighbors, expa
 
 The result is that enabling MSFM allows a wavefront to travel diagonally instead of having to zig-zag, producing a less overestimated, more accurate $u$.
 
----
 
 ## Gating
 
-When gating is enabled, the wave is forced to always travel forward in the first data dimension (axially). The result is a "shadowed" region behind any object that blocks the wavefront, instead of the wavefront bending around the object. It is implemented by limiting the stencil:
+When gating is enabled, the wave is forced to always travel forward in the first data dimension (axially).
+The result is a "shadowed" region behind any object that blocks the wavefront, instead of the wavefront bending around the object. It is implemented by limiting the stencil:
 
 ```text
  Default          Gated        Gated MSFM
@@ -78,9 +78,9 @@ When gating is enabled, the wave is forced to always travel forward in the first
     %               %            % % %
 ```
 
-Setting `gating = true` makes the code faster due to the smaller stencil. It may also be necessary in some imaging setups. For example, if a wave is blocked, one might expect a "shadow" behind the obscuring object in an acoustic setup, since most of the energy won't make it around a bend (even though some energy will theoretically bend around the object via Huygens' principle in a wavelength-dependent diffraction process).
+Setting `gating = true` makes the code faster due to the smaller stencil. It may also be necessary in some imaging setups. For example, if a wave is blocked, one might expect a "shadow" behind the obscuring object in an acoustic setup, since most of the energy won't make it around a bend (even though some energy theoretically bends around the object via Huygens' principle in a wavelength-dependent diffraction process).
 
-Gating can usually be enabled in pulse-echo setups without issues, but **be careful** as gating is only implemented along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions are usually flipped compared to MATLAB (which uses column-major aka Fortran order), meaning the last axis is the first dimension.
+Gating can usually be enabled in pulse-echo setups without issues, but **be careful** as gating is only implemented along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions are usually flipped compared to MATLAB (which uses column-major aka Fortran order), meaning the last axis is the leading dimension.
 
 ## Gradients with respect to the loss $L$
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
@@ -99,7 +99,7 @@ Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pas
 ### Gradient w.r.t. initial conditions ($u_{init}$)
 This is solved using the "adjoint" equation, which is a transport equation that takes an adjoint variable lambda ($\lambda$), and lets it flow backwards along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backwards along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). 
 
-Mathematically, the equation is:
+Mathematically, the equation for this backward pass is:
 
 $$-\nabla \cdot (\lambda(x) * n(x)) = g(x) \quad \text{for } x \in \Omega$$
 $$\lambda(x) = 0 \quad \text{for } x \in \Gamma_{out} \text{ (outflow boundaries)}$$
@@ -112,7 +112,7 @@ Where:
 *   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (this is distinct from $\Gamma$, which are the original source points).
 
 #### In human terms
-Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation runs this in reverse.
+Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation runs this process in reverse.
 
 The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backwards up the streams ($n(x)$) the way they came. 
  
