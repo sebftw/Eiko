@@ -1,9 +1,9 @@
 ![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?style=flat-square&logo=python&color=blue)
-[![PyPI version](https://img.shields.io/pypi/v/eiko?style=flat-square&logo=pypi&color=blue)](https://pypi.org/project/eiko/)
-[![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases)
-![GitHub License](https://img.shields.io/github/license/sebftw/Eiko?style=flat-square&color=green)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko)
+[![PyPI version](https://img.shields.io/pypi/v/eiko)](https://pypi.org/project/eiko/)
+![GitHub License](https://img.shields.io/github/license/sebftw/Eiko)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
+<!-- [![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases) -->
 
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
