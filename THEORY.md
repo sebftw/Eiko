@@ -113,9 +113,9 @@ Where:
 #### In human terms
 Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
-The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ($n(x)$) the way they came. 
+The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $n(x)$ ), the way they came. 
  
-The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values when the streams return to the original spring ($\Gamma$) become the gradient w.r.t. the initial conditions ($u_{init}$).
+The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{init}$).
 
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication.
