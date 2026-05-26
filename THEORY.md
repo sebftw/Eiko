@@ -96,9 +96,9 @@ Where:
 Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
 
 ### Gradient w.r.t. initial conditions ($u_{init}$)
-This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backward along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). Interestingly, this process is linear, unlike the forward pass. 
+This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is conceptually similar to advection, but reversed - it collects $\lambda$ values and pulls them upstream toward the sources, accumulating gradients and residuals along the way, rather than spreading initial values across a field. Interestingly, while the forward Eikonal equation is non-linear, this backward adjoint process is entirely linear.
 
-Mathematically, the equation for this backward pass is:
+Mathematically, the continuous equation for this backward pass is:
 
 $$-\nabla \cdot (\lambda(x) n(x)) = g(x) \quad \text{for } x \in \Omega$$
 $$\lambda(x) = 0 \quad \text{for } x \in \Gamma_{out} \text{ (outflow boundaries)}$$
@@ -107,25 +107,28 @@ Where:
 *   $\lambda(x)$ is the adjoint state variable (the backward-flowing sensitivity).
 *   $n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$ is the exact same ray direction computed in the forward pass.
 *   $\nabla \cdot$ is the divergence operator.
-*   $g(x) = \frac{dL}{du}$ is the gradient of the loss with respect to the arrival times.
-*   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (this is distinct from $\Gamma$, which are the original source points).
+*   $g = \frac{dL}{du}$ is the gradient of the loss with respect to the local arrival times (the injected residual).
+*   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (distinct from $\Gamma$, which were the original source points).
 
 #### In human terms
 Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
-The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $n(x)$ ), the way they came. 
+The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $n(x)$ ), exactly the way they came. 
  
 The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{init}$).
 
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication.
 
-Mathematically, the gradient is extracted via the optimality condition:
+Mathematically, because discrete Eikonal solvers typically use the squared formulation of the equation ($\|\nabla u\|^2 = f^2$), the gradient is extracted via the optimality condition:
 
-$$\frac{dL}{df} = (\Delta x)^2 * \lambda(x) * f(x)$$
+$$\frac{dL}{df} = \Delta V * \lambda(x) * f(x)$$
+
+**Where**:
+* $\Delta V$ is the pixel area, so $\Delta V=(\Delta x)^2$ in 2D and $\Delta V=(\Delta x)^3$ in 3D.
 
 #### In human terms
-If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times. We scale it by $(\Delta x)^2$ to correctly account for the physical size of the grid cells during the discrete integration.
+If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta V$ to correctly account for the physical size of the grid cells during the discrete integration.
 
 ## References
 *   [1] "Improved Fast Iterative Algorithm for Eikonal Equation for GPU Computing" by Yuhao Huang (2021), [arXiv:2106.15869](https://arxiv.org/abs/2106.15869).
