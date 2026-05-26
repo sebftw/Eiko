@@ -85,7 +85,7 @@ Gating can usually be enabled in pulse-echo setups without issues, but **be care
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
 
 ### Gradient w.r.t. step size ($\Delta x$)
-By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{du}{d\Delta x} = \frac{u}{\Delta x}$, and using the chain rule we get:
+By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{du}{d\Delta x} = \frac{u}{\Delta x}$, and using the chain rule, we get:
 
 $$\frac{dL}{d\Delta x} = \sum \frac{du}{d\Delta x} = \frac{1}{\Delta x} \sum \frac{dL}{du} * u$$
 
@@ -96,11 +96,11 @@ Where:
 Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
 
 ### Gradient w.r.t. initial conditions ($u_{init}$)
-This is solved using the "adjoint" equation, a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backward along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). 
+This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is similar to the advection of $v$, but going backward along the flow (it will collect $\lambda$ values and pull them toward the sources, while accumulating gradients/residuals along the way, instead of spreading initial values out over a field as we do when computing $v$). Interestingly, this process is linear, unlike the forward pass. 
 
 Mathematically, the equation for this backward pass is:
 
-$$-\nabla \cdot (\lambda(x) * n(x)) = g(x) \quad \text{for } x \in \Omega$$
+$$-\nabla \cdot (\lambda(x) n(x)) = g(x) \quad \text{for } x \in \Omega$$
 $$\lambda(x) = 0 \quad \text{for } x \in \Gamma_{out} \text{ (outflow boundaries)}$$
 
 Where:
