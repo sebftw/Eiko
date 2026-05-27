@@ -49,7 +49,11 @@ jobs:
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          CIBW_MANYLINUX_X86_64_IMAGE: "nvidia/cuda:12.1.1-devel-rockylinux8"
+          CIBW_MANYLINUX_X86_64_IMAGE: "manylinux2014"
+          # Install only the compiler and runtime to save space/time
+          CIBW_BEFORE_ALL: >
+            yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo &&
+            yum install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1
           CIBW_BEFORE_BUILD: >
             export CUDA_HOME=/usr/local/cuda &&
             export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
@@ -93,6 +97,7 @@ jobs:
   # Build MATLAB Toolbox on Linux (Generates .mexa64)
   build-matlab-linux:
     runs-on: ubuntu-22.04
+    # Use a container to target Ubuntu 20.04 (which will work for later versions due to forward compatability, since we statically compile to glibc).
     container: 
       image: nvidia/cuda:12.1.1-devel-ubuntu20.04
     steps:
@@ -102,6 +107,7 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
+          # Release should be R2020b or above.
           release: 'R2021b'
           products: 'Parallel_Computing_Toolbox'
       - name: Build MATLAB Toolbox
