@@ -1,6 +1,6 @@
 function build_release()
     % Get the directory where this script resides
-    scriptDir = fileparts(mfilename('fullpath'));
+    scriptDir = pwd; % fileparts(mfilename('fullpath'));
     
     % Use that directory to find Eiko.prj
     prjFile = fullfile(scriptDir, 'Eiko.prj');
