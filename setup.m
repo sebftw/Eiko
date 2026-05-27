@@ -145,7 +145,7 @@ function setup2(build_type)
     end
     
     % Host compiler flags strictly enforced on the `mex` linkage phase.
-    host_cflags   = 'CFLAGS=$CFLAGS -std=c++17';
+    host_cflags   = 'CFLAGS=$CFLAGS';
     host_cxxflags = 'CXXFLAGS=$CXXFLAGS -std=c++17';
 
     % Fallback configurations for the mexcuda pipeline.
