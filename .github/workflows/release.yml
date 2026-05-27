@@ -18,7 +18,9 @@ jobs:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
-          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin" CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"'
+          CIBW_ENVIRONMENT: >
+            PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"
+            CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
