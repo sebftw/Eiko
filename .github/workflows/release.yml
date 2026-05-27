@@ -19,7 +19,7 @@ jobs:
 
       # 1. Install CUDA Toolkit (NVCC wrapper)
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2
+        uses: Jimver/cuda-toolkit@v0
         with:
           cuda: '12.2.0'
 
