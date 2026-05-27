@@ -1,69 +1,124 @@
-name: Build and Release
+name: Package Eiko Multi-Language Release
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
-  build-mltbx:
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11'] 
     steps:
       - uses: actions/checkout@v4
-      - name: Install CUDA
+
+      - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
+        with:
+          cuda: '12.1.1'
+          method: 'network'
+
+      - name: Set up MATLAB
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/setup-matlab@v2
+
       - name: Build MATLAB Toolbox
+        if: matrix.python-version == '3.11'
         uses: matlab-actions/run-command@v2
         with:
           command: build_release()
-      - name: Upload MLTBX
-        uses: actions/upload-artifact@v4
-        with:
-          name: mltbx-${{ matrix.os }}
-          path: releases/*.mltbx
 
-  build-wheels:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-latest]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install CUDA
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
-      
-      - name: Build Wheels
+      - name: Build Python Wheels (AOT)
         uses: pypa/cibuildwheel@v2.16
         env:
-          # Install dependencies and trigger both JIT imports to build binaries
-          CIBW_BEFORE_BUILD: |
-            pip install torch>=2.0.0 "jax[cuda12]" pybind11
-            python -c "import eiko.eiko_torch; import eiko.eiko_jax"
-          # Ensure we build for your supported Python versions
+          CIBW_BEFORE_BUILD: "pip install torch>=2.0.0 jax[cuda12] pybind11 && python -c 'import eiko.eiko_torch; import eiko.eiko_jax'"
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          # Ensure CUDA is accessible to the build process
-          CIBW_ENVIRONMENT: 'PATH=$PATH:/usr/local/cuda/bin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64'
-      
-      - name: Upload Wheels
+          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"'
+
+      - name: Upload Raw Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}
-          path: wheelhouse/*.whl
+          name: raw-assets-windows-py${{ matrix.python-version }}
+          path: |
+            releases/*.mltbx
+            wheelhouse/*.whl
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    container: 
+      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11'] 
+    steps:
+      - name: Install Container Prerequisites
+        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip python3-pip
+
+      - uses: actions/checkout@v4
+
+      - name: Set up MATLAB
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Build MATLAB Toolbox
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/run-command@v2
+        with:
+          command: build_release()
+
+      - name: Build Python Wheels (AOT)
+        uses: pypa/cibuildwheel@v2.16
+        env:
+          CIBW_BEFORE_BUILD: "pip install torch>=2.0.0 jax[cuda12] pybind11 && python -c 'import eiko.eiko_torch; import eiko.eiko_jax'"
+          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
+          CIBW_ENVIRONMENT: 'PATH=$PATH:/usr/local/cuda/bin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64'
+
+      - name: Upload Raw Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-assets-linux-py${{ matrix.python-version }}
+          path: |
+            releases/*.mltbx
+            wheelhouse/*.whl
 
   merge-and-release:
-    needs: [build-mltbx, build-wheels]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
-      - name: Download All
+      - uses: actions/checkout@v4
+
+      - name: Download All Raw Artifacts
         uses: actions/download-artifact@v4
-        with: {path: raw-downloads}
-      
-      - name: Release
+        with:
+          path: raw-downloads
+
+      - name: Merge and Repackage Cross-Platform MATLAB Toolbox
+        run: |
+          mkdir -p unified-toolbox/extracted_win unified-toolbox/extracted_lin unified-toolbox/merged/+eiko_lib
+          
+          WIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "windows" | head -n 1)
+          unzip -q "$WIN_MLTBX" -d unified-toolbox/extracted_win
+          
+          LIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "linux" | head -n 1)
+          unzip -q "$LIN_MLTBX" -d unified-toolbox/extracted_lin
+          
+          cp -r unified-toolbox/extracted_win/* unified-toolbox/merged/
+          cp unified-toolbox/extracted_lin/fs/matlab/eiko/+eiko_lib/*.mexa64 unified-toolbox/merged/fs/matlab/eiko/+eiko_lib/ 2>/dev/null || true
+          
+          mkdir -p final-release
+          cd unified-toolbox/merged && zip -q -r ../../final-release/Eiko-Universal.mltbx * && cd ../..
+          
+          find raw-downloads -name "*.whl" -exec cp {} final-release/ \;
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: raw-downloads/**/*
+          files: final-release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
