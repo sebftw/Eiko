@@ -52,7 +52,7 @@ jobs:
           # Install CUDA inside the isolated container
           CIBW_BEFORE_ALL: >
             yum install -y https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo &&
-            yum install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1
+            yum install -y cuda-toolkit-12-1
           CIBW_BEFORE_BUILD: >
             export CUDA_HOME=/usr/local/cuda &&
             export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
