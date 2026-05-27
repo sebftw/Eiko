@@ -18,7 +18,7 @@ jobs:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
-          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"'
+          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin" CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"'
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
@@ -33,7 +33,7 @@ jobs:
         env:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
-          CIBW_ENVIRONMENT: 'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64'
+          CIBW_ENVIRONMENT: 'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64 CUDA_HOME=/usr/local/cuda'
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-linux
@@ -50,9 +50,12 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-        release: 'R2021b'
+          release: 'R2021b'
       - name: Build MATLAB Toolbox and MEX
         uses: matlab-actions/run-command@v2
+        env:
+        # Match the path to the version installed by Jimver/cuda-toolkit
+        CUDA_HOME: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1'
         with:
           # Assumes build_release() calls 'mex' which utilizes the system's VS compiler
           command: addpath(genpath(pwd)); build_release(); 
@@ -73,9 +76,11 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-        release: 'R2021b'
+          release: 'R2021b'
       - name: Build MATLAB Toolbox
         uses: matlab-actions/run-command@v2
+        env:
+        CUDA_HOME: '/usr/local/cuda'
         with:
           command: addpath(genpath(pwd)); build_release();
       - uses: actions/upload-artifact@v4
