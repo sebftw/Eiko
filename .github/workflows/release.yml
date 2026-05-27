@@ -19,9 +19,9 @@ jobs:
 
       # 1. Install CUDA Toolkit (NVCC wrapper)
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: '12.2.0'
+          cuda: '13.2.0'
 
       # 2. MATLAB Phase (Gated to only run once per OS to save time)
       - name: Set up MATLAB
