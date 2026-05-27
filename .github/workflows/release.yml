@@ -80,7 +80,7 @@ jobs:
           path: releases/*.mltbx
 
   merge-and-release:
-    needs: [build-wheels-windows, build-wheels-linux, build-matlab]
+    needs: [build-wheels-windows, build-wheels-linux, build-matlab-linux, build-matlab-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
