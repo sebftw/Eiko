@@ -57,7 +57,7 @@ You can verify that the driver was installed by runnning `nvidia-smi`.
 
 
 Then, navigate to [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads) to download CUDA.
-Run `uname -mr` and `cat /etc/os-release` to find out which version you should download. Select `deb (network)`, and follow the provided instructions.
+Run `uname -mr && cat /etc/os-release` to find out which version you should download. Select `deb (network)`, and follow the provided instructions.
 
 To verify that CUDA was installed, run `nvcc --version`.
 
