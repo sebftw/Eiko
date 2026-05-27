@@ -1,0 +1,92 @@
+name: Package Eiko Multi-Language Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Automatically runs when you push a version tag like v0.8.0
+  workflow_dispatch: # Adds the manual "Run workflow" button in the Actions UI
+
+jobs:
+  build-artifacts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11'] 
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Install CUDA Toolkit (NVCC wrapper)
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2
+        with:
+          cuda: '12.2.0'
+
+      # 2. MATLAB Phase (Gated to only run once per OS to save time)
+      - name: Set up MATLAB
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Build MATLAB Toolbox
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/run-command@v2
+        with:
+          command: build_release()
+
+      # 3. Python Phase (Compiles dynamic wheel targets)
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build Python Wheels
+        run: |
+          python -m pip install --upgrade pip build wheel
+          python -m build --wheel
+
+      # 4. Upload Raw Cross-Platform Pieces
+      - name: Upload Raw Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-assets-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            releases/*.mltbx
+            dist/*.whl
+
+  merge-and-release:
+    needs: build-artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Download all matrix artifacts to pull down compiled wheels and both mltbx files
+      - name: Download All Raw Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: raw-downloads
+
+      - name: Merge and Repackage Cross-Platform MATLAB Toolbox
+        run: |
+          mkdir -p unified-toolbox/extracted_win unified-toolbox/extracted_lin unified-toolbox/merged/+eiko_lib
+          
+          # Find and extract the Windows-compiled .mltbx (unzip handles .mltbx natively)
+          WIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "windows-latest" | head -n 1)
+          unzip -q "$WIN_MLTBX" -d unified-toolbox/extracted_win
+          
+          # Find and extract the Linux-compiled .mltbx
+          LIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "ubuntu-latest" | head -n 1)
+          unzip -q "$LIN_MLTBX" -d unified-toolbox/extracted_lin
+          
+          # Move everything from the Windows blueprint to the merged directory base
+          cp -r unified-toolbox/extracted_win/* unified-toolbox/merged/
+          
+          # Copy the Linux .mexa64 file directly into the merged +eiko_lib folder alongside the .mexw64 file
+          cp unified-toolbox/extracted_lin/fs/matlab/eiko/+eiko_lib/*.mexa64 unified-toolbox/merged/fs/matlab/eiko/+eiko_lib/ 2>/NaN || true
+          
+          # Zip the folder back up to create a singular, cross-platform .mltbx file
+          mkdir -p final-release
+          cd unified-toolbox/merged && zip -q -r ../../final-release/Eiko-Universal.mltbx * && cd ../..
+          
+          # Collect all python wheels into the release staging area
+          find
