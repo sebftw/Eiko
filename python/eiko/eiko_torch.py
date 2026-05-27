@@ -1,8 +1,9 @@
 import os, sys
 import torch
 
-# Import centralized configuration from __init__.py
-from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+# Import centralized configuration
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+from eiko import SRC_DIR
 
 
 # ------------------------------------------------------------------------
