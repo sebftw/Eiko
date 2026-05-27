@@ -11,7 +11,17 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: Jimver/cuda-toolkit@v0.2.18
+      # Check for CUDA (it may already be installed in Windows).
+      - name: Check for existing CUDA
+        id: check-cuda
+        shell: powershell
+        run: |
+          if (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1") {
+            echo "exists=true" >> $env:GITHUB_OUTPUT
+          }
+      - name: Install CUDA Toolkit
+        if: steps.check-cuda.outputs.exists != 'true'
+        uses: Jimver/cuda-toolkit@v0.2.18
         with: {cuda: '12.1.1', method: 'network'}
       - uses: pypa/cibuildwheel@v2.16
         env:
@@ -19,6 +29,7 @@ jobs:
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: >
             set CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1 &&
+            set TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6;8.9;9.0 &&
             pip install -e ".[jax]" &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           CIBW_ENVIRONMENT: |
@@ -39,6 +50,7 @@ jobs:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           CIBW_BEFORE_BUILD: >
             export CUDA_HOME=/usr/local/cuda &&
+            export TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6;8.9;9.0 &&
             pip install -e ".[jax]" &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           CIBW_ENVIRONMENT: |
