@@ -57,7 +57,7 @@ jobs:
         uses: matlab-actions/run-command@v2
         env:
         # Match the path to the version installed by Jimver/cuda-toolkit
-        CUDA_HOME: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1'
+          CUDA_HOME: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1'
         with:
           # Assumes build_release() calls 'mex' which utilizes the system's VS compiler
           command: addpath(genpath(pwd)); build_release(); 
@@ -82,7 +82,7 @@ jobs:
       - name: Build MATLAB Toolbox
         uses: matlab-actions/run-command@v2
         env:
-        CUDA_HOME: '/usr/local/cuda'
+          CUDA_HOME: '/usr/local/cuda'
         with:
           command: addpath(genpath(pwd)); build_release();
       - uses: actions/upload-artifact@v4
