@@ -52,7 +52,7 @@ jobs:
           # Install only the compiler and runtime to save space/time
           CIBW_BEFORE_ALL: >
             yum-config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo &&
-            yum install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1
+            yum install -y --setopt=install_weak_deps=False --nogpgcheck cuda-nvcc-12-1 cuda-cudart-devel-12-1
           CIBW_BEFORE_BUILD: >
             export CUDA_HOME=/usr/local/cuda &&
             export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
