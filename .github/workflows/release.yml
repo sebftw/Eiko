@@ -30,7 +30,7 @@ jobs:
           CIBW_BEFORE_BUILD: >
             set CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1 &&
             set TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
-            pip install ".[jax]" &&
+            pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121 &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           CIBW_ENVIRONMENT: |
             PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"
@@ -42,20 +42,21 @@ jobs:
           path: ./wheelhouse/*.whl
 
   build-wheels-linux:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       # cibuildwheel handles the container isolation, so we don't need a wrapper container.
       - uses: pypa/cibuildwheel@v2.16
         env:
-          CIBW_MANYLINUX_X86_64_IMAGE: "nvidia/cuda:12.1.0-devel-ubuntu22.04"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014 # Or manylinux_2_28
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           # Install only the compiler and runtime to save space/time
-          CIBW_BEFORE_ALL: >
-            apt-get update && apt-get install -y cuda-toolkit-12-1
-          CIBW_BEFORE_BUILD: pip install ".[jax]"
-          CIBW_ENVIRONMENT: |
-            LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
+          CIBW_BEFORE_ALL: |
+            yum install -y https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-repo-rhel7-12.1.0-1.x86_64.rpm
+            yum install -y cuda-toolkit-12-1
+          CIBW_BEFORE_BUILD: pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
+          CIBW_ENVIRONMENT: >
+            LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             CUDA_HOME=/usr/local/cuda
             TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
       - uses: actions/upload-artifact@v4
