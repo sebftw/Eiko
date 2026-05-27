@@ -48,12 +48,12 @@ jobs:
       # cibuildwheel handles the container isolation, so we don't need a wrapper container.
       - uses: pypa/cibuildwheel@v2.16
         env:
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014 # Or manylinux_2_28
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           # Install only the compiler and runtime to save space/time
           CIBW_BEFORE_ALL: |
-            yum install -y https://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-repo-rhel7-12.1.0-1.x86_64.rpm
-            yum install -y cuda-toolkit-12-1
+            dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+            dnf install -y cuda-toolkit-12-1
           CIBW_BEFORE_BUILD: pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
           CIBW_ENVIRONMENT: >
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
