@@ -40,11 +40,10 @@ struct SolveOp {
                     bool broadcast_f, cudaStream_t stream) {
         
 		// Retrieve compile-time configuration for exact memory calculation.
-        constexpr auto Config = MakeDefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>();
-
-        size_t pitch_u   = width * sizeof(float) * Config.CHANNELS;
-        size_t pitch_f   = width * sizeof(float) * Config.CHANNELS_F;
-        size_t pitch_v   = HAS_V ? (width * sizeof(float) * Config.CHANNELS_V) : 0;
+        using Config = DefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>;
+        size_t pitch_u   = width * sizeof(float) * Config::CHANNELS;
+        size_t pitch_f   = width * sizeof(float) * Config::CHANNELS_F;
+        size_t pitch_v   = HAS_V ? (width * sizeof(float) * Config::CHANNELS_V) : 0;
         size_t pitch_tof = IS_BACKWARD ? pitch_u : 0;
 
         auto* solver = static_cast<StandardFIMSolver<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>*>(solver_ptr);

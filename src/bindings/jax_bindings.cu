@@ -36,7 +36,7 @@ struct FIMSolveOp {
     void operator()(cudaStream_t stream, void** buffers, const FIMOpaque& cfg) {
         
         // A. Retrieve the exact compile-time config for memory calculations
-        constexpr auto Config = MakeDefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>();
+        using Config = DefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>;
 
         // B. Map XLA Buffers. 
         // JAX places inputs first, followed by outputs.
@@ -49,7 +49,7 @@ struct FIMSolveOp {
         size_t pitch_v = 0;
         if constexpr (HAS_V) {
             d_v_in    = buffers[buf_idx++];
-            pitch_v   = cfg.width * sizeof(float) * Config.CHANNELS_V;
+            pitch_v   = cfg.width * sizeof(float) * Config::CHANNELS_V;
         }
 
         void* d_tof = nullptr;
@@ -57,10 +57,10 @@ struct FIMSolveOp {
         if constexpr (IS_BACKWARD) {
             if (cfg.has_tof) {
                 d_tof     = buffers[buf_idx++];
-                pitch_tof = cfg.width * sizeof(float) * Config.CHANNELS;
+                pitch_tof = cfg.width * sizeof(float) * Config::CHANNELS;
             } else {
                 d_tof     = d_u_in;
-                pitch_tof = cfg.width * sizeof(float) * Config.CHANNELS;
+                pitch_tof = cfg.width * sizeof(float) * Config::CHANNELS;
             }
         }
 
@@ -81,17 +81,17 @@ struct FIMSolveOp {
         // C. Handle JAX Immutability
         // We clone the inputs into the safe output buffers that the solver will mutate.
         size_t num_elements = static_cast<size_t>(cfg.batch_size) * cfg.depth * cfg.height * cfg.width;
-        size_t u_bytes = num_elements * sizeof(float) * Config.CHANNELS;
+        size_t u_bytes = num_elements * sizeof(float) * Config::CHANNELS;
         cudaMemcpyAsync(d_u_out, d_u_in, u_bytes, cudaMemcpyDeviceToDevice, stream);
         
         if constexpr (HAS_V) {
-            size_t v_bytes = num_elements * sizeof(float) * Config.CHANNELS_V;
+            size_t v_bytes = num_elements * sizeof(float) * Config::CHANNELS_V;
             cudaMemcpyAsync(d_v_out, d_v_in, v_bytes, cudaMemcpyDeviceToDevice, stream);
         }
 
         // D. Calculate Primary Pitches
-        size_t pitch_u = cfg.width * sizeof(float) * Config.CHANNELS;
-        size_t pitch_f = cfg.width * sizeof(float) * Config.CHANNELS_F;
+        size_t pitch_u = cfg.width * sizeof(float) * Config::CHANNELS;
+        size_t pitch_f = cfg.width * sizeof(float) * Config::CHANNELS_F;
         
         // E. Instantiate using the Standard Alias and Execute
         StandardFIMSolver<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X> solver;

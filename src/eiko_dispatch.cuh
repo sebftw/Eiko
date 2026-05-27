@@ -63,31 +63,32 @@ void dispatch_fim(bool is_3d, bool is_backward, bool msfm, bool has_v, bool is_g
 }
 
 // Default generator.
-template <bool IS_3D, bool IS_BACKWARD, bool MSFM, bool HAS_V, bool GATED_X>
-constexpr FIMConfig MakeDefaultConfig() {
-    FIMConfig cfg{};
-    cfg.THREE_DIMENSIONAL = IS_3D;
-    cfg.BACKWARD_PASS = IS_BACKWARD;
-    cfg.MSFM = MSFM;
-    cfg.CHANNELS = 1; cfg.CHANNELS_F = 1; cfg.DOUBLE_BUFFERED_SMEM = false;
-    cfg.CHANNELS_V = static_cast<int>(HAS_V);
-    cfg.GATED_X = GATED_X;
+template <bool IS_3D, bool IS_BACKWARD, bool MSFM_VAL, bool HAS_V, bool GATED_X_VAL>
+struct DefaultConfig {
+    // Base properties directly mapped
+    static constexpr bool THREE_DIMENSIONAL = IS_3D;
+    static constexpr bool BACKWARD_PASS = IS_BACKWARD;
+    static constexpr bool MSFM = MSFM_VAL;
+    static constexpr bool GATED_X = GATED_X_VAL;
+    static constexpr int CHANNELS = 1;
+    static constexpr int CHANNELS_F = 1;
+    static constexpr int CHANNELS_V = HAS_V ? 1 : 0;
+    static constexpr bool DOUBLE_BUFFERED_SMEM = false;
 
-    if (IS_3D) {
-        cfg.NX = 4; cfg.NY = 1; cfg.NZ = 1;
-        cfg.TILE_W = 16; cfg.TILE_H = 16; cfg.TILE_D = 1;
-    } else {
-        cfg.NX = IS_BACKWARD ? 3 : 2;
-        cfg.NY = 1; cfg.NZ = 1;
-        cfg.TILE_W = IS_BACKWARD ? 8 : 32;
-        cfg.TILE_H = 8; cfg.TILE_D = 1;
-    }
-    cfg.MAX_LOCAL_ITERS = IS_BACKWARD ? 100 : 25;
-    return cfg;
-}
+    // Derived properties using ternary operators for compile-time evaluation
+    static constexpr int NX = IS_3D ? 4 : (IS_BACKWARD ? 3 : 2);
+    static constexpr int NY = 1;
+    static constexpr int NZ = 1;
+    
+    static constexpr int TILE_W = IS_3D ? 16 : (IS_BACKWARD ? 8 : 32);
+    static constexpr int TILE_H = IS_3D ? 16 : 8;
+    static constexpr int TILE_D = 1;
+    
+    static constexpr int MAX_LOCAL_ITERS = IS_BACKWARD ? 100 : 25;
+};
 
-// Default dispatch.
+// Default dispatch simply passes the Type instead of a Function output
 template <bool IS_3D, bool IS_BACKWARD, bool MSFM, bool HAS_V, bool GATED_X>
-using StandardFIMSolver = BatchedFIMSolver<MakeDefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>()>;
+using StandardFIMSolver = BatchedFIMSolver<DefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>>;
 
 #endif // EIKO_DISPATCH_H

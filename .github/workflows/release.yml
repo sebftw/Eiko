@@ -1,0 +1,52 @@
+jobs:
+  build-artifacts:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # You can even matrix the Python versions here
+        python-version: ['3.8', '3.11'] 
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Shared Base: Install NVCC
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2
+        with:
+          cuda: '12.2.0'
+
+      # ---------------------------------------------------
+      # 2. MATLAB Path (Only runs once per OS, ignoring Python matrix)
+      # ---------------------------------------------------
+      - name: Set up MATLAB
+        if: matrix.python-version == '3.11' # Arbitrary gate to prevent duplicate mltbx builds
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Build MATLAB Toolbox
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/run-command@v2
+        with:
+          command: build_release()
+
+      # ---------------------------------------------------
+      # 3. Python Path
+      # ---------------------------------------------------
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build Python Wheels
+        run: |
+          python -m pip install --upgrade pip build wheel
+          python -m build --wheel
+
+      # 4. Upload Everything
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-assets-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            releases/*.mltbx
+            dist/*.whl
