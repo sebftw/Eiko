@@ -1,6 +1,5 @@
 import os, sys
 import torch
-from torch.utils.cpp_extension import load, _get_build_directory
 
 # Import centralized configuration from __init__.py
 from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
@@ -9,32 +8,37 @@ from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 # ------------------------------------------------------------------------
 # JIT Compilation & Loading
 # ------------------------------------------------------------------------
+try:
+    # 1. Attempt to import the pre-compiled binary 
+    from eiko import eiko_torch_impl as _fim_cuda_impl
+    
+except ImportError:
+    # 2. Fallback to JIT compilation if the pre-compiled binary is missing
+    from torch.utils.cpp_extension import load, _get_build_directory
+    
+    # Get the native PyTorch build directory for this specific extension name.
+    build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
 
-# Check if the extension has already been compiled in a previous session.
+    # Check if the extension has already been compiled in a previous session.
+    is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
 
-# Get the native PyTorch build directory for this specific extension name.
-build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
+    if not is_cached:
+        print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+        sys.stdout.flush()
 
-# If the directory doesn't exist or is empty, this is a first-time compile.
-is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
+    # JIT compilation.
+    torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
+    _fim_cuda_impl = load(
+        name="eiko_torch_impl",
+        sources=[torch_source],
+        extra_cflags=CXX_ARGS,
+        extra_cuda_cflags=NVCC_ARGS,
+        extra_include_paths=EXTRA_INCLUDE_PATHS,
+        verbose=False
+    )
 
-if not is_cached:
-    print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
-    sys.stdout.flush()
-
-# JIT compilation.
-torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
-_fim_cuda_impl = load(
-    name="eiko_torch_impl",
-    sources=[torch_source],
-    extra_cflags=CXX_ARGS,
-    extra_cuda_cflags=NVCC_ARGS,
-    extra_include_paths=EXTRA_INCLUDE_PATHS,
-    verbose=False
-)
-
-if not is_cached:
-    print("Congratulations, you are now ready to use Eiko! :)")
+    if not is_cached:
+        print("Congratulations, you are now ready to use Eiko! :)")
 
 #------------------------------------------------------------------------
 # Global Solver Cache
