@@ -6,87 +6,54 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows:
+  # Build wheels independently (cibuildwheel handles the matrix of python versions internally)
+  build-wheels-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pypa/cibuildwheel@v2.16
+        env:
+          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
+          # Use single quotes for the main string to safely include double quotes for the install command
+          CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
+          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows
+          path: ./wheelhouse/*.whl
+
+  build-wheels-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      # cibuildwheel handles the container isolation; you don't need a wrapper container.
+      - uses: pypa/cibuildwheel@v2.16
+        env:
+          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
+          CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
+          CIBW_ENVIRONMENT: 'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-linux
+          path: ./wheelhouse/*.whl
+
+  # Keep matrix for MATLAB as it is a specific toolchain setup
+  build-matlab:
     runs-on: windows-latest
     strategy:
-      fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11'] 
+        # MATLAB only needs to be built once (or per target version, adjust as needed)
+        python-version: ['3.11'] 
     steps:
       - uses: actions/checkout@v4
-      - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
-      - name: Set up MATLAB
-        if: matrix.python-version == '3.11'
-        uses: matlab-actions/setup-matlab@v2
-      - name: Build MATLAB Toolbox
-        if: matrix.python-version == '3.11'
-        uses: matlab-actions/run-command@v2
+      - uses: matlab-actions/setup-matlab@v2
+      - uses: matlab-actions/run-command@v2
         with:
           command: addpath(pwd); build_release();
-      - name: Build Python Wheels (AOT)
-        uses: pypa/cibuildwheel@v2.16
-        env:
-          CIBW_BEFORE_BUILD: "pip install -e ".[jax]" && python -c 'import eiko.eiko_torch; import eiko.eiko_jax'"
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          CIBW_ENVIRONMENT: 'PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"'
-
-      - name: Upload Raw Artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: raw-assets-windows-py${{ matrix.python-version }}
-          path: |
-            releases/*.mltbx
-            wheelhouse/*.whl
-
-  build-linux:
-    runs-on: ubuntu-22.04 # Host runner
-    container: 
-      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11'] 
-    steps:
-      - name: Install Container Prerequisites
-        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
-
-      - uses: actions/checkout@v4
-
-      # Native Python installation to match container glibc
-      - name: Install Python ${{ matrix.python-version }}
-        run: |
-          add-apt-repository ppa:deadsnakes/ppa -y
-          apt-get update
-          apt-get install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-dev python3-pip
-          python${{ matrix.python-version }} -m pip install --upgrade pip
-
-      - name: Set up MATLAB
-        if: matrix.python-version == '3.11'
-        uses: matlab-actions/setup-matlab@v2
-      - name: Build MATLAB Toolbox
-        if: matrix.python-version == '3.11'
-        uses: matlab-actions/run-command@v2
-        with:
-          command: addpath(pwd); build_release();
-
-      - name: Build Python Wheels (AOT)
-        uses: pypa/cibuildwheel@v2.16
-        env:
-          CIBW_BEFORE_BUILD: "pip install -e ".[jax]" && python -c 'import eiko.eiko_torch; import eiko.eiko_jax'"
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          # Explicitly set the python executable for cibuildwheel to the one we installed
-          CIBW_BEFORE_BUILD_LINUX: "pip install -e ".[jax]" && python -c 'import eiko.eiko_torch; import eiko.eiko_jax'"
-          CIBW_ENVIRONMENT: 'PATH=$PATH:/usr/local/cuda/bin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64'
-
-      - name: Upload Raw Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-assets-linux-py${{ matrix.python-version }}
-          path: |
-            releases/*.mltbx
-            wheelhouse/*.whl
+          name: matlab-toolbox
+          path: releases/*.mltbx
 
   merge-and-release:
     needs: [build-windows, build-linux]
