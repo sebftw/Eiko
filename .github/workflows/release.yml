@@ -11,6 +11,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Jimver/cuda-toolkit@v0.2.18
+        with: {cuda: '12.1.1', method: 'network'}
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
@@ -26,7 +28,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      # cibuildwheel handles the container isolation; you don't need a wrapper container.
+      # cibuildwheel handles the container isolation, so we don't need a wrapper container.
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
@@ -37,22 +39,44 @@ jobs:
           name: wheels-linux
           path: ./wheelhouse/*.whl
 
-  # Keep matrix for MATLAB as it is a specific toolchain setup
-  build-matlab:
+# Build MATLAB Toolbox on Windows (Generates .mexw64)
+  build-matlab-windows:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        # MATLAB only needs to be built once (or per target version, adjust as needed)
-        python-version: ['3.11'] 
     steps:
       - uses: actions/checkout@v4
-      - uses: matlab-actions/setup-matlab@v2
-      - uses: matlab-actions/run-command@v2
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.18
+        with: {cuda: '12.1.1', method: 'network'}
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2
+      - name: Build MATLAB Toolbox and MEX
+        uses: matlab-actions/run-command@v2
+        with:
+          # Assumes build_release() calls 'mex' which utilizes the system's VS compiler
+          command: addpath(pwd); build_release(); 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matlab-toolbox-windows
+          path: releases/*.mltbx
+
+  # Build MATLAB Toolbox on Linux (Generates .mexa64)
+  build-matlab-linux:
+    runs-on: ubuntu-22.04
+    container: 
+      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
+    steps:
+      - name: Install Prerequisites
+        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
+      - uses: actions/checkout@v4
+      - name: Setup MATLAB
+        uses: matlab-actions/setup-matlab@v2
+      - name: Build MATLAB Toolbox
+        uses: matlab-actions/run-command@v2
         with:
           command: addpath(pwd); build_release();
       - uses: actions/upload-artifact@v4
         with:
-          name: matlab-toolbox
+          name: matlab-toolbox-linux
           path: releases/*.mltbx
 
   merge-and-release:
