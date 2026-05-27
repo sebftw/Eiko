@@ -3,27 +3,25 @@ name: Package Eiko Multi-Language Release
 on:
   push:
     tags:
-      - 'v*' # Automatically runs when you push a version tag like v0.8.0
-  workflow_dispatch: # Adds the manual "Run workflow" button in the Actions UI
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
-  build-artifacts:
+  build-windows:
+    runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
         python-version: ['3.8', '3.9', '3.10', '3.11'] 
-    runs-on: ${{ matrix.os }}
-
     steps:
       - uses: actions/checkout@v4
 
-      # 1. Install CUDA Toolkit (NVCC wrapper)
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.35
+        uses: Jimver/cuda-toolkit@v0
         with:
-          cuda: '13.2.0'
+          cuda: '12.1.1'
+          method: 'network'
 
-      # 2. MATLAB Phase (Gated to only run once per OS to save time)
       - name: Set up MATLAB
         if: matrix.python-version == '3.11'
         uses: matlab-actions/setup-matlab@v2
@@ -34,7 +32,6 @@ jobs:
         with:
           command: build_release()
 
-      # 3. Python Phase (Compiles dynamic wheel targets)
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -45,22 +42,66 @@ jobs:
           python -m pip install --upgrade pip build wheel
           python -m build --wheel
 
-      # 4. Upload Raw Cross-Platform Pieces
       - name: Upload Raw Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: raw-assets-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: raw-assets-windows-py${{ matrix.python-version }}
+          path: |
+            releases/*.mltbx
+            dist/*.whl
+
+  build-linux:
+    runs-on: ubuntu-latest
+    # This mounts an Ubuntu 20.04 environment with CUDA 12.1 built-in
+    container: 
+      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11'] 
+    steps:
+      # Bare containers lack basic tools; install them so the GitHub setup actions work
+      - name: Install Container Prerequisites
+        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip
+
+      - uses: actions/checkout@v4
+
+      # Note: No Jimver/cuda-toolkit action needed here! NVCC is natively available.
+
+      - name: Set up MATLAB
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Build MATLAB Toolbox
+        if: matrix.python-version == '3.11'
+        uses: matlab-actions/run-command@v2
+        with:
+          command: build_release()
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Build Python Wheels
+        run: |
+          python -m pip install --upgrade pip build wheel
+          python -m build --wheel
+
+      - name: Upload Raw Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-assets-linux-py${{ matrix.python-version }}
           path: |
             releases/*.mltbx
             dist/*.whl
 
   merge-and-release:
-    needs: build-artifacts
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Download all matrix artifacts to pull down compiled wheels and both mltbx files
       - name: Download All Raw Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -70,23 +111,25 @@ jobs:
         run: |
           mkdir -p unified-toolbox/extracted_win unified-toolbox/extracted_lin unified-toolbox/merged/+eiko_lib
           
-          # Find and extract the Windows-compiled .mltbx (unzip handles .mltbx natively)
-          WIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "windows-latest" | head -n 1)
+          # Isolate toolboxes by OS source
+          WIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "windows" | head -n 1)
           unzip -q "$WIN_MLTBX" -d unified-toolbox/extracted_win
           
-          # Find and extract the Linux-compiled .mltbx
-          LIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "ubuntu-latest" | head -n 1)
+          LIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "linux" | head -n 1)
           unzip -q "$LIN_MLTBX" -d unified-toolbox/extracted_lin
           
-          # Move everything from the Windows blueprint to the merged directory base
           cp -r unified-toolbox/extracted_win/* unified-toolbox/merged/
+          cp unified-toolbox/extracted_lin/fs/matlab/eiko/+eiko_lib/*.mexa64 unified-toolbox/merged/fs/matlab/eiko/+eiko_lib/ 2>/dev/null || true
           
-          # Copy the Linux .mexa64 file directly into the merged +eiko_lib folder alongside the .mexw64 file
-          cp unified-toolbox/extracted_lin/fs/matlab/eiko/+eiko_lib/*.mexa64 unified-toolbox/merged/fs/matlab/eiko/+eiko_lib/ 2>/NaN || true
-          
-          # Zip the folder back up to create a singular, cross-platform .mltbx file
           mkdir -p final-release
           cd unified-toolbox/merged && zip -q -r ../../final-release/Eiko-Universal.mltbx * && cd ../..
           
-          # Collect all python wheels into the release staging area
-          find
+          find raw-downloads -name "*.whl" -exec cp {} final-release/ \;
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: final-release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
