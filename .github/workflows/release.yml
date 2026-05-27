@@ -12,6 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup MSVC Compiler Environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       # Replaced manual check with the action. 
       # Method 'network' with sub-packages downloads very quickly.
       - name: Install CUDA Toolkit (NVCC only)
@@ -25,7 +28,7 @@ jobs:
 
       - uses: pypa/cibuildwheel@v2.16
         env:
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
+          CIBW_BUILD: "cp39-* cp310-* cp311-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: >
             pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121 &&
@@ -87,6 +90,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Setup MSVC Compiler Environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.18
         with: {cuda: '12.1.1', method: 'network'}
