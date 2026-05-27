@@ -42,27 +42,45 @@ jobs:
           path: ./wheelhouse/*.whl
 
   build-wheels-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # cibuildwheel handles the container isolation, so we don't need a wrapper container.
-      - uses: pypa/cibuildwheel@v2.16
-        env:
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          # Install only the compiler and runtime to save space/time
-          CIBW_BEFORE_ALL: |
-            dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-            dnf install -y cuda-toolkit-12-1
-          CIBW_BEFORE_BUILD: pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
-          CIBW_ENVIRONMENT: >
-            LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-            CUDA_HOME=/usr/local/cuda
-            TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux
-          path: ./wheelhouse/*.whl
+      runs-on: ubuntu-latest
+      steps:
+        # OPTIONAL BUT RECOMMENDED: Free up disk space. 
+        # CUDA Toolkit + PyTorch + 4 Python versions = very high risk of running out of disk space on standard GitHub runners.
+        - name: Free Disk Space (Ubuntu)
+          uses: jlumbroso/free-disk-space@main
+          with:
+            tool-cache: false
+            android: true
+            dotnet: true
+            haskell: true
+            large-packages: false
+            docker-images: true
+            swap-storage: false
+  
+        - uses: actions/checkout@v4
+        
+        - uses: pypa/cibuildwheel@v2.16
+          env:
+            CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+            CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"  # "cp38-* cp39-* cp310-* cp311-*"
+            
+            # Install CUDA Toolkit into the manylinux container
+            CIBW_BEFORE_ALL: |
+              dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+              dnf install -y cuda-toolkit-12-1
+            
+            # We pass PIP_EXTRA_INDEX_URL to the environment so the isolated 
+            # build-system can find PyTorch when reading pyproject.toml
+            CIBW_ENVIRONMENT: >
+              LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+              CUDA_HOME=/usr/local/cuda
+              TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
+              PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121"
+  
+        - uses: actions/upload-artifact@v4
+          with:
+            name: wheels-linux
+            path: ./wheelhouse/*.whl
 
 # Build MATLAB Toolbox on Windows (Generates .mexw64)
   build-matlab-windows:
@@ -93,7 +111,7 @@ jobs:
   # Build MATLAB Toolbox on Linux (Generates .mexa64)
   build-matlab-linux:
     runs-on: ubuntu-22.04
-    # Use a container to target Ubuntu 20.04 (which will work for later versions due to forward compatability, since we statically compile to glibc).
+    # Use a container to target Ubuntu 20.04 (which will work for later versions due to forward compatibility, since we statically compile to glibc).
     container: 
       image: nvidia/cuda:12.1.1-devel-ubuntu20.04
     steps:
