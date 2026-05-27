@@ -27,26 +27,6 @@ else:
         f"2. {SRC_DIR_DEV}"
     )
 
-# ---------------------------------------------------------
-# COMPILER FLAGS
-# ---------------------------------------------------------
-if sys.platform == "win32":
-    CXX_ARGS = ['/std:c++20', '/Zc:preprocessor', '/DNOMINMAX']
-    NVCC_ARGS = [
-        '-std=c++20', 
-        '-allow-unsupported-compiler', 
-        '-Xcompiler', '/Zc:preprocessor', 
-        '-Xcompiler', '/std:c++20', 
-        '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
-        '-DNOMINMAX', 
-        '--use_fast_math', 
-        '-arch=native'
-    ]
-else:
-    CXX_ARGS = ['-std=c++20', '-O3']
-    NVCC_ARGS = ['-std=c++20', '--use_fast_math', '-arch=native']
-
-
 EXTRA_INCLUDE_PATHS = [SRC_DIR]
 
 try:
