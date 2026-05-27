@@ -28,7 +28,7 @@ sudo ubuntu-drivers install
 Then, you must reboot your system (`sudo reboot`). You can verify that the driver was installed by runnning `nvidia-smi`.
 
 
-Then, navigate to [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads) to download CUDA. Run `uname -mr` and `cat /etc/os-release` to find out which version you should download, select `deb (network)`, and follow the instructions.
+Then, navigate to [https://developer.nvidia.com/cuda-downloads](https://developer.nvidia.com/cuda-downloads) to download CUDA. Run `uname -m && cat /etc/os-release` to find out which version you should download, select `deb (network)`, and follow the instructions.
 To verify that CUDA was installed, run `nvcc --version`.
 
 #### Compiler
