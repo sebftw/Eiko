@@ -56,7 +56,7 @@ jobs:
           path: releases/*.mltbx
 
   merge-and-release:
-    needs: [build-windows, build-linux]
+    needs: [build-wheels-windows, build-wheels-linux, build-matlab]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
