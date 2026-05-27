@@ -6,36 +6,36 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Build wheels independently (cibuildwheel handles the matrix of python versions internally)
+  # Build wheels independently (cibuildwheel handles the matrix of Python versions internally)
   build-wheels-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      # Check for CUDA (it may already be installed in Windows).
-      - name: Check for existing CUDA
-        id: check-cuda
-        shell: powershell
-        run: |
-          if (Test-Path "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1") {
-            echo "exists=true" >> $env:GITHUB_OUTPUT
-          }
-      - name: Install CUDA Toolkit
-        if: steps.check-cuda.outputs.exists != 'true'
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
+
+      # Replaced manual check with the action. 
+      # Method 'network' with sub-packages downloads very quickly.
+      - name: Install CUDA Toolkit (NVCC only)
+        uses: Jimver/cuda-toolkit@master
+        id: cuda-toolkit
+        with: 
+          cuda: '12.1.1'
+          method: 'network'
+          # Windows requires exact versioned component names. VS integration is mandatory for C++ on Windows.
+          sub-packages: '["nvcc_12.1", "visual_studio_integration_12.1"]'
+
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: >
-            set CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1 &&
-            set TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
             pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121 &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
+          # Dynamically inject the CUDA path from the toolkit action
           CIBW_ENVIRONMENT: |
-            PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"
-            CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"
+            PATH=$PATH:"${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin"
+            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
+
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
@@ -62,12 +62,12 @@ jobs:
         - uses: pypa/cibuildwheel@v2.16
           env:
             CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-            CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"  # "cp38-* cp39-* cp310-* cp311-*"
+            CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
             
-            # Install CUDA Toolkit into the manylinux container
+            # Install ONLY the compiler and headers into the manylinux container instead of the whole toolkit
             CIBW_BEFORE_ALL: |
               dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-              dnf install -y cuda-toolkit-12-1
+              dnf install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1
             
             # We pass PIP_EXTRA_INDEX_URL to the environment so the isolated 
             # build-system can find PyTorch when reading pyproject.toml
