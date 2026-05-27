@@ -29,12 +29,13 @@ jobs:
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: >
             set CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1 &&
-            set TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6;8.9;9.0 &&
+            set TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
             pip install -e ".[jax]" &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           CIBW_ENVIRONMENT: |
             PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"
             CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"
+            TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-windows
@@ -50,13 +51,13 @@ jobs:
           CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
           CIBW_BEFORE_BUILD: >
             export CUDA_HOME=/usr/local/cuda &&
-            export TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6;8.9;9.0 &&
+            export TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0" &&
             pip install -e ".[jax]" &&
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           CIBW_ENVIRONMENT: |
             LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
             CUDA_HOME=/usr/local/cuda
-            TORCH_CUDA_ARCH_LIST=7.5;8.0;8.6;8.9;9.0
+            TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0"
       - uses: actions/upload-artifact@v4
         with:
           name: wheels-linux
