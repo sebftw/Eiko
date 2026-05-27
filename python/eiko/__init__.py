@@ -154,6 +154,11 @@ from .animate_eikonal import animate_eikonal
 __all__ = ['eiko', 'eiko3d', 'animate_eikonal']
 
 # Define the version number, so it is easily accessible.
-from importlib.metadata import version
-__version__ = version("eiko")
+try:
+    from importlib.metadata import version, PackageNotFoundError
+    __version__ = version("eiko")
+except PackageNotFoundError:
+    # This acts as a fallback when the package is being built
+    # or imported from source without being installed first.
+    __version__ = "unknown"
 
