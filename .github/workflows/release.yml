@@ -33,13 +33,13 @@ jobs:
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"  # ONLY 64-bit wheels.
-          CIBW_BUILD: "cp39-*" # cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: |
             pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           # Dynamically inject the CUDA path from the toolkit action
-          CIBW_ENVIRONMENT: |
+          CIBW_ENVIRONMENT: >
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
           
