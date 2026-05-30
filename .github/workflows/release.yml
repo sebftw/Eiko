@@ -8,7 +8,7 @@ on:
 jobs:
   # Build wheels independently (cibuildwheel handles the matrix of Python versions internally)
   build-wheels-windows:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
       - uses: actions/checkout@v4
 
@@ -40,11 +40,11 @@ jobs:
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           # Dynamically inject the CUDA path from the toolkit action
           CIBW_ENVIRONMENT: |
-            PATH=$PATH:"${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin"
-            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
           
+          # Define paths natively in the step environment.
+          # cibuildwheel will inherit these on Windows.
           CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
           CUDA_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
 
@@ -73,8 +73,9 @@ jobs:
         
         - uses: pypa/cibuildwheel@v2.16
           env:
+            CIBW_ARCHS_LINUX: x86_64  # 64 bit only
             CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-            CIBW_BUILD: "cp39-*" #cp310-* cp311-* cp312-* cp313-* cp314-*"
+            CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
             
             # Install ONLY the compiler and headers into the manylinux container instead of the whole toolkit
             CIBW_BEFORE_ALL: |
@@ -112,10 +113,8 @@ jobs:
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Setup MSVC Compiler Environment (VS 2019 for MATLAB R2021b Compatibility)
+      - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: '14.29' # Force-activates MSVC v142 (VS 2019)
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
@@ -127,7 +126,7 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: 'R2021b' # Keeps the binary backward compatible down to R2021b
+          release: 'R2022b' # Keeps the binary backward compatible down to R2022b
           products: 'Parallel_Computing_Toolbox'
       - name: Build MATLAB Toolbox and MEX
         uses: matlab-actions/run-command@v2
