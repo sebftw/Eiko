@@ -25,11 +25,15 @@ jobs:
           method: 'network'
           # Windows requires exact versioned component names. VS integration is mandatory for C++ on Windows.
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
-
+          
+      # Natively append to the runner's PATH so cibuildwheel and PyTorch inherit it safely
+      - name: Add CUDA to PATH
+        run: echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
+        
       - uses: pypa/cibuildwheel@v2.16
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"  # ONLY 64-bit wheels.
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_BUILD: "cp39-*" # cp310-* cp311-* cp312-* cp313-* cp314-*"
           # Use single quotes for the main string to safely include double quotes for the install command
           CIBW_BEFORE_BUILD: |
             pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
@@ -40,6 +44,9 @@ jobs:
             CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
+          
+          CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
+          CUDA_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -67,23 +74,30 @@ jobs:
         - uses: pypa/cibuildwheel@v2.16
           env:
             CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-            CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+            CIBW_BUILD: "cp39-*" #cp310-* cp311-* cp312-* cp313-* cp314-*"
             
             # Install ONLY the compiler and headers into the manylinux container instead of the whole toolkit
             CIBW_BEFORE_ALL: |
               dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
               dnf install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1 cuda-libraries-devel-12-1
             
-            # Dynamically locate libtorch.so using python inside the repair step
-            CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
-              export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
-              export LD_LIBRARY_PATH=$TORCH_LIB:$LD_LIBRARY_PATH
-              auditwheel repair -w {dest_dir} {wheel}
+            # Exclude PyTorch and CUDA libraries so they aren't bundled into the wheel.
+            # They will be resolved at runtime via the user's PyTorch installation.
+            CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+              auditwheel repair
+              --exclude libtorch.so
+              --exclude libtorch_python.so
+              --exclude libtorch_cpu.so
+              --exclude libtorch_cuda.so
+              --exclude libc10.so
+              --exclude libc10_cuda.so
+              -w {dest_dir} {wheel}
             # We pass PIP_EXTRA_INDEX_URL to the environment so the isolated 
             # build-system can find PyTorch when reading pyproject.toml
             CIBW_ENVIRONMENT: >
+              PATH=/usr/local/cuda-12.1/bin:$PATH
               LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-              CUDA_HOME=/usr/local/cuda
+              CUDA_HOME=/usr/local/cuda-12.1
               TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
               PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121"
               IS_RELEASE_BUILD=1
