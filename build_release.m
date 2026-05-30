@@ -1,6 +1,4 @@
 function build_release()
-    setup('release');
-    return;
     % Get the directory where this script resides
     scriptDir = fileparts(mfilename('fullpath'));
     

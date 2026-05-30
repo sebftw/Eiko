@@ -18,6 +18,7 @@
 # Packaged app and toolbox files
 *.mlappinstall
 *.mltbx
+resources/
 
 # Deployable archives
 *.ctf

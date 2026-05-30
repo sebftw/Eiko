@@ -28,10 +28,11 @@ jobs:
 
       - uses: pypa/cibuildwheel@v2.16
         env:
-          CIBW_BUILD: "cp39-* cp310-* cp311-*"
+          CIBW_ARCHS_WINDOWS: "AMD64"  # ONLY 64-bit wheels.
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
           # Use single quotes for the main string to safely include double quotes for the install command
-          CIBW_BEFORE_BUILD: >
-            pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121 &&
+          CIBW_BEFORE_BUILD: |
+            pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
             python -c "import eiko.eiko_torch; import eiko.eiko_jax"
           # Dynamically inject the CUDA path from the toolkit action
           CIBW_ENVIRONMENT: |
@@ -66,13 +67,18 @@ jobs:
         - uses: pypa/cibuildwheel@v2.16
           env:
             CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-            CIBW_BUILD: "cp39-* cp310-* cp311-*"
+            CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
             
             # Install ONLY the compiler and headers into the manylinux container instead of the whole toolkit
             CIBW_BEFORE_ALL: |
               dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
               dnf install -y cuda-nvcc-12-1 cuda-cudart-devel-12-1 cuda-libraries-devel-12-1
             
+            # Dynamically locate libtorch.so using python inside the repair step
+            CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
+              export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
+              export LD_LIBRARY_PATH=$TORCH_LIB:$LD_LIBRARY_PATH
+              auditwheel repair -w {dest_dir} {wheel}
             # We pass PIP_EXTRA_INDEX_URL to the environment so the isolated 
             # build-system can find PyTorch when reading pyproject.toml
             CIBW_ENVIRONMENT: >
@@ -89,11 +95,13 @@ jobs:
 
 # Build MATLAB Toolbox on Windows (Generates .mexw64)
   build-matlab-windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
-      - name: Setup MSVC Compiler Environment
+      - name: Setup MSVC Compiler Environment (VS 2019 for MATLAB R2021b Compatibility)
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: '14.29' # Force-activates MSVC v142 (VS 2019)
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
@@ -111,11 +119,11 @@ jobs:
         uses: matlab-actions/run-command@v2
         env:
         # Match the path to the version installed by Jimver/cuda-toolkit
-          CUDA_HOME: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1'
+          CUDA_HOME: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}'
           IS_RELEASE_BUILD: '1'
         with:
           # Assumes build_release() calls 'mex' which utilizes the system's VS compiler
-          command: mex -setup C++; addpath(genpath('${{ github.workspace }}')); build_release();
+          command: mex -setup C++; addpath(genpath(pwd)); build_release();
       - uses: actions/upload-artifact@v4
         with:
           name: matlab-toolbox-windows
