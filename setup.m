@@ -41,14 +41,14 @@ function setup2(build_type)
     builtin_ver = 0;  % MATLAB's internal CUDA toolkit version.
     
     % Query MATLAB for its built-in CUDA version.
-    tf = parallel.gpu.enableCUDAForwardCompatibility(true);  
-    try
+	try
+		tf = parallel.gpu.enableCUDAForwardCompatibility(true); 
         gpu = gpuDevice();
         builtin_ver = gpu.ToolkitVersion;
-    catch
+		parallel.gpu.enableCUDAForwardCompatibility(tf);
+	catch
         % Fails safely if no GPU is present on the system.
     end
-    parallel.gpu.enableCUDAForwardCompatibility(tf);
 
     % Hunt for a user-installed CUDA toolkit.
     user_nvcc = '';  
