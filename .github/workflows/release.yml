@@ -8,7 +8,7 @@ on:
 jobs:
   # Build wheels independently (cibuildwheel handles the matrix of Python versions internally)
   build-wheels-windows:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
