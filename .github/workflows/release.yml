@@ -31,7 +31,7 @@ jobs:
           CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
           
           CIBW_ARCHS_WINDOWS: "AMD64"
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
           # 2. ADD 'ninja' TO YOUR BUILD DEPENDENCIES
@@ -71,7 +71,7 @@ jobs:
         env:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           
           # 1. Disable build isolation so setup.py can see the environment
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
@@ -79,7 +79,7 @@ jobs:
           # 2. Pre-install all build requirements before wheel creation
           CIBW_BEFORE_BUILD: >
             pip install setuptools>=61.0.0 wheel &&
-            pip install torch>=2.0.0 --index-url https://download.pytorch.org/whl/cu130 &&
+            pip install torch>=2.0.0 --extra-index-url https://download.pytorch.org/whl/cu130 &&
             pip install jax pybind11
             
           CIBW_BEFORE_ALL: |

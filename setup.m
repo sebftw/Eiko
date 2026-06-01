@@ -256,7 +256,7 @@ function setup(build_type)
 			else
 				ccbin_flag = '';
 			end
-		en
+		end
         
         % Step 3: Define output objects and Position Independent Code (PIC) flags.
         if ispc
@@ -273,18 +273,31 @@ function setup(build_type)
             user_nvcc, ccbin_flag, sourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag);
         
         try
-            % Execute device compilation (NVCC -> .o/.obj)
-            [st, cmdout] = system(nvcc_cmd);
-            if st == 0
-                % Execute host linkage (MEX -> .mexw64/.mexa64)
-                mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', outDir, '-lut', link_flags{:});
-                success = true;
-            else
-                fprintf('NVCC device compilation failed:\n%s\n', cmdout);
-            end
-        catch ME
-            fprintf('Linkage failed due to: %s\n', ME.message);
-        end
+			% Execute device compilation (NVCC -> .o/.obj)
+			[st, cmdout] = system(nvcc_cmd);
+			if st == 0
+				fprintf('NVCC compilation succeeded. Starting MEX linkage...\n');
+				
+				% 1. Added '-v' for verbose compiler output
+				mex('-v', '-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', outDir, '-lut', link_flags{:});
+				
+				% 2. Programmatically verify file generation
+				expected_mex = fullfile(outDir, ['mex_bindings.', mexext]);
+				if exist(expected_mex, 'file')
+					success = true;
+					fprintf('MEX compilation completely successful: %s\n', expected_mex);
+				else
+					error('MEX run finished but output file "%s" is missing.', expected_mex);
+				end
+			else
+				% Force a hard crash if NVCC fails so CI runners drop a red flag
+				error('NVCC device compilation failed! Command output was:\n%s', cmdout);
+			end
+		catch ME
+			% Use generic rethrow or severe warning to ensure it doesn't pass silently
+			warning('Compilation attempt %d aborted due to error.', attempt);
+			rethrow(ME); 
+		end
         
         % Clean up intermediate object file.
         if exist(obj_file, 'file')
