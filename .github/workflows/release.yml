@@ -47,6 +47,9 @@ jobs:
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
+            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+            PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin;$PATH"
+            DISTUTILS_USE_SDK=1
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
             MAX_JOBS=4
@@ -90,16 +93,18 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BUILD: "cp310-*"
           
-          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
+          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation --no-cache-dir"
           
           CIBW_BEFORE_BUILD: >
             pip install setuptools>=61.0.0 wheel &&
-            pip install torch>=2.0.0 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }} &&
+            pip install --no-cache-dir torch>=2.0.0 --index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }} &&
             pip install jax pybind11
             
           CIBW_BEFORE_ALL: |
-            dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-            dnf install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
+            PKG_MGR=$(command -v dnf || command -v yum)
+            if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
+            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+            $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
@@ -112,10 +117,11 @@ jobs:
             -w {dest_dir} {wheel}
             
           CIBW_ENVIRONMENT: >
+            CUDA_HOME=/usr/local/cuda
             PATH=/usr/local/cuda/bin:$PATH
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-            CUDA_HOME=/usr/local/cuda
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+            FORCE_CUDA=1
             PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/${{ matrix.torch_tag }}"
             IS_RELEASE_BUILD=1
   
@@ -141,7 +147,7 @@ jobs:
           sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
        
       - name: Clone NVIDIA CCCL (Thrust/CUB)
-        run: git clone https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
+        run: git clone --recursive https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
         
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
