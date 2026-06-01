@@ -55,7 +55,7 @@ jobs:
           CIBW_BEFORE_BUILD: >
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
-          CIBW_ENVIRONMENT: |
+          CIBW_ENVIRONMENT: >
             CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
             CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
             PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}\bin;$PATH
@@ -191,13 +191,11 @@ jobs:
   build-matlab-linux:
     runs-on: ubuntu-22.04
     container: 
-      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
+      image: nvidia/cuda:12.9.2-devel-ubuntu20.04
     steps:
       - name: Install Prerequisites
         run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
       - uses: actions/checkout@v4
-      - name: Clone NVIDIA CCCL (Thrust/CUB)
-        run: git clone https://github.com/NVIDIA/cccl.git ${{ github.workspace }}/cccl
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:

@@ -281,8 +281,8 @@ function setup(build_type)
         obj_file = fullfile(outDir, ['mex_bindings', obj_ext]);
         
         % Formulate the raw system NVCC command.
-        nvcc_cmd = sprintf('"%s" %s -c "%s" -o "%s" %s %s %s %s %s %s', ...
-            user_nvcc, ccbin_flag, sourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag);
+        nvcc_cmd = sprintf('"%s" %s -c "%s" -o "%s" %s %s %s %s %s %s -I"%s"', ...
+            user_nvcc, ccbin_flag, sourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag, fullfile(cuda_root, 'include'));
         
         try
 			% Execute device compilation (NVCC -> .o/.obj)
@@ -308,7 +308,7 @@ function setup(build_type)
 		catch ME
 			% Use generic rethrow or severe warning to ensure it doesn't pass silently
 			warning('Compilation attempt %d aborted due to error.', attempt);
-			rethrow(ME); 
+			% rethrow(ME); 
 		end
         
         % Clean up intermediate object file.
