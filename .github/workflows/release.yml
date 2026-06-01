@@ -53,7 +53,7 @@ jobs:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           # CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
-          CIBW_BEFORE_BUILD: >
+          CIBW_BEFORE_BUILD: |
             echo "DEBUG: CUDA_HOME is %CUDA_HOME%"
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
@@ -122,8 +122,8 @@ jobs:
             # ln -sf /usr/bin/python3 /usr/local/bin/python
             
             # Install CUDA
-            # $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
-            # $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
+            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
+            $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
             export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
