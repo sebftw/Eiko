@@ -227,7 +227,7 @@ function setup(build_type)
 		% Allow CI to provide the exact path to a cloned CCCL repo via environment variable.
         % This is critical if using a lightweight pip/conda NVCC package.
         cccl_include = getenv('CCCL_ROOT');
-        if isempty(cccl_include)
+        if isempty(cccl_include) || not(exist(cccl_include, 'dir'))
             % Fallback to looking inside the CUDA root
             cccl_include = fullfile(cuda_root, 'include', 'cccl');
         end

@@ -37,7 +37,7 @@ jobs:
           echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
           echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
        
-      - uses: pypa/cibuildwheel@v2.16
+      - uses: pypa/cibuildwheel@v2.22
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp310-*"
@@ -46,7 +46,7 @@ jobs:
           CIBW_BEFORE_BUILD: >
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
-          CIBW_ENVIRONMENT: >
+          CIBW_ENVIRONMENT: |
             CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin;$PATH"
             DISTUTILS_USE_SDK=1
@@ -67,9 +67,13 @@ jobs:
         include:
           - cuda: '12.8.0'
             torch_tag: 'cu128'
+            dnf_repo: 'rhel8'          # CUDA 12 supports RHEL 8
+            manylinux_img: 'manylinux_2_28'
             dnf_tag: '12-8'
           - cuda: '13.0.0'
             torch_tag: 'cu130'
+            dnf_repo: 'rhel9'          # CUDA 13 requires RHEL 9 / glibc 2.34+
+            manylinux_img: 'manylinux_2_34'
             dnf_tag: '13-0'
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -87,10 +91,11 @@ jobs:
         with:
           fetch-depth: 0
         
-      - uses: pypa/cibuildwheel@v2.16
+      # Updated to a modern cibuildwheel version
+      - uses: pypa/cibuildwheel@v2.22
         env:
           CIBW_ARCHS_LINUX: x86_64
-          CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_img }}
           CIBW_BUILD: "cp310-*"
           
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation --no-cache-dir"
@@ -103,7 +108,8 @@ jobs:
           CIBW_BEFORE_ALL: |
             PKG_MGR=$(command -v dnf || command -v yum)
             if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
-            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
+            # Dynamically pull rhel8 or rhel9 repo depending on the matrix row
+            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
             $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
@@ -115,6 +121,9 @@ jobs:
             --exclude libc10.so
             --exclude libc10_cuda.so
             -w {dest_dir} {wheel}
+            
+          # CRITICAL: Ensures the isolated compilation container inherits these paths
+          CIBW_ENVIRONMENT_PASS_LINUX: CUDA_HOME PATH LD_LIBRARY_PATH TORCH_CUDA_ARCH_LIST FORCE_CUDA PIP_EXTRA_INDEX_URL IS_RELEASE_BUILD
             
           CIBW_ENVIRONMENT: >
             CUDA_HOME=/usr/local/cuda
@@ -147,7 +156,7 @@ jobs:
           sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
        
       - name: Clone NVIDIA CCCL (Thrust/CUB)
-        run: git clone --recursive https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
+        run: git clone --branch v2.x --recursive https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
         
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
