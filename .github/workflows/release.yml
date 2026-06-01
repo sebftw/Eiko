@@ -16,7 +16,7 @@ jobs:
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install CUDA Toolkit (NVCC only)
+      - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with: 
@@ -24,42 +24,25 @@ jobs:
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
       
-      - name: Normalize CUDA Path
-        id: normalize-path
-        run: |
-          $CudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-          
-          # 1. Fetch the 8.3 short path to eliminate spaces (e.g., C:\PROGRA~1\...)
-          $fso = New-Object -ComObject Scripting.FileSystemObject
-          $ShortPath = $fso.GetFolder($CudaPath).ShortPath
-          
-          # 2. Convert backslashes to forward slashes to prevent escape char issues
-          $NormalizedPath = $ShortPath -replace '\\', '/'
-          
-          # 3. Write to GITHUB_OUTPUT enforcing UTF-8 encoding
-          "CUDA_PATH_N=$NormalizedPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
-      
-      - name: Add CUDA to PATH
-        run: |
-          "${{ steps.normalize-path.outputs.CUDA_PATH_N }}/bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-        
       - uses: pypa/cibuildwheel@v2.16
         env:
+          # 1. Inject CUDA_HOME via the native Action 'env' block.
+          # cibuildwheel on Windows runs on the host, so it natively inherits this!
+          CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
+          
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
-          
-          # 1. Disable build isolation so setup.py checks the local env
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
-          # 2. Pre-populate the build environment with PyTorch, JAX, and pybind11
+          # 2. ADD 'ninja' TO YOUR BUILD DEPENDENCIES
           CIBW_BEFORE_BUILD: >
-            pip install setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/cu130
+            pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/cu130
             
+          # 3. Keep CIBW_ENVIRONMENT strictly for simple string/flag variables
           CIBW_ENVIRONMENT: >
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
-            CUDA_HOME="${{ steps.normalize-path.outputs.CUDA_PATH_N }}"
-            CUDA_PATH="${{ steps.normalize-path.outputs.CUDA_PATH_N }}"
+            MAX_JOBS=4
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,7 +79,7 @@ jobs:
           # 2. Pre-install all build requirements before wheel creation
           CIBW_BEFORE_BUILD: >
             pip install setuptools>=61.0.0 wheel &&
-            "torch>=2.0.0" --index-url https://download.pytorch.org/whl/cu130 &&
+            pip install torch>=2.0.0 --index-url https://download.pytorch.org/whl/cu130 &&
             pip install jax pybind11
             
           CIBW_BEFORE_ALL: |

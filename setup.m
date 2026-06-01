@@ -233,7 +233,7 @@ function setup(build_type)
         
         % Step 2: Force NVCC to use MATLAB's specifically configured host compiler.
         % This is vital on Windows so NVCC can locate cl.exe without Developer Prompt environment vars.
-        if ~isempty(getenv('IS_RELEASE_BUILD'))
+        if ispc && ~isempty(getenv('IS_RELEASE_BUILD'))
 			% We are on the GitHub Runner. Dynamically find the co-installed VS2019 (v142) compiler.
 			msvc_base = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC';
 			
