@@ -75,12 +75,12 @@ jobs:
           - cuda: '12.6.0'
             torch_tag: 'cu126'
             dnf_repo: 'rhel8'          # CUDA 12 supports RHEL 8
-            manylinux_img: 'manylinux_2_28'
+            manylinux_img: 'quay.io/pypa/manylinux_2_28_x86_64:latest'
             dnf_tag: '12-6'
           - cuda: '13.0.0'
             torch_tag: 'cu130'
             dnf_repo: 'rhel9'          # CUDA 13 requires RHEL 9 / glibc 2.34+
-            manylinux_img: 'quay.io/pypa/manylinux_2_34_x86_64'
+            manylinux_img: 'quay.io/pypa/manylinux_2_34_x86_64:latest'
             dnf_tag: '13-0'
     steps:
       - name: Free Disk Space (Ubuntu)
