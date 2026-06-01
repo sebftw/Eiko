@@ -234,9 +234,19 @@ function setup(build_type)
         % Step 2: Force NVCC to use MATLAB's specifically configured host compiler.
         % This is vital on Windows so NVCC can locate cl.exe without Developer Prompt environment vars.
         if ~isempty(getenv('IS_RELEASE_BUILD'))
-			% We are on the GitHub Runner. Force nvcc to use the co-installed VS2019 (v142) compiler.
-			cc_bin_dir = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64';
-			ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+			% We are on the GitHub Runner. Dynamically find the co-installed VS2019 (v142) compiler.
+			msvc_base = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC';
+			
+			% Search for the 14.29.x toolchain directory
+			v142_dirs = dir(fullfile(msvc_base, '14.29.*'));
+			if ~isempty(v142_dirs)
+				% Grab the first match (usually only one exists)
+				v142_version = v142_dirs(1).name;
+				cc_bin_dir = fullfile(msvc_base, v142_version, 'bin', 'Hostx64', 'x64');
+				ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+			else
+				error('Could not locate the v142 (VS2019) build tools on the GitHub runner.');
+			end
 		else
 			% We are on a local machine. Trust MATLAB's selected C++ compiler.
 			cc_info = mex.getCompilerConfigurations('C++', 'Selected');
