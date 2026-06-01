@@ -9,20 +9,46 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 
-sources = ["src/bindings/torch_bindings.cu"]
+# 1. Define the base PyTorch Extension
+ext_modules = [
+    CUDAExtension(
+        name="eiko.eiko_torch_impl",
+        sources=["src/bindings/torch_bindings.cu"],
+        extra_compile_args={
+            "cxx": CXX_ARGS,
+            "nvcc": NVCC_ARGS,
+        },
+        include_dirs=EXTRA_INCLUDE_PATHS,
+    )
+]
 
-setup(
-    ext_modules=[
+# 2. Conditionally attempt to add the JAX Extension
+try:
+    import jax
+    import pybind11
+    
+    # Append pybind11 headers to the include paths for JAX
+    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+    
+    ext_modules.append(
         CUDAExtension(
-            name="eiko.eiko_torch_impl",
-            sources=sources,
+            name="eiko.eiko_jax_impl",
+            sources=["src/bindings/jax_bindings.cu"],
             extra_compile_args={
                 "cxx": CXX_ARGS,
                 "nvcc": NVCC_ARGS,
             },
-            include_dirs=EXTRA_INCLUDE_PATHS,
+            include_dirs=jax_includes,
         )
-    ],
+    )
+    print("\n[Eiko setup.py] JAX environment detected. Queuing JAX extension for build.\n")
+    
+except ImportError:
+    print("\n[Eiko setup.py] JAX or pybind11 not found. Skipping JAX extension build.\n")
+
+# 3. Execute setup
+setup(
+    ext_modules=ext_modules,
     cmdclass={
         "build_ext": BuildExtension
     }

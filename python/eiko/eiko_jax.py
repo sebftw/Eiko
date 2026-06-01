@@ -42,24 +42,33 @@ from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 # ---------------------------------------------------------
 # JIT COMPILATION & LOADING
 # ---------------------------------------------------------
-build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
-is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
+try:
+    # 1. Attempt to import the pre-compiled binary 
+    from eiko import eiko_jax_impl as _fim_jax_impl
+    
+except ImportError:
+    # 2. Fallback to JIT compilation if the pre-compiled binary is missing
+    build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
+    is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
 
-if not is_cached:
-    print("[Eiko] First-time JAX initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
-    sys.stdout.flush()
+    if not is_cached:
+        print("[Eiko] First-time JAX initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+        sys.stdout.flush()
 
-jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
-jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+    jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
+    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
 
-_fim_jax_impl = load(
-    name="eiko_jax_impl",
-    sources=[jax_source],
-    extra_cflags=CXX_ARGS,
-    extra_cuda_cflags=NVCC_ARGS,
-    extra_include_paths=jax_includes,
-    verbose=False
-)
+    _fim_jax_impl = load(
+        name="eiko_jax_impl",
+        sources=[jax_source],
+        extra_cflags=CXX_ARGS,
+        extra_cuda_cflags=NVCC_ARGS,
+        extra_include_paths=jax_includes,
+        verbose=False
+    )
+    
+    if not is_cached:
+        print("Congratulations, you are now ready to use Eiko with JAX! :)")
 
 for name, target in _fim_jax_impl.registrations().items():
     xla_client.register_custom_call_target(name, target, platform="gpu")
