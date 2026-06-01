@@ -122,8 +122,8 @@ jobs:
             # ln -sf /usr/bin/python3 /usr/local/bin/python
             
             # Install CUDA
-            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
-            $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
+            # $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
+            # $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
             export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
@@ -138,11 +138,10 @@ jobs:
             -w {dest_dir} {wheel}
             
           # CRITICAL: Ensures the isolated compilation container inherits these paths
-          CIBW_ENVIRONMENT_PASS_LINUX: CUDA_HOME PATH LD_LIBRARY_PATH TORCH_CUDA_ARCH_LIST FORCE_CUDA PIP_EXTRA_INDEX_URL IS_RELEASE_BUILD
+          CIBW_ENVIRONMENT_PASS_LINUX: CUDA_HOME LD_LIBRARY_PATH TORCH_CUDA_ARCH_LIST FORCE_CUDA PIP_EXTRA_INDEX_URL IS_RELEASE_BUILD
             
           CIBW_ENVIRONMENT: >
             CUDA_HOME=/usr/local/cuda
-            PATH=$PATH:/usr/local/cuda/bin
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             FORCE_CUDA=1
