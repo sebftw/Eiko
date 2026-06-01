@@ -54,8 +54,7 @@ jobs:
           # CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
           CIBW_BEFORE_BUILD: >
-            Write-Host "Printing specific CUDA_HOME:"
-            Write-Host $env:CUDA_HOME
+            echo "DEBUG: CUDA_HOME is %CUDA_HOME%"
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
@@ -119,8 +118,8 @@ jobs:
             if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
             
             # Install python3 if not already present
-            $PKG_MGR install -y python3 python3-pip python3-devel
-            ln -sf /usr/bin/python3 /usr/local/bin/python
+            # $PKG_MGR install -y python3 python3-pip python3-devel
+            # ln -sf /usr/bin/python3 /usr/local/bin/python
             
             # Install CUDA
             $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
@@ -143,7 +142,7 @@ jobs:
             
           CIBW_ENVIRONMENT: >
             CUDA_HOME=/usr/local/cuda
-            PATH=/usr/local/cuda/bin:$PATH
+            PATH=$PATH:/usr/local/cuda/bin
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             FORCE_CUDA=1
