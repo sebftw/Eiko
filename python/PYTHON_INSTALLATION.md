@@ -72,7 +72,7 @@ You can verify that the compiler is installed sucessfully by running `gcc --vers
 #### Python
 Finally, you need to install Python with Eiko.
 ```
-sudo apt install python3-full python3-pip python3-dev -y
+sudo apt install python3 python3-venv python3-pip python3-distutils python3-dev -y
 ```
 This installs Python along with `venv` (virtual environment) and more, which is highly recommended to avoid clashing package installations.
 
