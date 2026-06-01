@@ -51,9 +51,11 @@ jobs:
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
+          # CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
           CIBW_BEFORE_BUILD: >
+            Write-Host "Printing specific CUDA_HOME:"
+            Write-Host $env:CUDA_HOME
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
@@ -106,22 +108,27 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_img }}
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           
-          CIBW_BEFORE_BUILD: >
-            pip install .[jax]
+          CIBW_BEFORE_BUILD: |
+            pip install setuptools>=61.0.0 wheel
+            pip install --no-cache-dir torch>=2.0.0 --index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
+            pip install jax pybind11
             
           CIBW_BEFORE_ALL: |
+            echo "Current PATH: $PATH"
             PKG_MGR=$(command -v dnf || command -v yum)
             if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
-            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
             
             # Install python3 if not already present
-            # $PKG_MGR install -y python3 python3-pip python3-devel
+            $PKG_MGR install -y python3 python3-pip python3-devel
+            ln -sf /usr/bin/python3 /usr/local/bin/python
             
             # Install CUDA
             $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
             $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
-          CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
+          CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
+            export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
+            export LD_LIBRARY_PATH=$TORCH_LIB:$LD_LIBRARY_PATH
             auditwheel repair
             --exclude libtorch.so
             --exclude libtorch_python.so
