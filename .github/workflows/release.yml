@@ -35,21 +35,21 @@ jobs:
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
        
       - name: Set Global CUDA Environment Variables
-        run: |
-          $cudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-          echo "CUDA_HOME=$cudaPath" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
-          echo "$($cudaPath)\bin" >> $env:GITHUB_PATH
-       
-      - name: Set Global CUDA Environment Variables
         shell: powershell
         run: |
-          # Convert backslashes to forward slashes to prevent escape char issues
-          $cudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}".Replace('\', '/')
+          # Get the raw path from the toolkit step
+          $rawPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
           
-          echo "CUDA_HOME=$cudaPath" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
-          echo "$cudaPath/bin" >> $env:GITHUB_PATH
+          # Convert backslashes to forward slashes for cross-platform tool compatibility
+          $safePath = $rawPath.Replace('\', '/')
+          
+          # Set the standard variables
+          echo "CUDA_HOME=$safePath" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=$safePath" >> $env:GITHUB_ENV
+          echo "$safePath/bin" >> $env:GITHUB_PATH
+          
+          # Explicitly pass this sanitized string into the environment runner
+          echo "CUDA_PATH_FOR_CIBW=$safePath" >> $env:GITHUB_ENV
       
       - uses: pypa/cibuildwheel@v2.22
         env:
@@ -62,8 +62,8 @@ jobs:
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
-            CUDA_HOME="${{ replace(steps.cuda-toolkit.outputs.CUDA_PATH, '\', '/') }}"
-            CUDA_PATH="${{ replace(steps.cuda-toolkit.outputs.CUDA_PATH, '\', '/') }}"
+            CUDA_HOME=%CUDA_PATH_FOR_CIBW%
+            CUDA_PATH=%CUDA_PATH_FOR_CIBW%
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
 
