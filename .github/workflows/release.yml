@@ -41,25 +41,29 @@ jobs:
           echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
           echo "$($cudaPath)\bin" >> $env:GITHUB_PATH
        
-      - name: Debug Environment
+      - name: Set Global CUDA Environment Variables
         shell: powershell
         run: |
-          Get-ChildItem Env: | Where-Object {$_.Name -like "*CUDA*"}
-          Write-Host "CUDA_HOME is: $env:CUDA_HOME"
+          # Convert backslashes to forward slashes to prevent escape char issues
+          $cudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}".Replace('\', '/')
+          
+          echo "CUDA_HOME=$cudaPath" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
+          echo "$cudaPath/bin" >> $env:GITHUB_PATH
       
       - uses: pypa/cibuildwheel@v2.22
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          # CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
+          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
           CIBW_BEFORE_BUILD: |
             echo "DEBUG: CUDA_HOME is %CUDA_HOME%"
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
-            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-            CUDA_PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+            CUDA_HOME="${{ replace(steps.cuda-toolkit.outputs.CUDA_PATH, '\', '/') }}"
+            CUDA_PATH="${{ replace(steps.cuda-toolkit.outputs.CUDA_PATH, '\', '/') }}"
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
 
@@ -79,11 +83,11 @@ jobs:
             dnf_repo: 'rhel8'          # CUDA 12 supports RHEL 8
             manylinux_img: 'quay.io/pypa/manylinux_2_28_x86_64:latest'
             dnf_tag: '12-6'
-          - cuda: '13.0.0'
-            torch_tag: 'cu130'
+          - cuda: '12.8.0'
+            torch_tag: 'cu128'
             dnf_repo: 'rhel9'          # CUDA 13 requires RHEL 9 / glibc 2.34+
             manylinux_img: 'quay.io/pypa/manylinux_2_34_x86_64:latest'
-            dnf_tag: '13-0'
+            dnf_tag: '12-8'
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
@@ -128,13 +132,13 @@ jobs:
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
             export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
             export LD_LIBRARY_PATH=$TORCH_LIB:$LD_LIBRARY_PATH
-            auditwheel repair
-            --exclude libtorch.so
-            --exclude libtorch_python.so
-            --exclude libtorch_cpu.so
-            --exclude libtorch_cuda.so
-            --exclude libc10.so
-            --exclude libc10_cuda.so
+            auditwheel repair \
+            --exclude libtorch.so  \
+            --exclude libtorch_python.so \
+            --exclude libtorch_cpu.so \
+            --exclude libtorch_cuda.so \
+            --exclude libc10.so \
+            --exclude libc10_cuda.so \
             -w {dest_dir} {wheel}
             
           # CRITICAL: Ensures the isolated compilation container inherits these paths
@@ -144,6 +148,7 @@ jobs:
             CUDA_HOME=/usr/local/cuda
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+            CXXFLAGS=--allow-unsupported-compiler
             FORCE_CUDA=1
             PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/${{ matrix.torch_tag }}"
             IS_RELEASE_BUILD=1
