@@ -20,7 +20,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+      - name: Set SDK Environment Variable
+        run: echo "DISTUTILS_USE_SDK=1" >> $env:GITHUB_ENV
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
 
@@ -49,7 +50,6 @@ jobs:
           CIBW_ENVIRONMENT: |
             CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin;$PATH"
-            DISTUTILS_USE_SDK=1
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
             MAX_JOBS=4
