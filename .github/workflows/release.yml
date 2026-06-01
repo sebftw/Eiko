@@ -65,15 +65,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cuda: '12.8.0'
-            torch_tag: 'cu128'
+          - cuda: '12.6.0'
+            torch_tag: 'cu126'
             dnf_repo: 'rhel8'          # CUDA 12 supports RHEL 8
             manylinux_img: 'manylinux_2_28'
-            dnf_tag: '12-8'
+            dnf_tag: '12-6'
           - cuda: '13.0.0'
             torch_tag: 'cu130'
             dnf_repo: 'rhel9'          # CUDA 13 requires RHEL 9 / glibc 2.34+
-            manylinux_img: 'manylinux_2_34'
+            manylinux_img: 'quay.io/pypa/manylinux_2_34_x86_64'
             dnf_tag: '13-0'
     steps:
       - name: Free Disk Space (Ubuntu)
@@ -106,9 +106,11 @@ jobs:
             pip install jax pybind11
             
           CIBW_BEFORE_ALL: |
+            # Fix the "no python" error by putting the container's default python on the PATH
+            export PATH=/opt/python/cp310-cp310/bin:$PATH
+            
             PKG_MGR=$(command -v dnf || command -v yum)
             if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
-            # Dynamically pull rhel8 or rhel9 repo depending on the matrix row
             $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
             $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
