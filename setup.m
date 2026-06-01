@@ -233,13 +233,20 @@ function setup(build_type)
         
         % Step 2: Force NVCC to use MATLAB's specifically configured host compiler.
         % This is vital on Windows so NVCC can locate cl.exe without Developer Prompt environment vars.
-        cc_info = mex.getCompilerConfigurations('C++', 'Selected');
-        if ~isempty(cc_info)
-            cc_bin_dir = fileparts(cc_info(1).Details.CompilerExecutable);
-            ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
-        else
-            ccbin_flag = '';
-        end
+        if ~isempty(getenv('IS_RELEASE_BUILD'))
+			% We are on the GitHub Runner. Force nvcc to use the co-installed VS2019 (v142) compiler.
+			cc_bin_dir = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64';
+			ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+		else
+			% We are on a local machine. Trust MATLAB's selected C++ compiler.
+			cc_info = mex.getCompilerConfigurations('C++', 'Selected');
+			if ~isempty(cc_info)
+				cc_bin_dir = fileparts(cc_info(1).Details.CompilerExecutable);
+				ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+			else
+				ccbin_flag = '';
+			end
+		en
         
         % Step 3: Define output objects and Position Independent Code (PIC) flags.
         if ispc

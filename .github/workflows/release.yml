@@ -116,6 +116,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          toolset: '14.29' # Forces the use of Visual Studio 2019 (v142) compiler tools
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
@@ -134,7 +136,7 @@ jobs:
           CUDA_HOME: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}'
           IS_RELEASE_BUILD: '1'
         with:
-          command: mex -setup C++; addpath(genpath(pwd)); build_release();
+          command: mex -setup C++; mexcuda -setup; addpath(genpath(pwd)); build_release();
       - uses: actions/upload-artifact@v4
         with:
           name: matlab-mex-windows
@@ -159,7 +161,7 @@ jobs:
           CUDA_HOME: '/usr/local/cuda'
           IS_RELEASE_BUILD: '1'
         with:
-          command: mex -setup C++; addpath(genpath(pwd)); build_release(); # FIXED: Replaced github.workspace with pwd
+          command: mex -setup C++; mexcuda -setup; addpath(genpath(pwd)); build_release(); # FIXED: Replaced github.workspace with pwd
       - uses: actions/upload-artifact@v4
         with:
           name: matlab-mex-linux
