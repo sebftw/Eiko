@@ -223,8 +223,15 @@ function setup(build_type)
         % Step 1: Attempt to inject modern CCCL (Thrust, CUB, libcudacxx) if available.
         [cuda_bin_dir, ~, ~] = fileparts(user_nvcc);
         [cuda_root, ~, ~] = fileparts(cuda_bin_dir);
-        
-        cccl_include = fullfile(cuda_root, 'include', 'cccl');
+		
+		% Allow CI to provide the exact path to a cloned CCCL repo via environment variable.
+        % This is critical if using a lightweight pip/conda NVCC package.
+        cccl_include = getenv('CCCL_ROOT');
+        if isempty(cccl_include)
+            % Fallback to looking inside the CUDA root
+            cccl_include = fullfile(cuda_root, 'include', 'cccl');
+        end
+		
         cccl_flags = '';
         if exist(cccl_include, 'dir')
             cccl_flags = sprintf('-I"%s" -I"%s" -I"%s" -I"%s" ', ...
