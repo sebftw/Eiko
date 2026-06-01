@@ -56,9 +56,8 @@ jobs:
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: >
-            CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
-            CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
-            PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}\bin;$PATH
+            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+            CUDA_PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
             TORCH_CUDA_ARCH_LIST=6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX
             IS_RELEASE_BUILD=1
             MAX_JOBS=4
@@ -153,69 +152,8 @@ jobs:
           name: wheels-linux-cuda${{ matrix.cuda }}
           path: ./wheelhouse/*.whl
 
-  build-matlab-windows:
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup MSVC Compiler Environment
-        uses: ilammy/msvc-dev-cmd@v1
-      - name: Install CUDA Toolkit (NVCC only)
-        uses: Jimver/cuda-toolkit@master
-        id: cuda-toolkit
-        with: 
-          method: 'network'
-          sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
-       
-      #- name: Clone NVIDIA CCCL (Thrust/CUB)
-      #  run: git clone --branch v2.x --recursive https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
-        
-      - name: Setup MATLAB
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          # release: 'R2022b'
-          products: 'Parallel_Computing_Toolbox'
-      - name: Build MATLAB MEX
-        uses: matlab-actions/run-command@v2
-        env:
-          MW_NVCC_PATH: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe'
-          CUDA_HOME: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}'
-          IS_RELEASE_BUILD: '1'
-          # CCCL_ROOT: ${{ github.workspace }}\cccl
-        with:
-          command: mex -setup C++; addpath(genpath(pwd)); build_release();
-      - uses: actions/upload-artifact@v4
-        with:
-          name: matlab-mex-windows
-          path: ./matlab/eiko/+eiko_lib/*.mexw64
-
-  build-matlab-linux:
-    runs-on: ubuntu-22.04
-    container: 
-      image: nvidia/cuda:12.9.2-devel-ubuntu20.04
-    steps:
-      - name: Install Prerequisites
-        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
-      - uses: actions/checkout@v4
-      - name: Setup MATLAB
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: 'R2021b'
-          products: 'Parallel_Computing_Toolbox'
-      - name: Build MATLAB MEX
-        uses: matlab-actions/run-command@v2
-        env:
-          MW_NVCC_PATH: '/usr/local/cuda/bin/nvcc'
-          CUDA_HOME: '/usr/local/cuda'
-          IS_RELEASE_BUILD: '1'
-        with:
-          command: mex -setup C++; mexcuda -setup; addpath(genpath(pwd)); build_release();
-      - uses: actions/upload-artifact@v4
-        with:
-          name: matlab-mex-linux
-          path: ./matlab/eiko/+eiko_lib/*.mexa64
-
   merge-and-release:
-    needs: [build-wheels-windows, build-wheels-linux, build-matlab-linux, build-matlab-windows]
+    needs: [build-wheels-windows, build-wheels-linux,]
     runs-on: ubuntu-latest
     permissions:
       contents: write # Required to create a release
