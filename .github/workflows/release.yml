@@ -35,8 +35,10 @@ jobs:
        
       - name: Set Global CUDA Environment Variables
         run: |
-          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
-          echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
+          $cudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+          echo "CUDA_HOME=$cudaPath" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=$cudaPath" >> $env:GITHUB_ENV
+          echo "$($cudaPath)\bin" >> $env:GITHUB_PATH
        
       - name: Debug Environment
         shell: powershell
@@ -54,10 +56,10 @@ jobs:
             pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
           CIBW_ENVIRONMENT: |
-            CUDA_HOME="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-            CUDA_PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-            PATH="${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin;$PATH"
-            TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+            CUDA_HOME=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
+            CUDA_PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}
+            PATH=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v${{ matrix.cuda }}\bin;$PATH
+            TORCH_CUDA_ARCH_LIST=6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX
             IS_RELEASE_BUILD=1
             MAX_JOBS=4
 
@@ -157,13 +159,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
-        with:
-          toolset: '14.29'
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with: 
-          cuda: '13.2.0'
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
        
@@ -173,7 +172,7 @@ jobs:
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: 'R2022b'
+          # release: 'R2022b'
           products: 'Parallel_Computing_Toolbox'
       - name: Build MATLAB MEX
         uses: matlab-actions/run-command@v2

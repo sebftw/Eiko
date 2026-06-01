@@ -241,18 +241,23 @@ function setup(build_type)
         % Step 2: Force NVCC to use MATLAB's specifically configured host compiler.
         % This is vital on Windows so NVCC can locate cl.exe without Developer Prompt environment vars.
         if ispc && ~isempty(getenv('IS_RELEASE_BUILD'))
-			% We are on the GitHub Runner. Dynamically find the co-installed VS2019 (v142) compiler.
-			msvc_base = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC';
+			% Retrieve the active MSVC directory from the environment
+			% ilammy/msvc-dev-cmd sets VCToolsInstallDir automatically
+			msvc_root = getenv('VCToolsInstallDir');
+
+			if isempty(msvc_root)
+				error('MSVC environment not found. Ensure ilammy/msvc-dev-cmd is used in GitHub Actions.');
+			end
+
+			% Construct the path to cl.exe
+			% VCToolsInstallDir usually ends in a backslash, so we join carefully
+			cc_bin_dir = fullfile(msvc_root, 'bin', 'Hostx64', 'x64');
 			
-			% Search for the 14.29.x toolchain directory
-			v142_dirs = dir(fullfile(msvc_base, '14.29.*'));
-			if ~isempty(v142_dirs)
-				% Grab the first match (usually only one exists)
-				v142_version = v142_dirs(1).name;
-				cc_bin_dir = fullfile(msvc_base, v142_version, 'bin', 'Hostx64', 'x64');
+			if exist(fullfile(cc_bin_dir, 'cl.exe'), 'file')
 				ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+				fprintf('Using MSVC compiler at: %s\n', cc_bin_dir);
 			else
-				error('Could not locate the v142 (VS2019) build tools on the GitHub runner.');
+				error('Could not locate cl.exe in the detected MSVC directory: %s', cc_bin_dir);
 			end
 		else
 			% We are on a local machine. Trust MATLAB's selected C++ compiler.
