@@ -51,7 +51,7 @@ function setup2(build_type)
     end
 
     % Hunt for a user-installed CUDA toolkit.
-    user_nvcc = '';  
+    user_nvcc = '';
     
     % Strategy 1: Check standard Environment Variables.
     env_vars = {'CUDA_PATH', 'CUDA_HOME'};
@@ -78,6 +78,41 @@ function setup2(build_type)
             % 'where'/'which' might return multiple paths; take the first.
             paths = strsplit(strtrim(out), '\n');
             user_nvcc = paths{1}; 
+        end
+    end
+	
+	% Strategy 3: Fallback to common default installation paths.
+    if isempty(user_nvcc)
+        if ispc
+            % Windows: Typically installs in versioned subfolders
+            base_cuda_dir = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA';
+            if exist(base_cuda_dir, 'dir')
+                % Find all subfolders starting with 'v'
+                cuda_versions = dir(fullfile(base_cuda_dir, 'v*'));
+                if ~isempty(cuda_versions)
+                    % Sort descending so the highest version string is checked first
+                    [~, idx] = sort({cuda_versions.name}, 'descend');
+                    cuda_versions = cuda_versions(idx);
+                    
+                    for i = 1:length(cuda_versions)
+                        test_path = fullfile(base_cuda_dir, cuda_versions(i).name, 'bin', 'nvcc.exe');
+                        if exist(test_path, 'file')
+                            user_nvcc = test_path;
+                            break;
+                        end
+                    end
+                end
+            end
+        else
+            % Linux: Typically symlinked to /usr/local/cuda or installed in /opt/cuda
+            common_paths = {'/usr/local/cuda', '/opt/cuda'};
+            for i = 1:length(common_paths)
+                test_path = fullfile(common_paths{i}, 'bin', 'nvcc');
+                if exist(test_path, 'file')
+                    user_nvcc = test_path;
+                    break;
+                end
+            end
         end
     end
     
