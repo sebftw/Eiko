@@ -36,11 +36,13 @@ jobs:
           # 2. Convert backslashes to forward slashes to prevent escape char issues
           $NormalizedPath = $ShortPath -replace '\\', '/'
           
-          echo "CUDA_PATH_N=$NormalizedPath" >> $env:GITHUB_OUTPUT
+          # 3. Write to GITHUB_OUTPUT enforcing UTF-8 encoding
+          "CUDA_PATH_N=$NormalizedPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       
       - name: Add CUDA to PATH
         # Use the newly normalized path for consistency
-        run: echo "${{ steps.normalize-path.outputs.CUDA_PATH_N }}/bin" >> $env:GITHUB_PAT
+        run: |
+          "${{ steps.normalize-path.outputs.CUDA_PATH_N }}/bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
         
       - uses: pypa/cibuildwheel@v2.16
         env:
