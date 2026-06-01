@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # FIXED: Required to correctly read version tags
+          fetch-depth: 0
 
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -20,7 +20,7 @@ jobs:
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with: 
-          cuda: '12.1.1'
+          cuda: '13.0.3'
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
       
@@ -40,7 +40,6 @@ jobs:
           "CUDA_PATH_N=$NormalizedPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       
       - name: Add CUDA to PATH
-        # Use the newly normalized path for consistency
         run: |
           "${{ steps.normalize-path.outputs.CUDA_PATH_N }}/bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
         
@@ -48,9 +47,14 @@ jobs:
         env:
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
-          CIBW_BEFORE_BUILD: |
-            pip install ".[jax]" --extra-index-url https://download.pytorch.org/whl/cu121
-            python -c "import eiko.eiko_torch; import eiko.eiko_jax"
+          
+          # 1. Disable build isolation so setup.py checks the local env
+          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
+          
+          # 2. Pre-populate the build environment with PyTorch, JAX, and pybind11
+          CIBW_BEFORE_BUILD: >
+            pip install setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/cu130
+            
           CIBW_ENVIRONMENT: >
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
@@ -85,11 +89,20 @@ jobs:
           CIBW_ARCHS_LINUX: x86_64
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-* cp313-* cp314-*"
+          
+          # 1. Disable build isolation so setup.py can see the environment
+          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
+          
+          # 2. Pre-install all build requirements before wheel creation
+          CIBW_BEFORE_BUILD: >
+            pip install setuptools>=61.0.0 wheel 
+            "torch>=2.0.0" --index-url https://download.pytorch.org/whl/cu130
+            pip install jax pybind11
             
           CIBW_BEFORE_ALL: |
             dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-            dnf install -y cuda-nvcc-12-8 cuda-cudart-devel-12-8 cuda-libraries-devel-12-8
-            
+            dnf install -y cuda-nvcc-13-0 cuda-cudart-devel-13-0 cuda-libraries-devel-13-0
+          
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
             --exclude libtorch.so
@@ -99,12 +112,13 @@ jobs:
             --exclude libc10.so
             --exclude libc10_cuda.so
             -w {dest_dir} {wheel}
+            
           CIBW_ENVIRONMENT: >
             PATH=/usr/local/cuda/bin:$PATH
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             CUDA_HOME=/usr/local/cuda
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-            PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu121"
+            PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu130"
             IS_RELEASE_BUILD=1
   
       - uses: actions/upload-artifact@v4
@@ -119,7 +133,7 @@ jobs:
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          toolset: '14.29' # Forces the use of Visual Studio 2019 (v142) compiler tools
+          toolset: '14.29' # Forces the use of Visual Studio 2019 (v142) compiler tools for CUDA 11.8 / MATLAB R2022b compatibility
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
@@ -135,6 +149,7 @@ jobs:
       - name: Build MATLAB MEX
         uses: matlab-actions/run-command@v2
         env:
+          MW_NVCC_PATH: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe'
           CUDA_HOME: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}'
           IS_RELEASE_BUILD: '1'
         with:
@@ -160,6 +175,7 @@ jobs:
       - name: Build MATLAB MEX
         uses: matlab-actions/run-command@v2
         env:
+          MW_NVCC_PATH: '${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe'
           CUDA_HOME: '/usr/local/cuda'
           IS_RELEASE_BUILD: '1'
         with:
