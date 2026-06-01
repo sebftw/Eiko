@@ -23,9 +23,24 @@ jobs:
           cuda: '12.1.1'
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
+      
+      - name: Normalize CUDA Path
+        id: normalize-path
+        run: |
+          $CudaPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
           
+          # 1. Fetch the 8.3 short path to eliminate spaces (e.g., C:\PROGRA~1\...)
+          $fso = New-Object -ComObject Scripting.FileSystemObject
+          $ShortPath = $fso.GetFolder($CudaPath).ShortPath
+          
+          # 2. Convert backslashes to forward slashes to prevent escape char issues
+          $NormalizedPath = $ShortPath -replace '\\', '/'
+          
+          echo "CUDA_PATH_N=$NormalizedPath" >> $env:GITHUB_OUTPUT
+      
       - name: Add CUDA to PATH
-        run: echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
+        # Use the newly normalized path for consistency
+        run: echo "${{ steps.normalize-path.outputs.CUDA_PATH_N }}/bin" >> $env:GITHUB_PAT
         
       - uses: pypa/cibuildwheel@v2.16
         env:
@@ -37,8 +52,8 @@ jobs:
           CIBW_ENVIRONMENT: >
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
-          CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
-          CUDA_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
+            CUDA_HOME="${{ steps.normalize-path.outputs.CUDA_PATH_N }}"
+            CUDA_PATH="${{ steps.normalize-path.outputs.CUDA_PATH_N }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -71,7 +86,7 @@ jobs:
             
           CIBW_BEFORE_ALL: |
             dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-            dnf install -y cuda-nvcc-13-0 cuda-cudart-devel-13-0 cuda-libraries-devel-13-0
+            dnf install -y cuda-nvcc-12-8 cuda-cudart-devel-12-8 cuda-libraries-devel-12-8
             
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
@@ -96,22 +111,22 @@ jobs:
           path: ./wheelhouse/*.whl
 
   build-matlab-windows:
-    runs-on: windows-2019 # FIXED: MATLAB R2021b requires MSVC 2019, which is native to this runner.
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
       - name: Setup MSVC Compiler Environment
-        uses: ilammy/msvc-dev-cmd@v1 # Will now natively default to VS 2019
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with: 
-          cuda: '12.1.1' # NOTE: You may need to downgrade this to 11.2 if R2021b throws compiler errors.
+          cuda: '11.8.0'
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: 'R2021b' # FIXED: Adjusted to requested version
+          release: 'R2022b'
           products: 'Parallel_Computing_Toolbox'
       - name: Build MATLAB MEX
         uses: matlab-actions/run-command@v2

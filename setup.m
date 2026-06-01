@@ -1,4 +1,4 @@
-function setup2(build_type)
+function setup(build_type)
     % SETUP Compiles and installs Eiko CUDA MEX bindings for MATLAB.
     %
     % Usage:
