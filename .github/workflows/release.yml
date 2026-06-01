@@ -8,6 +8,14 @@ on:
 jobs:
   build-wheels-windows:
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cuda: '12.8.0'
+            torch_tag: 'cu128'
+          - cuda: '13.0.0'
+            torch_tag: 'cu130'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,30 +28,24 @@ jobs:
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with: 
-          cuda: '13.0.0'
+          cuda: ${{ matrix.cuda }}
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
-      
+       
       - name: Set Global CUDA Environment Variables
         run: |
           echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
           echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
-      
+       
       - uses: pypa/cibuildwheel@v2.16
         env:
-          # 1. Inject CUDA_HOME via the native Action 'env' block.
-          # cibuildwheel on Windows runs on the host, so it natively inherits this!
-          # CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
-          
           CIBW_ARCHS_WINDOWS: "AMD64"
           CIBW_BUILD: "cp310-*"
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
-          # 2. ADD 'ninja' TO YOUR BUILD DEPENDENCIES
           CIBW_BEFORE_BUILD: >
-            pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/cu130
+            pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
             
-          # 3. Keep CIBW_ENVIRONMENT strictly for simple string/flag variables
           CIBW_ENVIRONMENT: >
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
             IS_RELEASE_BUILD=1
@@ -51,11 +53,21 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows
+          name: wheels-windows-cuda${{ matrix.cuda }}
           path: ./wheelhouse/*.whl
 
   build-wheels-linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cuda: '12.8.0'
+            torch_tag: 'cu128'
+            dnf_tag: '12-8'
+          - cuda: '13.0.0'
+            torch_tag: 'cu130'
+            dnf_tag: '13-0'
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
@@ -70,7 +82,7 @@ jobs:
   
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # FIXED: Required to correctly read version tags
+          fetch-depth: 0
         
       - uses: pypa/cibuildwheel@v2.16
         env:
@@ -78,18 +90,16 @@ jobs:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BUILD: "cp310-*"
           
-          # 1. Disable build isolation so setup.py can see the environment
           CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
           
-          # 2. Pre-install all build requirements before wheel creation
           CIBW_BEFORE_BUILD: >
             pip install setuptools>=61.0.0 wheel &&
-            pip install torch>=2.0.0 --extra-index-url https://download.pytorch.org/whl/cu130 &&
+            pip install torch>=2.0.0 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }} &&
             pip install jax pybind11
             
           CIBW_BEFORE_ALL: |
             dnf config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/rhel8/x86_64/cuda-rhel8.repo
-            dnf install -y cuda-nvcc-13-0 cuda-cudart-devel-13-0 cuda-libraries-devel-13-0
+            dnf install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
           
           CIBW_REPAIR_WHEEL_COMMAND_LINUX: >
             auditwheel repair
@@ -106,12 +116,12 @@ jobs:
             LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
             CUDA_HOME=/usr/local/cuda
             TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-            PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/cu130"
+            PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/${{ matrix.torch_tag }}"
             IS_RELEASE_BUILD=1
   
       - uses: actions/upload-artifact@v4
         with:
-          name: wheels-linux
+          name: wheels-linux-cuda${{ matrix.cuda }}
           path: ./wheelhouse/*.whl
 
   build-matlab-windows:
@@ -121,7 +131,7 @@ jobs:
       - name: Setup MSVC Compiler Environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          toolset: '14.29' # Forces the use of Visual Studio 2019 (v142) compiler tools for CUDA 11.8 / MATLAB R2022b compatibility
+          toolset: '14.29'
       - name: Install CUDA Toolkit (NVCC only)
         uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
@@ -129,7 +139,7 @@ jobs:
           cuda: '11.8.0'
           method: 'network'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart"]'
-      
+       
       - name: Clone NVIDIA CCCL (Thrust/CUB)
         run: git clone https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
         
@@ -161,7 +171,7 @@ jobs:
         run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
       - uses: actions/checkout@v4
       - name: Clone NVIDIA CCCL (Thrust/CUB)
-        run: git clone https://github.com/NVIDIA/cccl.git ${{ github.workspace }}\cccl
+        run: git clone https://github.com/NVIDIA/cccl.git ${{ github.workspace }}/cccl
       - name: Setup MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
@@ -174,7 +184,7 @@ jobs:
           CUDA_HOME: '/usr/local/cuda'
           IS_RELEASE_BUILD: '1'
         with:
-          command: mex -setup C++; mexcuda -setup; addpath(genpath(pwd)); build_release(); # FIXED: Replaced github.workspace with pwd
+          command: mex -setup C++; mexcuda -setup; addpath(genpath(pwd)); build_release();
       - uses: actions/upload-artifact@v4
         with:
           name: matlab-mex-linux
@@ -183,6 +193,8 @@ jobs:
   merge-and-release:
     needs: [build-wheels-windows, build-wheels-linux, build-matlab-linux, build-matlab-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to create a release
     steps:
       - uses: actions/checkout@v4
         with:
