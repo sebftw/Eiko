@@ -42,7 +42,7 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential git wget curl ca-certificates
+          apt-get install -y software-properties-common build-essential git wget curl ca-certificates patchelf
           
           # Add deadsnakes PPA to get modern Python on older Ubuntu versions
           add-apt-repository ppa:deadsnakes/ppa -y
@@ -88,7 +88,7 @@ jobs:
           echo "Building for Python ${{ matrix.config.python }}..."
           
           python${{ matrix.config.python }} -m pip install --upgrade pip
-          python${{ matrix.config.python }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          python${{ matrix.config.python }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel
           
           # Install PyTorch from the explicit wheel index, along with JAX
           python${{ matrix.config.python }} -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -96,6 +96,24 @@ jobs:
           
           # Build the wheel 
           python${{ matrix.config.python }} -m build --wheel --no-isolation
+
+          # Repair the wheel for cross-distro compatibility (excluding PyTorch binaries)
+          echo "Repairing wheel with auditwheel..."
+          python${{ matrix.config.python }} -m auditwheel repair dist/*.whl \
+            --exclude libtorch.so \
+            --exclude libtorch_cpu.so \
+            --exclude libtorch_cuda.so \
+            --exclude libtorch_python.so \
+            --exclude libc10.so \
+            --exclude libc10_cuda.so \
+            --exclude libcudart.so.11.0 \
+            --exclude libcudart.so.12.0 \
+            -w repaired_dist/
+          
+          # Replace original wheel with the repaired many-linux wheel
+          rm dist/*.whl
+          mv repaired_dist/*.whl dist/
+          
       
       # 5. Upload artifacts (Ensure names are unique per Python version)
       - name: Upload Wheel Artifacts
@@ -251,6 +269,9 @@ jobs:
 
       - name: Generate PEP-503 compliant Siloed Indexes
         run: |
+          # Prevent bash from looping over literal '*.whl' if the directory is empty
+          shopt -s nullglob
+          
           mkdir -p public/whl
           
           # 1. Sort NEW wheels into the existing PEP-503 structure
