@@ -1,189 +1,242 @@
 name: Package Eiko Multi-Language Release
 
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
-  build-wheels-windows:
+  build_ubuntu_wheels:
+    name: Ubuntu (Torch:${{ matrix.torch-version }}, CUDA:${{ matrix.cuda-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        torch-version: ['2.5.0', '2.9.0', '2.12.0']
+        cuda-version: ['12.1.1', '12.4.0', '13.0.1']
+        include:
+          # Map CUDA 12.x to Ubuntu 20.04 (Max compatibility), and CUDA 13.x to 22.04
+          - cuda-version: '12.1.1'
+            ubuntu-version: '20.04'
+          - cuda-version: '12.4.0'
+            ubuntu-version: '20.04'
+          - cuda-version: '13.0.1'
+            ubuntu-version: '22.04'
+        exclude:
+          # PyTorch 2.5 and older do not have CUDA 13 wheels
+          - torch-version: '2.5.0'
+            cuda-version: '13.0.1'
+        
+    container:
+      image: nvidia/cuda:${{ matrix.cuda-version }}-devel-ubuntu${{ matrix.ubuntu-version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install System Dependencies and Python via Deadsnakes
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y software-properties-common build-essential git wget
+          
+          add-apt-repository -y ppa:deadsnakes/ppa
+          apt-get update
+          
+          # Install target Python versions at once
+          apt-get install -y python3.11 python3.11-dev python3.11-venv 
+          apt-get install -y python3.12 python3.12-dev python3.12-venv
+
+      - name: Format CUDA version for PyTorch
+        id: format-cuda
+        run: |
+          CUDA_SHORT=$(echo ${{ matrix.cuda-version }} | cut -d'.' -f1,2 | tr -d '.')
+          echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+
+      - name: Compile Wheels for all Python Versions
+        env:
+          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+        run: |
+          for PY in "python3.11" "python3.12"; do
+            echo "Building for $PY..."
+            $PY -m pip install --upgrade pip setuptools wheel ninja build
+            
+            # 1. Install PyTorch first from the explicit wheel index
+            $PY -m pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+            
+            # 2. Install pyproject.toml dependencies + jax extras
+            $PY -m pip install -e ".[jax]"
+            
+            # 3. Build the wheel 
+            $PY -m build --wheel --no-build-isolation
+            
+            rm -rf build/ *.egg-info/
+          done
+      
+      - name: Upload Wheel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-ubuntu-pt${{ matrix.torch-version }}-${{ env.cu_version }}
+          path: dist/*.whl
+
+  build_windows_wheels:
+    name: Windows (Torch:${{ matrix.torch-version }}, CUDA:${{ matrix.cuda-version }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - cuda: '12.6.0'
-            torch_tag: 'cu126'
-          - cuda: '13.0.0'
-            torch_tag: 'cu130'
+        torch-version: ['2.5.0', '2.9.0', '2.12.0']
+        cuda-version: ['12.1.1', '12.4.0', '13.0.1']
+        exclude:
+          - torch-version: '2.5.0'
+            cuda-version: '13.0.1'
+
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Set SDK Environment Variable
-        run: echo "DISTUTILS_USE_SDK=1" >> $env:GITHUB_ENV
-      - name: Setup MSVC Compiler Environment
+
+      - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@master
-        id: cuda-toolkit
-        with: 
-          cuda: ${{ matrix.cuda }}
-          method: 'network'
-          use-github-cache: 'true'
-          sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
-       
-      - name: Set Global CUDA Environment Variables
-        shell: powershell
+        uses: Jimver/cuda-toolkit@v0.2.19
+        with:
+          cuda: ${{ matrix.cuda-version }}
+          
+      - name: Format CUDA version for PyTorch
+        shell: bash
+        id: format-cuda
         run: |
-          # Get the raw path from the toolkit step
-          $rawPath = "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+          CUDA_SHORT=$(echo ${{ matrix.cuda-version }} | cut -d'.' -f1,2 | tr -d '.')
+          echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+
+      # --- PYTHON 3.11 BUILD ---
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
           
-          # Convert backslashes to forward slashes for cross-platform tool compatibility
-          $safePath = $rawPath.Replace('\', '/')
+      - name: Build 3.11 Wheel
+        env:
+          DISTUTILS_USE_SDK: 1
+          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+        run: |
+          python -m pip install --upgrade pip setuptools wheel ninja build
           
-          # Set the standard variables
-          echo "CUDA_HOME=$safePath" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=$safePath" >> $env:GITHUB_ENV
-          echo "$safePath/bin" >> $env:GITHUB_PATH
+          # 1. Install PyTorch
+          pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           
-          # Explicitly pass this sanitized string into the environment runner
-          echo "CUDA_PATH_FOR_CIBW=$safePath" >> $env:GITHUB_ENV
+          # 2. Install pyproject.toml dependencies + jax extras (Quotes are mandatory in PowerShell)
+          pip install -e ".[jax]"
+          
+          # 3. Build Wheel
+          python -m build --wheel --no-build-isolation
+          
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+
+      # --- PYTHON 3.12 BUILD ---
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Build 3.12 Wheel
+        env:
+          DISTUTILS_USE_SDK: 1
+          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+        run: |
+          python -m pip install --upgrade pip setuptools wheel ninja build
+          
+          # 1. Install PyTorch
+          pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          
+          # 2. Install pyproject.toml dependencies + jax extras (Quotes are mandatory in PowerShell)
+          pip install -e ".[jax]"
+          
+          # 3. Build Wheel
+          python -m build --wheel --no-build-isolation
+          
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
       
-      - uses: pypa/cibuildwheel@v2.22
-        env:
-          CIBW_ARCHS_WINDOWS: "AMD64"
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          CIBW_BUILD_FRONTEND: "pip; args: --no-build-isolation"
-          
-          CIBW_BEFORE_BUILD: |
-            echo "DEBUG: CUDA_HOME is %CUDA_HOME%"
-            pip install ninja setuptools>=61.0.0 wheel "torch>=2.0.0" jax pybind11 --extra-index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
-            
-          CIBW_ENVIRONMENT: >
-            CUDA_HOME=%CUDA_PATH_FOR_CIBW%
-            CUDA_PATH=%CUDA_PATH_FOR_CIBW%
-            TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-            IS_RELEASE_BUILD=1
-
-      - uses: actions/upload-artifact@v4
+      - name: Upload Wheel Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-cuda${{ matrix.cuda }}
-          path: ./wheelhouse/*.whl
-
-  build-wheels-linux:
+          name: wheels-windows-pt${{ matrix.torch-version }}-${{ env.cu_version }}
+          path: dist/*.whl
+          
+  publish_gh_pages:
+    name: Generate Siloed HTML Indexes and Publish
+    needs: [build_ubuntu_wheels, build_windows_wheels]
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - cuda: '12.6.0'
-            torch_tag: 'cu126'
-            dnf_repo: 'rhel8'          # CUDA 12 supports RHEL 8
-            manylinux_img: 'quay.io/pypa/manylinux_2_28_x86_64:latest'
-            dnf_tag: '12-6'
-          - cuda: '12.8.0'
-            torch_tag: 'cu128'
-            dnf_repo: 'rhel9'          # CUDA 13 requires RHEL 9 / glibc 2.34+
-            manylinux_img: 'quay.io/pypa/manylinux_2_34_x86_64:latest'
-            dnf_tag: '12-8'
-    steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: false
-          docker-images: true
-          swap-storage: false
-  
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-        
-      # Updated to a modern cibuildwheel version
-      - uses: pypa/cibuildwheel@v2.22
-        env:
-          CIBW_ARCHS_LINUX: x86_64
-          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.manylinux_img }}
-          CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
-          
-          CIBW_BEFORE_BUILD: |
-            pip install setuptools>=61.0.0 wheel
-            pip install --no-cache-dir torch>=2.0.0 --index-url https://download.pytorch.org/whl/${{ matrix.torch_tag }}
-            pip install jax pybind11
-            
-          CIBW_BEFORE_ALL: |
-            echo "Current PATH: $PATH"
-            PKG_MGR=$(command -v dnf || command -v yum)
-            if [ -z "$PKG_MGR" ]; then echo "Neither yum nor dnf found!"; exit 1; fi
-            
-            # Install python3 if not already present
-            # $PKG_MGR install -y python3 python3-pip python3-devel
-            # ln -sf /usr/bin/python3 /usr/local/bin/python
-            
-            # Install CUDA
-            $PKG_MGR config-manager --add-repo https://developer.download.nvidia.com/compute/cuda/repos/${{ matrix.dnf_repo }}/x86_64/cuda-${{ matrix.dnf_repo }}.repo
-            $PKG_MGR install -y cuda-nvcc-${{ matrix.dnf_tag }} cuda-cudart-devel-${{ matrix.dnf_tag }} cuda-libraries-devel-${{ matrix.dnf_tag }}
-          
-          CIBW_REPAIR_WHEEL_COMMAND_LINUX: |
-            export TORCH_LIB=$(python -c "import torch; import os; print(os.path.dirname(torch.__file__) + '/lib')")
-            export LD_LIBRARY_PATH=$TORCH_LIB:$LD_LIBRARY_PATH
-            auditwheel repair \
-            --exclude libtorch.so  \
-            --exclude libtorch_python.so \
-            --exclude libtorch_cpu.so \
-            --exclude libtorch_cuda.so \
-            --exclude libc10.so \
-            --exclude libc10_cuda.so \
-            -w {dest_dir} {wheel}
-            
-          # CRITICAL: Ensures the isolated compilation container inherits these paths
-          CIBW_ENVIRONMENT_PASS_LINUX: CUDA_HOME LD_LIBRARY_PATH TORCH_CUDA_ARCH_LIST FORCE_CUDA PIP_EXTRA_INDEX_URL IS_RELEASE_BUILD
-            
-          CIBW_ENVIRONMENT: >
-            CUDA_HOME=/usr/local/cuda
-            LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-            TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-            CXXFLAGS=--allow-unsupported-compiler
-            FORCE_CUDA=1
-            PIP_EXTRA_INDEX_URL="https://download.pytorch.org/whl/${{ matrix.torch_tag }}"
-            IS_RELEASE_BUILD=1
-  
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux-cuda${{ matrix.cuda }}
-          path: ./wheelhouse/*.whl
-
-  merge-and-release:
-    needs: [build-wheels-windows, build-wheels-linux]
-    runs-on: ubuntu-latest
+    # Only publish code if on main branch.
+    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     permissions:
-      contents: write # Required to create a release
+      contents: write
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-        
-      - name: Download All Artifacts
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
-          path: raw-downloads
-          
-      - name: Gather Release Files
-        run: |
-          mkdir -p final-release
-          find raw-downloads -name "*.whl" -exec cp {} final-release/ \;
-          find raw-downloads -name "*.mexw64" -exec cp {} final-release/ \;
-          find raw-downloads -name "*.mexa64" -exec cp {} final-release/ \;
+          path: wheelhouse
+          pattern: wheels-*
+          merge-multiple: true
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+      - name: Generate PEP-503 compliant Siloed Indexes
+        run: |
+          mkdir -p public/whl
+          
+          # 1. Sort wheels into separate CUDA directories based on their filename tags
+          for wheel in wheelhouse/*.whl; do
+            filename=$(basename "$wheel")
+            
+            # Extract the CUDA tag (e.g., cu121, cu124, cu130) from the filename
+            if [[ "$filename" =~ (cu[0-9]+) ]]; then
+              cuda_tag="${BASH_REMATCH[1]}"
+            else
+              cuda_tag="cpu"
+            fi
+            
+            # Create a dedicated PEP-503 structure for this CUDA version
+            mkdir -p "public/whl/$cuda_tag/eiko"
+            cp "$wheel" "public/whl/$cuda_tag/eiko/"
+          done
+
+          # 2. Generate index files for each isolated index environment
+          cd public/whl
+          for dir in cu*; do
+            if [ -d "$dir" ]; then
+              # Create the top-level index for the specific CUDA channel
+              echo "<!DOCTYPE html><html><body><a href=\"eiko/\">eiko</a></body></html>" > "$dir/index.html"
+              
+              # Create the project-level index listing the wheels
+              cd "$dir/eiko"
+              echo "<!DOCTYPE html><html><head><title>Links for eiko ($dir)</title></head><body>" > index.html
+              echo "<h1>Links for eiko</h1>" >> index.html
+              
+              for w in *.whl; do
+                if [ "$w" != "index.html" ]; then
+                  echo "<a href=\"$w\">$w</a><br>" >> index.html
+                fi
+              done
+              
+              echo "</body></html>" >> index.html
+              cd ../..
+            fi
+          done
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          files: final-release/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public
+          keep_files: true
