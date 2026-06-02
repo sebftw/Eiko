@@ -14,11 +14,11 @@ jobs:
       matrix:
         config:
           # PyTorch 2.5 supports older CUDA 12.x
-          - { torch: '2.5.0', cuda: '12.1.1' }
+          # - { torch: '2.5.0', cuda: '12.1.1' }
           # - { torch: '2.5.0', cuda: '12.4.0' }
           
           # PyTorch 2.9 dropped 12.4, moved to 12.6+
-          # - { torch: '2.9.0', cuda: '12.6.2' } 
+          - { torch: '2.9.0', cuda: '12.6.2' } 
           
           # PyTorch 2.12 supports 12.6 and 13.x
           # - { torch: '2.12.0', cuda: '12.6.2' }
