@@ -42,7 +42,7 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential git wget curl ca-certificates
+          apt-get install -y software-properties-common build-essential git wget curl ca-certificates unzip
           
           # Add deadsnakes PPA to get modern Python on older Ubuntu versions
           add-apt-repository ppa:deadsnakes/ppa -y
