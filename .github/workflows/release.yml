@@ -7,21 +7,26 @@ on:
 
 jobs:
   build_ubuntu_wheels:
-    name: Ubuntu (Torch:${{ matrix.torch-version }}, CUDA:${{ matrix.cuda-version }})
+    name: Ubuntu (Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ['2.5.0', '2.9.0', '2.12.0']
-        cuda-version: ['12.1.1', '12.4.0', '13.0.1']
-        exclude:
-          # PyTorch 2.5 and older do not have CUDA 13 wheels
-          - torch-version: '2.5.0'
-            cuda-version: '13.0.1'
+        config:
+          # PyTorch 2.5 supports older CUDA 12.x
+          # - { torch: '2.5.0', cuda: '12.1.1' }
+          # - { torch: '2.5.0', cuda: '12.4.0' }
+          
+          # PyTorch 2.9 dropped 12.4, moved to 12.6+
+          # - { torch: '2.9.0', cuda: '12.6.2' } 
+          
+          # PyTorch 2.12 supports 12.6 and 13.x
+          # - { torch: '2.12.0', cuda: '12.6.2' }
+          - { torch: '2.12.0', cuda: '13.0.1' }
         
     container:
       # Hardcode ubuntu22.04 for all CUDA versions
-      image: nvidia/cuda:${{ matrix.cuda-version }}-devel-ubuntu22.04
+      image: nvidia/cuda:${{ matrix.config.cuda }}-devel-ubuntu22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -48,26 +53,26 @@ jobs:
       - name: Format CUDA version for PyTorch
         id: format-cuda
         run: |
-          CUDA_SHORT=$(echo ${{ matrix.cuda-version }} | cut -d'.' -f1,2 | tr -d '.')
+          CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
 
       - name: Compile Wheels for all Python Versions
         env:
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
-          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
+          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
         run: |
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
             
-            
             $PY -m pip install --upgrade pip setuptools wheel ninja build
             
             # 1. Install PyTorch first from the explicit wheel index
-            $PY -m pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+            $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
             
             # 2. Install pyproject.toml dependencies + jax extras
-            $PY -m pip install -e ".[jax]"
+            $PY -m pip install -e ".[jax]" --extra-index-url https://download.pytorch.org/whl/${{ env.cu_version }}
             
             # 3. Build the wheel 
             $PY -m build --wheel --no-build-isolation
@@ -78,20 +83,26 @@ jobs:
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-ubuntu-pt${{ matrix.torch-version }}-${{ env.cu_version }}
+          name: wheels-ubuntu-pt${{ matrix.config.torch }}-${{ env.cu_version }}
           path: dist/*.whl
 
   build_windows_wheels:
-    name: Windows (Torch:${{ matrix.torch-version }}, CUDA:${{ matrix.cuda-version }})
+    name: Windows (Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ['2.5.0', '2.9.0', '2.12.0']
-        cuda-version: ['12.1.1', '12.4.0', '13.0.1']
-        exclude:
-          - torch-version: '2.5.0'
-            cuda-version: '13.0.1'
+        config:
+          # PyTorch 2.5 supports older CUDA 12.x
+          # - { torch: '2.5.0', cuda: '12.1.1' }
+          # - { torch: '2.5.0', cuda: '12.4.0' }
+          
+          # PyTorch 2.9 dropped 12.4, moved to 12.6+
+          # - { torch: '2.9.0', cuda: '12.6.2' } 
+          
+          # PyTorch 2.12 supports 12.6 and 13.x
+          # - { torch: '2.12.0', cuda: '12.6.2' }
+          - { torch: '2.12.0', cuda: '13.0.1' }
 
     steps:
       - uses: actions/checkout@v4
@@ -102,7 +113,7 @@ jobs:
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
         with:
-          cuda: ${{ matrix.cuda-version }}
+          cuda: ${{ matrix.config.cuda }}
           method: 'network'
           use-github-cache: 'true'
           sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
@@ -111,7 +122,7 @@ jobs:
         shell: bash
         id: format-cuda
         run: |
-          CUDA_SHORT=$(echo ${{ matrix.cuda-version }} | cut -d'.' -f1,2 | tr -d '.')
+          CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
 
       # --- PYTHON 3.11 BUILD ---
@@ -123,20 +134,21 @@ jobs:
       - name: Build 3.11 Wheel
         env:
           DISTUTILS_USE_SDK: 1
-          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0" 
+          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
-          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
+          CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
         run: |
           python -m pip install --upgrade pip setuptools wheel ninja build
           
           # 1. Install PyTorch
-          pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           
-          # 2. Install pyproject.toml dependencies + jax extras (Quotes are mandatory in PowerShell)
-          pip install -e ".[jax]"
+          # 2. Install pyproject.toml dependencies + jax extras
+          pip install -e ".[jax]" --extra-index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           
           # 3. Build Wheel
-          python -m build --wheel --no-build-isolation
+          python -m build --wheel --no-isolation
           
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
           Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
@@ -152,18 +164,19 @@ jobs:
           DISTUTILS_USE_SDK: 1
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0" 
           MAX_JOBS: 2
-          EIKO_LOCAL_VERSION: "+pt${{ matrix.torch-version }}${{ env.cu_version }}"
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
+          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
         run: |
           python -m pip install --upgrade pip setuptools wheel ninja build
           
           # 1. Install PyTorch
-          pip install torch==${{ matrix.torch-version }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           
           # 2. Install pyproject.toml dependencies + jax extras (Quotes are mandatory in PowerShell)
           pip install -e ".[jax]"
           
           # 3. Build Wheel
-          python -m build --wheel --no-build-isolation
+          python -m build --wheel --no-isolation
           
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
           Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
@@ -171,7 +184,7 @@ jobs:
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-windows-pt${{ matrix.torch-version }}-${{ env.cu_version }}
+          name: wheels-windows-pt${{ matrix.config.torch }}-${{ env.cu_version }}
           path: dist/*.whl
           
   publish_gh_pages:
