@@ -80,7 +80,7 @@ packages = ["eiko", "eiko.src", "eiko.src.bindings"]
 [tool.setuptools.package-dir]
 "eiko" = "python/eiko"
 "eiko.src" = "src"
-# (setuptools will automatically figure out that eiko.src.bindings is in src/bindings)
+"eiko.src.bindings" = "src/bindings"
 
 [tool.setuptools.package-data]
 "eiko.src" = ["*.cuh"]
