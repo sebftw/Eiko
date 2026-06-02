@@ -84,8 +84,8 @@ jobs:
           # Compile for each supported Python version.
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
-            
-            $PY -m pip install --upgrade pip setuptools wheel ninja build
+
+            $PY -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
             
             # 1. Install PyTorch from the explicit wheel index, along with JAX (+pybind11)
             $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -178,7 +178,7 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path
           EIKO_RELEASE_BUILD: "1"
         run: |
-          python -m pip install --upgrade pip setuptools wheel ninja build
+          python -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
           # 1. Install PyTorch and JAX (+pybind11)
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -207,7 +207,7 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
           EIKO_RELEASE_BUILD: "1"
         run: |
-          python -m pip install --upgrade pip setuptools wheel ninja build
+          python -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
           # 1. Install PyTorch and JAX (+pybind11)
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
