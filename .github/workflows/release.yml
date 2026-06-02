@@ -90,7 +90,7 @@ jobs:
           echo "Building for Python ${{ matrix.config.python }}..."
           
           python${{ matrix.config.python }} -m pip install --upgrade pip
-          python${{ matrix.config.python }} -m pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          python${{ matrix.config.python }} -m pip install "setuptools>=77.0.3,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
           # Install PyTorch from the explicit wheel index, along with JAX
           python${{ matrix.config.python }} -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -180,7 +180,7 @@ jobs:
         run: |
           # Install PyTorch and JAX (+pybind11)
           pip install --upgrade pip
-          pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install "setuptools>=77.0.3,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
           
@@ -209,7 +209,7 @@ jobs:
         run: |
           # Install PyTorch and JAX (+pybind11)
           pip install --upgrade pip
-          pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install "setuptools>=77.0.3,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
           
