@@ -20,7 +20,7 @@ jobs:
             
           # 2. The Modern Standard (What 90% of your users will actually run)
           # - Previous stable PyTorch on a highly adopted Python version
-          - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.12' }
+          # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.12' }
           # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.13' }
             
           # 3. The Bleeding Edge (Future-proofing)
@@ -72,6 +72,19 @@ jobs:
         run: |
           CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+
+      - name: Determine Target manylinux Platform
+        id: set-plat
+        run: |
+          if [ "${{ matrix.config.os_version }}" = "20.04" ]; then
+            echo "PLAT=manylinux_2_31_x86_64" >> $GITHUB_ENV
+          elif [ "${{ matrix.config.os_version }}" = "22.04" ]; then
+            echo "PLAT=manylinux_2_35_x86_64" >> $GITHUB_ENV
+          elif [ "${{ matrix.config.os_version }}" = "24.04" ]; then
+            echo "PLAT=manylinux_2_39_x86_64" >> $GITHUB_ENV
+          else
+            echo "PLAT=linux_x86_64" >> $GITHUB_ENV # Fallback
+          fi
       
       # Straightforward compilation step (No bash loops, no mid-job cleanup required)
       - name: Compile Wheel
@@ -100,20 +113,40 @@ jobs:
           # Repair the wheel for cross-distro compatibility (excluding PyTorch binaries)
           echo "Repairing wheel with auditwheel..."
           python${{ matrix.config.python }} -m auditwheel repair dist/*.whl \
+            --plat $PLAT \
             --exclude libtorch.so \
             --exclude libtorch_cpu.so \
             --exclude libtorch_cuda.so \
             --exclude libtorch_python.so \
             --exclude libc10.so \
             --exclude libc10_cuda.so \
+            --exclude libbackend_with_compiler.so \
+            --exclude libjitbackend_test.so \
+            --exclude libcudart.so \
             --exclude libcudart.so.11.0 \
+            --exclude libcudart.so.12 \
             --exclude libcudart.so.12.0 \
             -w repaired_dist/
           
           # Replace original wheel with the repaired many-linux wheel
           rm dist/*.whl
           mv repaired_dist/*.whl dist/
+
+          # --- VERIFICATION STEP ---
+          echo "Verifying Wheel Contents..."          
           
+          # List files and look for the vendored .libs directory auditwheel creates
+          WHEEL_FILES=$(unzip -l dist/*.whl)
+          echo "$WHEEL_FILES"
+          
+          # Check if any forbidden libraries leaked into the wheel
+          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib(torch|c10|cuda)" > /dev/null; then
+            echo "ERROR: Auditwheel accidentally bundled PyTorch or CUDA libraries!"
+            echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib(torch|c10|cuda)"
+            exit 1
+          else
+            echo "Success: No heavy external runtimes were bundled inside the wheel."
+          fi          
       
       # 5. Upload artifacts (Ensure names are unique per Python version)
       - name: Upload Wheel Artifacts
