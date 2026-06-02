@@ -52,6 +52,11 @@ jobs:
           # Install the specific Python version dictated by the matrix
           apt-get install -y python${{ matrix.config.python }} python${{ matrix.config.python }}-dev python${{ matrix.config.python }}-venv
           
+          # Conditionally install distutils (Required for <3.12 to run get-pip.py)
+          if apt-cache show python${{ matrix.config.python }}-distutils > /dev/null 2>&1; then
+            apt-get install -y python${{ matrix.config.python }}-distutils
+          fi
+          
           # Bootstrap pip directly into this Python version
           curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
           python${{ matrix.config.python }} get-pip.py
@@ -75,15 +80,15 @@ jobs:
         run: |
           echo "Building for Python ${{ matrix.config.python }}..."
           
-          python -m pip install --upgrade pip
-          python -m pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          python${{ matrix.config.python }} -m pip install --upgrade pip
+          python${{ matrix.config.python }} -m pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
           # Install PyTorch from the explicit wheel index, along with JAX
-          python -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          python -m pip install jax pybind11
+          python${{ matrix.config.python }} -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          python${{ matrix.config.python }} -m pip install jax pybind11
           
           # Build the wheel 
-          python -m build --wheel --no-isolation
+          python${{ matrix.config.python }} -m build --wheel --no-isolation
       
       # 5. Upload artifacts (Ensure names are unique per Python version)
       - name: Upload Wheel Artifacts
