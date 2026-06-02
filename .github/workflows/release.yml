@@ -128,6 +128,16 @@ jobs:
             --exclude libcudart.so.12.0 \
             --exclude libcudart.so.13 \
             --exclude libcudart.so.13.2 \
+            --exclude _xla.so \
+            --exclude xla_extension.so \
+            --exclude libjax_cuda_plugin.so \
+            --exclude libjax_cuda_pjrt.so \
+            --exclude libnvrtc.so \
+            --exclude libnvidia-ml.so \
+            --exclude libnccl.so \
+            --exclude libgomp.so.1 \
+            --exclude libcublas.so \
+            --exclude libcublasLt.so \
             -w repaired_dist/
 
           # Safely rewrite the tags to ONLY use the requested $PLAT
@@ -148,9 +158,9 @@ jobs:
           echo "$WHEEL_FILES"
           
           # Check if any forbidden libraries leaked into the wheel
-          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib(torch|c10|cuda)" > /dev/null; then
-            echo "ERROR: Auditwheel accidentally bundled PyTorch or CUDA libraries!"
-            echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib(torch|c10|cuda)"
+          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)" > /dev/null; then
+            echo "ERROR: Auditwheel accidentally bundled PyTorch/JAX or CUDA libraries!"
+            echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)"
             exit 1
           else
             echo "Success: No heavy external runtimes were bundled inside the wheel."
