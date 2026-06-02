@@ -7,6 +7,7 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 # Add 'python' to sys.path so we can import 'eiko.build_config'
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
+from eiko import __version__
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 
 # 1. Define the base PyTorch Extension
@@ -47,7 +48,7 @@ except ImportError:
 
 
 # 3. Process Dynamic Version
-base_version = "0.8.5" # Manage your base version here now
+base_version = __version__
 local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
 full_version = f"{base_version}{local_version}"
 
