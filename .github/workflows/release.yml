@@ -127,6 +127,12 @@ jobs:
             --exclude libcudart.so.12 \
             --exclude libcudart.so.12.0 \
             -w repaired_dist/
+
+          # Safely rewrite the tags to ONLY use the requested $PLAT
+          echo "Stripping redundant platform tags..."
+          cd repaired_dist
+          python${{ matrix.config.python }} -m wheel tags --platform-tag $PLAT *.whl --remove
+          cd ..
           
           # Replace original wheel with the repaired many-linux wheel
           rm dist/*.whl
@@ -231,13 +237,28 @@ jobs:
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax pybind11
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
           
           # Build Wheel
           python -m build --wheel --no-isolation
+
+      - name: Upload 3.11 Wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.config.torch }}-${{ env.cu_version }}-py3.11
+          path: dist/*.whl
           
+      - name: Clean Build Workspace
+        shell: pwsh
+        run: |
+          # Clear intermediate C++ / CUDA binaries
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          
+          # Clear metadata cache
           Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          
+          # Clear the 3.11 output wheel so it doesn't get bundled with 3.12 later
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
 
       # --- PYTHON 3.12 BUILD ---
       - name: Set up Python 3.12
@@ -260,7 +281,7 @@ jobs:
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax pybind11
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
           
           # Build Wheel
           python -m build --wheel --no-isolation
@@ -323,7 +344,7 @@ jobs:
 
           # 2. Regenerate index files for ALL wheels (old + new)
           cd public/whl
-          for dir in cu*; do
+          for dir in cu* cpu; do
             if [ -d "$dir" ]; then
               echo "<!DOCTYPE html><html><body><a href=\"eiko/\">eiko</a></body></html>" > "$dir/index.html"
               
