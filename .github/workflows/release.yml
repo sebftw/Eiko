@@ -7,73 +7,37 @@ on:
 
 jobs:
   build_ubuntu_wheels:
-    name: Ubuntu ${{ matrix.config.os_version }} (Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
+    name: Ubuntu ${{ matrix.config.os_version }} (Python:${{ matrix.python-version }}, Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
+        python-version: ["3.10"]  # 3.10, 3.12, etc...
         config:
-          # PyTorch 2.5 supports older CUDA 12.x
-          # - { torch: '2.5.0', cuda: '12.1.1' }
-          # - { torch: '2.5.0', cuda: '12.4.0' }
-          
-          # PyTorch 2.9 dropped 12.4, moved to 12.6+
-          # - { torch: '2.9.0', cuda: '12.6.2' } 
-          
-          # PyTorch 2.12 supports 12.6 and 13.x
-          # - { torch: '2.12.0', cuda: '12.6.2', os_version: '22.04' }
-          - { torch: '2.12.0', cuda: '13.0.1', os_version: '26.04' }
           - { torch: '2.12.0', cuda: '13.0.1', os_version: '22.04' }
-          - { torch: '2.12.0', cuda: '12.6.2', os_version: '20.04' }  # If we can compile for Ubuntu 20, then Ubuntu 22 release is redundant.
+          - { torch: '2.12.0', cuda: '12.6.2', os_version: '20.04' }
         
     container:
-      # Hardcode ubuntu22.04 for all CUDA versions
+      # Use a NVIDIA CUDA container for compilation
       image: nvidia/cuda:${{ matrix.config.cuda }}-devel-ubuntu${{ matrix.config.os_version }}
 
     steps:
-      - name: Maximize Runner Disk Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-      
-      - name: Pre-install Git for Checkout
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: apt-get update && apt-get install -y git
-
-      - uses: actions/checkout@v4
-
-      - name: Install System Dependencies and Python via Deadsnakes
+      # Pre-install dependencies required by GitHub Actions tools
+      - name: Install Action Prerequisites
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential git wget curl
-          
-          add-apt-repository -y ppa:deadsnakes/ppa
-          apt-get update
-          
-          # Detect OS Version
-          OS_REL=$(lsb_release -rs)
-          echo "Detected Ubuntu $OS_REL"
-          
-          # Base packages
-          PKGS="python3.8 python3.8-dev python3.8-venv \
-             python3.10 python3.10-dev python3.10-venv \
-             python3.12 python3.12-dev python3.12-venv"
-          
-          apt-get install -y $PKGS
-          
-          # Bootstrap pip for all detected versions
-          curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          for py in $(find /usr/bin /usr/local/bin /bin -maxdepth 1 -executable -name "python3*" 2>/dev/null | sort -u); do
-            $py get-pip.py
-          done
+          apt-get install -y git curl wget build-essential ca-certificates
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Setup Python using the official action
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Format CUDA version for PyTorch
         id: format-cuda
@@ -81,9 +45,10 @@ jobs:
           CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
       
-      - name: Compile Wheels for all Python Versions
+      # Straightforward compilation step (No bash loops, no mid-job cleanup required)
+      - name: Compile Wheel
         env:
-          FORCE_CUDA: "1" # <-- PYTORCH SHOULD COMPILE WITHOUT RUNTIME GPU CHECK
+          FORCE_CUDA: "1"
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
@@ -91,32 +56,23 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
         run: |
-          # Find all Python versions
-          AVAILABLE_PY=$(find /usr/bin /usr/local/bin /bin -maxdepth 1 -executable -name "python3*" 2>/dev/null | sort -u)
+          echo "Building for Python ${{ matrix.python-version }}..."
           
-          for PY in $AVAILABLE_PY; do
-            echo "Building for $PY..."
-            
-            $PY -m pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-            
-            # 1. Install PyTorch from the explicit wheel index, along with JAX (+pybind11)
-            $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-            $PY -m pip install jax pybind11
-            
-            # 2. Build the wheel 
-            $PY -m build --wheel --no-isolation
-            
-            # 3. CLEANUP: Reclaim ~5-7GB before moving to the next Python version
-            rm -rf build/ *.egg-info/  # Important to remove these build files as well
-            echo "Cleaning up $PY dependencies to save disk space..."
-            $PY -m pip uninstall -y torch torchvision jax pybind11
-            $PY -m pip cache purge 2>/dev/null || true
-          done
+          python -m pip install --upgrade pip
+          python -m pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          
+          # Install PyTorch from the explicit wheel index, along with JAX
+          python -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          python -m pip install jax pybind11
+          
+          # Build the wheel 
+          python -m build --wheel --no-isolation
       
+      # 5. Upload artifacts (Ensure names are unique per Python version)
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-ubuntu${{ matrix.config.os_version }}-pt${{ matrix.config.torch }}-${{ env.cu_version }}
+          name: wheels-ubuntu${{ matrix.config.os_version }}-pt${{ matrix.config.torch }}-${{ env.cu_version }}-py${{ matrix.python-version }}
           path: dist/*.whl
 
   build_windows_wheels:
@@ -152,7 +108,7 @@ jobs:
           cuda: ${{ matrix.config.cuda }}
           method: 'network'
           use-github-cache: 'true'
-          sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
+          sub-packages: '["nvcc", "visual_studio_integration", "thrust", "cudart"]'
           
       - name: Format CUDA version for PyTorch
         shell: bash
@@ -170,7 +126,7 @@ jobs:
           if (-not (Test-Path $SymlinkPath)) {
               New-Item -ItemType Junction -Path $SymlinkPath -Value "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
           }
-
+          
           # 3. Export the space-free path to your environment variables
           echo "CUDA_HOME=$SymlinkPath" >> $env:GITHUB_ENV
           echo "CUDA_PATH=$SymlinkPath" >> $env:GITHUB_ENV
@@ -206,7 +162,8 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
         run: |
           # Install PyTorch and JAX (+pybind11)
-          pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install --upgrade pip
+          pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
           
@@ -234,7 +191,8 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
         run: |
           # Install PyTorch and JAX (+pybind11)
-          pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install --upgrade pip
+          pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
           
