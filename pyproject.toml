@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel", "torch>=2.0.0"]
+requires = ["setuptools>=77.0.3", "wheel", "torch>=2.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,6 +9,7 @@ description = "Eiko: the GPU-accelerated Eikonal equation solver"
 readme = "README.md"
 requires-python = ">=3.9"  # Required for PyTorch 2.0.0
 license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [
     {name = "Sebastian Kazmarek Præsius", email = "sebastian.devel@gmail.com"},
 ]
@@ -20,7 +21,6 @@ keywords = [
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: BSD License",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "Operating System :: Microsoft :: Windows",
