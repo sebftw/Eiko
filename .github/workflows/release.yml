@@ -7,7 +7,7 @@ on:
 
 jobs:
   build_ubuntu_wheels:
-    name: Ubuntu (Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
+    name: Ubuntu ${{ matrix.config.os_version }} (Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
