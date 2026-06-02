@@ -85,6 +85,7 @@ jobs:
           PIP_ROOT_USER_ACTION: "ignore"
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
+          PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
           echo "Building for Python ${{ matrix.config.python }}..."
           
