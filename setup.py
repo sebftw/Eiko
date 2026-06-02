@@ -49,6 +49,7 @@ except ImportError:
 # 3. Process Dynamic Version
 def get_base_version():
     # Read __init__.py as plain text to avoid the import paradox
+    import re
     init_path = os.path.join(os.path.dirname(__file__), "python", "eiko", "__init__.py")
     with open(init_path, "r") as f:
         match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.M)
