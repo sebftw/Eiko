@@ -29,6 +29,16 @@ jobs:
       image: nvidia/cuda:${{ matrix.config.cuda }}-devel-ubuntu22.04
 
     steps:
+      - name: Maximize Runner Disk Space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+      
       - name: Pre-install Git for Checkout
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -60,15 +70,6 @@ jobs:
         run: |
           CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
-
-      - name: Cache Pip Packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.pip-cache
-          # The cache key is tied to the specific Torch version, so it updates when Torch upgrades
-          key: ubuntu-pip-${{ matrix.config.torch }}-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            ubuntu-pip-${{ matrix.config.torch }}-
       
       - name: Compile Wheels for all Python Versions
         env:
@@ -76,14 +77,10 @@ jobs:
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
-          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
           PIP_ROOT_USER_ACTION: "ignore"
           EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
         run: |
-          # Fix the directory ownership so pip trusts the cache folder
-          mkdir -p "${{ github.workspace }}/.pip-cache"
-          chown -R $(whoami) "${{ github.workspace }}/.pip-cache"
-
           # Compile for each supported Python version.
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
@@ -98,6 +95,11 @@ jobs:
             $PY -m build --wheel --no-isolation
             
             rm -rf build/ *.egg-info/
+
+            # 4. CLEANUP: Reclaim ~5-7GB before moving to the next Python version
+            echo "Cleaning up $PY dependencies to save disk space..."
+            $PY -m pip uninstall -y torch torchvision jax pybind11
+            $PY -m pip cache purge 2>/dev/null || true
           done
       
       - name: Upload Wheel Artifacts
