@@ -74,6 +74,7 @@ test = [
 [project.urls]
 Homepage = "https://github.com/sebftw/Eiko"
 
+
 [tool.setuptools]
 packages = ["eiko"]
 include-package-data = true  # <-- Crucial for JIT compilation architectures
@@ -84,6 +85,9 @@ include-package-data = true  # <-- Crucial for JIT compilation architectures
 [tool.setuptools.package-data]
 "eiko.src" = ["*.cuh"]
 "eiko.src.bindings" = ["*.cu"]
+
+[tool.setuptools.dynamic]
+version = {attr = "eiko.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["python/test"]
