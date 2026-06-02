@@ -16,16 +16,16 @@ jobs:
           # 1. The Legacy Baseline (Maximum Compatibility)
           # - Oldest supported Python (3.8) and PyTorch (2.4.0)
           # - Compiling on 22.04's glibc ensures it works natively on 24.04+
-          - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04', python: '3.8' }
+          # - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04', python: '3.8' }
             
           # 2. The Modern Standard (What 90% of your users will actually run)
           # - Previous stable PyTorch on a highly adopted Python version
-          # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.12' }
+          - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.12' }
           # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04', python: '3.13' }
             
           # 3. The Bleeding Edge (Future-proofing)
           # - Used to catch compiler warnings, deprecations, and OS-level quirks early
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04', python: '3.14' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04', python: '3.14' }
         
         
     container:
@@ -170,13 +170,14 @@ jobs:
         config:
           # PyTorch 2.5 supports older CUDA 12.x
           # - { torch: '2.5.0', cuda: '12.1.1' }
+          - { torch: '2.4.0', cuda: '12.1.0' }
           # - { torch: '2.5.0', cuda: '12.4.0' }
           
           # PyTorch 2.9 dropped 12.4, moved to 12.6+
           # - { torch: '2.9.0', cuda: '12.6.2' } 
           
           # PyTorch 2.12 supports 12.6 and 13.x
-          - { torch: '2.12.0', cuda: '12.6.2' }
+          # - { torch: '2.12.0', cuda: '12.6.2' }
           # - { torch: '2.12.0', cuda: '13.0.1' }
 
     steps:
