@@ -117,7 +117,7 @@ jobs:
           cuda: ${{ matrix.config.cuda }}
           method: 'network'
           use-github-cache: 'true'
-          sub-packages: '["nvcc", "visual_studio_integration", "thrust", "cudart"]'
+          # sub-packages: '["nvcc", "visual_studio_integration", "thrust", "cudart"]'
           
       - name: Format CUDA version for PyTorch
         shell: bash
