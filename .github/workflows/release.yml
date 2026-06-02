@@ -58,7 +58,12 @@ jobs:
           fi
           
           # Bootstrap pip directly into this Python version
-          curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          if [ "${{ matrix.config.python }}" = "3.8" ] || [ "${{ matrix.config.python }}" = "3.9" ]; then
+            # Dynamically choose the correct get-pip URL based on Python version
+            PIP_URL="https://bootstrap.pypa.io/pip/${{ matrix.config.python }}/get-pip.py"
+          else
+            PIP_URL="https://bootstrap.pypa.io/get-pip.py"
+          fi
           python${{ matrix.config.python }} get-pip.py
 
       - name: Format CUDA version for PyTorch
