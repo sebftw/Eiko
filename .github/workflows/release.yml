@@ -84,12 +84,12 @@ jobs:
           # Compile for each supported Python version.
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
-
-            $PY -m pip install --upgrade "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
             
             # 1. Install PyTorch from the explicit wheel index, along with JAX (+pybind11)
             $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
             $PY -m pip install jax pybind11
+
+            $PY -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
             
             # 2. Build the wheel 
             $PY -m build --wheel --no-isolation
