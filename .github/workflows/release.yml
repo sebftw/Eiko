@@ -22,6 +22,7 @@ jobs:
           
           # PyTorch 2.12 supports 12.6 and 13.x
           # - { torch: '2.12.0', cuda: '12.6.2', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '13.0.1', os_version: '26.04' }
           - { torch: '2.12.0', cuda: '13.0.1', os_version: '22.04' }
           - { torch: '2.12.0', cuda: '12.6.2', os_version: '20.04' }  # If we can compile for Ubuntu 20, then Ubuntu 22 release is redundant.
         
@@ -61,14 +62,10 @@ jobs:
           OS_REL=$(lsb_release -rs)
           echo "Detected Ubuntu $OS_REL"
           
-          # Base packages needed for both
-          PKGS="python3.10 python3.10-dev python3.10-venv"
-          
-          # Add Python 3.12 if not on 20.04 (or if supported by your PPA)
-          if [ "$OS_REL" != "20.04" ]; then
-            PKGS="$PKGS python3.11 python3.11-dev python3.11-venv"
-            PKGS="$PKGS python3.12 python3.12-dev python3.12-venv"
-          fi
+          # Base packages
+          PKGS="python3.8 python3.8-dev python3.8-venv \
+             python3.10 python3.10-dev python3.10-venv \
+             python3.12 python3.12-dev python3.12-venv"
           
           apt-get install -y $PKGS
           
