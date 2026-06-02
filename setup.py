@@ -7,7 +7,6 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 # Add 'python' to sys.path so we can import 'eiko.build_config'
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
-from eiko import __version__
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 
 # 1. Define the base PyTorch Extension
