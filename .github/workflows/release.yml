@@ -7,15 +7,14 @@ on:
 
 jobs:
   build_ubuntu_wheels:
-    name: Ubuntu ${{ matrix.config.os_version }} (Python:${{ matrix.python-version }}, Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
+    name: Ubuntu ${{ matrix.config.os_version }} (Python:${{ matrix.config.python }}, Torch:${{ matrix.config.torch }}, CUDA:${{ matrix.config.cuda }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]  # 3.10, 3.12, etc...
         config:
-          - { torch: '2.12.0', cuda: '13.0.1', os_version: '22.04' }
-          - { torch: '2.12.0', cuda: '12.6.2', os_version: '20.04' }
+          - { torch: '2.12.0', cuda: '13.0.1', os_version: '22.04', python: '3.10' }
+          - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04', python: '3.8' }
         
     container:
       # Use a NVIDIA CUDA container for compilation
@@ -37,16 +36,11 @@ jobs:
           apt-get update
           
           # Install the specific Python version dictated by the matrix
-          apt-get install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-dev python${{ matrix.python-version }}-venv
+          apt-get install -y python${{ matrix.config.python }} python${{ matrix.config.python }}-dev python${{ matrix.config.python }}-venv
           
           # Bootstrap pip directly into this Python version
-          curl -sS https://bootstrap.pypa.io/get-pip.py | python${{ matrix.python-version }}
-      
-      # Setup Python using the official action
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+          curl -sS https://bootstrap.pypa.io/get-pip.py
+          python${{ matrix.config.python }} get-pip.py
 
       - name: Format CUDA version for PyTorch
         id: format-cuda
@@ -65,7 +59,7 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
         run: |
-          echo "Building for Python ${{ matrix.python-version }}..."
+          echo "Building for Python ${{ matrix.config.python }}..."
           
           python -m pip install --upgrade pip
           python -m pip install "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
@@ -81,7 +75,7 @@ jobs:
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-ubuntu${{ matrix.config.os_version }}-pt${{ matrix.config.torch }}-${{ env.cu_version }}-py${{ matrix.python-version }}
+          name: wheels-ubuntu${{ matrix.config.os_version }}-pt${{ matrix.config.torch }}-${{ env.cu_version }}-py${{ matrix.config.python }}
           path: dist/*.whl
 
   build_windows_wheels:
@@ -128,31 +122,21 @@ jobs:
       
       - name: Create CUDA Symlink and Set Environment Variables
         run: |
-          # 1. Define a space-free path destination
-          $SymlinkPath = "C:\CUDA"
-
-          # 2. Create a Directory Junction if it doesn't already exist
-          if (-not (Test-Path $SymlinkPath)) {
-              New-Item -ItemType Junction -Path $SymlinkPath -Value "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
-          }
           
-          # 3. Export the space-free path to your environment variables
-          echo "CUDA_HOME=$SymlinkPath" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=$SymlinkPath" >> $env:GITHUB_ENV
+          # 1. Export the space-free path to your environment variables
+          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
 
           # 4. Force GitHub to use the symlinked nvcc.exe instead of the one in Program Files.
           # (Writing to GITHUB_PATH prepends it, ensuring it takes priority).
-          echo "$SymlinkPath\bin" >> $env:GITHUB_PATH
-          
-          # 5. Bypass nvcc's include parsing bugs and feed the directory natively to MSVC
-          echo "INCLUDE=$SymlinkPath\include;$env:INCLUDE" >> $env:GITHUB_ENV
+          echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
 
           # 6. Validate and print the contents of the include directory
           Write-Host "--- Validating CUDA Include Directory Contents ---"
-          if (Test-Path "$SymlinkPath\include") {
-              Get-ChildItem -Path "$SymlinkPath\include" | Select-Object -Property Name, Length
+          if (Test-Path "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include") {
+              Get-ChildItem -Path "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include" | Select-Object -Property Name, Length
           } else {
-              Write-Error "Error: Include directory does not exist at $SymlinkPath\include"
+              Write-Error "Error: Include directory does not exist at ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include"
               exit 1
           }
 
@@ -166,7 +150,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          config.python: '3.11'
           
       - name: Build 3.11 Wheel
         env:
@@ -195,7 +179,7 @@ jobs:
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          config.python: '3.12'
           
       - name: Build 3.12 Wheel
         env:
