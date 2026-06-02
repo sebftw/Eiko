@@ -160,14 +160,6 @@ jobs:
           echo "The CUDA_HOME variable is currently set to: $env:CUDA_HOME"
           echo "Testing if nvcc is accessible:"
           nvcc --version
-
-      - name: Cache Pip Packages (Windows)
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.pip-cache
-          key: windows-pip-${{ matrix.config.torch }}-${{ hashFiles('**/pyproject.toml') }}
-          restore-keys: |
-            windows-pip-${{ matrix.config.torch }}-
       
       # --- PYTHON 3.11 BUILD ---
       - name: Set up Python 3.11
@@ -182,7 +174,7 @@ jobs:
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
-          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
+          PIP_NO_CACHE_DIR: "1"
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path
           EIKO_RELEASE_BUILD: "1"
         run: |
@@ -211,7 +203,7 @@ jobs:
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
-          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
+          PIP_NO_CACHE_DIR: "1"
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
           EIKO_RELEASE_BUILD: "1"
         run: |
