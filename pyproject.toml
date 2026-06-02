@@ -76,6 +76,7 @@ Homepage = "https://github.com/sebftw/Eiko"
 
 [tool.setuptools]
 packages = ["eiko"]
+include-package-data = true  # <-- Crucial for JIT compilation architectures
 
 [tool.setuptools.package-dir]
 "eiko" = "python/eiko"
