@@ -62,10 +62,11 @@ jobs:
           echo "Detected Ubuntu $OS_REL"
           
           # Base packages needed for both
-          PKGS="python3.11 python3.11-dev python3.11-venv"
+          PKGS="python3.10 python3.10-dev python3.10-venv"
           
           # Add Python 3.12 if not on 20.04 (or if supported by your PPA)
           if [ "$OS_REL" != "20.04" ]; then
+            PKGS="$PKGS python3.11 python3.11-dev python3.11-venv"
             PKGS="$PKGS python3.12 python3.12-dev python3.12-venv"
           fi
           
@@ -73,7 +74,7 @@ jobs:
           
           # Bootstrap pip for all detected versions
           curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          for py in $(ls /usr/bin/python3* | grep -E '3\.(11|12)$'); do
+          for py in $(find /usr/bin /usr/local/bin /bin -maxdepth 1 -executable -name "python3*" 2>/dev/null | sort -u); do
             $py get-pip.py
           done
 
@@ -93,8 +94,8 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
         run: |
-          # Find all Python versions that have pip installed
-          AVAILABLE_PY=$(compgen -c | grep -E '^python3\.(11|12)$' | sort -u)
+          # Find all Python versions
+          AVAILABLE_PY=$(find /usr/bin /usr/local/bin /bin -maxdepth 1 -executable -name "python3*" 2>/dev/null | sort -u)
           
           for PY in $AVAILABLE_PY; do
             echo "Building for $PY..."
@@ -108,9 +109,8 @@ jobs:
             # 2. Build the wheel 
             $PY -m build --wheel --no-isolation
             
-            rm -rf build/ *.egg-info/
-
-            # 4. CLEANUP: Reclaim ~5-7GB before moving to the next Python version
+            # 3. CLEANUP: Reclaim ~5-7GB before moving to the next Python version
+            rm -rf build/ *.egg-info/  # Important to remove these build files as well
             echo "Cleaning up $PY dependencies to save disk space..."
             $PY -m pip uninstall -y torch torchvision jax pybind11
             $PY -m pip cache purge 2>/dev/null || true
@@ -164,10 +164,19 @@ jobs:
           CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
       
-      - name: Set CUDA_HOME
+      - name: Create CUDA Symlink and Set Environment Variables
         run: |
-          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV 
+          # 1. Define a space-free path destination
+          $SymlinkPath = "C:\CUDA"
+
+          # 2. Create a Directory Junction if it doesn't already exist
+          if (-not (Test-Path $SymlinkPath)) {
+              New-Item -ItemType Junction -Path $SymlinkPath -Value "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}"
+          }
+
+          # 3. Export the space-free path to your environment variables
+          echo "CUDA_HOME=$SymlinkPath" >> $env:GITHUB_ENV
+          echo "CUDA_PATH=$SymlinkPath" >> $env:GITHUB_ENV
 
       - name: Verify CUDA_HOME
         run: |
