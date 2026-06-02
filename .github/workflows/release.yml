@@ -14,20 +14,20 @@ jobs:
       matrix:
         config:
         # 1. The Modern Standard (Primary Target)
-        - { torch: '2.12.0', cuda: '13.0.1', os_version: '24.04', python: '3.12' }
+        # - { torch: '2.12.0', cuda: '13.0.1', os_version: '24.04', python: '3.12' }
         
         # 2. Legacy Hardware Support (CUDA 12.6 is PyTorch's maintained legacy backend)
-        - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04', python: '3.10' }
+        # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04', python: '3.10' }
         # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04', python: '3.11' }
         # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04', python: '3.12' }
         # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04', python: '3.13' }
         - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04', python: '3.8' }  # super old legacy version
         
         # 3. Previous Stable PyTorch Release
-        # - { torch: '2.11.0', cuda: '13.0.1', os_version: '24.04', python: '3.12' }
+        - { torch: '2.11.0', cuda: '13.0.1', os_version: '24.04', python: '3.12' }
         
         # 4. Bleeding Edge (Catch issues early with the latest Python & Experimental CUDA)
-        # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04', python: '3.14' }
+        - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04', python: '3.14' }
         
         
     container:
