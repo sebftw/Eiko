@@ -75,14 +75,16 @@ test = [
 Homepage = "https://github.com/sebftw/Eiko"
 
 [tool.setuptools]
-packages = ["eiko", "eiko.src"]
+packages = ["eiko", "eiko.src", "eiko.src.bindings"]
 
 [tool.setuptools.package-dir]
 "eiko" = "python/eiko"
 "eiko.src" = "src"
+# (setuptools will automatically figure out that eiko.src.bindings is in src/bindings)
 
 [tool.setuptools.package-data]
-"eiko.src" = ["*.cuh", "bindings/*.cu"]
+"eiko.src" = ["*.cuh"]
+"eiko.src.bindings" = ["*.cu"]
 
 [tool.pytest.ini_options]
 testpaths = ["python/test"]
