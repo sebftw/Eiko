@@ -126,6 +126,8 @@ jobs:
             --exclude libcudart.so.11.0 \
             --exclude libcudart.so.12 \
             --exclude libcudart.so.12.0 \
+            --exclude libcudart.so.13 \
+            --exclude libcudart.so.13.2 \
             -w repaired_dist/
 
           # Safely rewrite the tags to ONLY use the requested $PLAT
