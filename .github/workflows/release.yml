@@ -14,21 +14,14 @@ jobs:
       matrix:
         torch-version: ['2.5.0', '2.9.0', '2.12.0']
         cuda-version: ['12.1.1', '12.4.0', '13.0.1']
-        include:
-          # Map CUDA 12.x to Ubuntu 20.04 (Max compatibility), and CUDA 13.x to 22.04
-          - cuda-version: '12.1.1'
-            ubuntu-version: '20.04'
-          - cuda-version: '12.4.0'
-            ubuntu-version: '20.04'
-          - cuda-version: '13.0.1'
-            ubuntu-version: '22.04'
         exclude:
           # PyTorch 2.5 and older do not have CUDA 13 wheels
           - torch-version: '2.5.0'
             cuda-version: '13.0.1'
         
     container:
-      image: nvidia/cuda:${{ matrix.cuda-version }}-devel-ubuntu${{ matrix.ubuntu-version }}
+      # Hardcode ubuntu22.04 for all CUDA versions
+      image: nvidia/cuda:${{ matrix.cuda-version }}-devel-ubuntu22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -38,14 +31,19 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential git wget
+          apt-get install -y software-properties-common build-essential git wget curl
           
           add-apt-repository -y ppa:deadsnakes/ppa
           apt-get update
           
           # Install target Python versions at once
-          apt-get install -y python3.11 python3.11-dev python3.11-venv 
+          apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
           apt-get install -y python3.12 python3.12-dev python3.12-venv
+
+          # Bootstrap pip globally for both versions
+          curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+          python3.11 get-pip.py
+          python3.12 get-pip.py
 
       - name: Format CUDA version for PyTorch
         id: format-cuda
@@ -61,6 +59,8 @@ jobs:
         run: |
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
+            
+            
             $PY -m pip install --upgrade pip setuptools wheel ninja build
             
             # 1. Install PyTorch first from the explicit wheel index
@@ -100,9 +100,12 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.19
+        uses: Jimver/cuda-toolkit@v0.2.35
         with:
           cuda: ${{ matrix.cuda-version }}
+          method: 'network'
+          use-github-cache: 'true'
+          sub-packages: '["nvcc", "visual_studio_integration", "cudart", "cublas", "cublas_dev", "cusparse", "cusparse_dev"]'
           
       - name: Format CUDA version for PyTorch
         shell: bash
