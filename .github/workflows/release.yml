@@ -42,7 +42,7 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential git wget curl ca-certificates patchelf
+          apt-get install -y software-properties-common build-essential git wget curl ca-certificates
           
           # Add deadsnakes PPA to get modern Python on older Ubuntu versions
           add-apt-repository ppa:deadsnakes/ppa -y
@@ -101,7 +101,7 @@ jobs:
           echo "Building for Python ${{ matrix.config.python }}..."
           
           python${{ matrix.config.python }} -m pip install --upgrade pip
-          python${{ matrix.config.python }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel
+          python${{ matrix.config.python }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14"
           
           # Install PyTorch from the explicit wheel index, along with JAX
           python${{ matrix.config.python }} -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
