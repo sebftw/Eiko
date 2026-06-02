@@ -175,6 +175,13 @@ jobs:
           echo "CUDA_HOME=$SymlinkPath" >> $env:GITHUB_ENV
           echo "CUDA_PATH=$SymlinkPath" >> $env:GITHUB_ENV
 
+          # 4. Force GitHub to use the symlinked nvcc.exe instead of the one in Program Files.
+          # (Writing to GITHUB_PATH prepends it, ensuring it takes priority).
+          echo "$SymlinkPath\bin" >> $env:GITHUB_PATH
+          
+          # 5. Bypass nvcc's include parsing bugs and feed the directory natively to MSVC
+          echo "INCLUDE=$SymlinkPath\include;$env:INCLUDE" >> $env:GITHUB_ENV
+
       - name: Verify CUDA_HOME
         run: |
           echo "The CUDA_HOME variable is currently set to: $env:CUDA_HOME"
