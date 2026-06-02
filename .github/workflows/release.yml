@@ -14,7 +14,7 @@ jobs:
       matrix:
         config:
           # PyTorch 2.5 supports older CUDA 12.x
-          # - { torch: '2.5.0', cuda: '12.1.1' }
+          - { torch: '2.5.0', cuda: '12.1.1' }
           # - { torch: '2.5.0', cuda: '12.4.0' }
           
           # PyTorch 2.9 dropped 12.4, moved to 12.6+
@@ -22,7 +22,7 @@ jobs:
           
           # PyTorch 2.12 supports 12.6 and 13.x
           # - { torch: '2.12.0', cuda: '12.6.2' }
-          - { torch: '2.12.0', cuda: '13.0.1' }
+          # - { torch: '2.12.0', cuda: '13.0.1' }
         
     container:
       # Hardcode ubuntu22.04 for all CUDA versions
@@ -72,23 +72,29 @@ jobs:
       
       - name: Compile Wheels for all Python Versions
         env:
+          FORCE_CUDA: "1" # <-- PYTORCH SHOULD COMPILE WITHOUT RUNTIME GPU CHECK
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
           PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
+          PIP_ROOT_USER_ACTION: "ignore"
+          EIKO_RELEASE_BUILD: "1"
         run: |
+          # Fix the directory ownership so pip trusts the cache folder
+          mkdir -p "${{ github.workspace }}/.pip-cache"
+          chown -R $(whoami) "${{ github.workspace }}/.pip-cache"
+
+          # Compile for each supported Python version.
           for PY in "python3.11" "python3.12"; do
             echo "Building for $PY..."
             
             $PY -m pip install --upgrade pip setuptools wheel ninja build
             
-            # 1. Install PyTorch first from the explicit wheel index
+            # 1. Install PyTorch from the explicit wheel index, along with JAX (+pybind11)
             $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+            $PY -m pip install jax pybind11
             
-            # 2. Install pyproject.toml dependencies + jax extras
-            $PY -m pip install -e ".[jax]" --extra-index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-            
-            # 3. Build the wheel 
+            # 2. Build the wheel 
             $PY -m build --wheel --no-isolation
             
             rm -rf build/ *.egg-info/
@@ -123,6 +129,8 @@ jobs:
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -167,21 +175,22 @@ jobs:
           
       - name: Build 3.11 Wheel
         env:
-          DISTUTILS_USE_SDK: 1
+          DISTUTILS_USE_SDK: "1"  # Crucial: Tells setuptools to use the active MSVC env
+          FORCE_CUDA: "1"        # Forces compilation even if runtime check fails (there is no GPU attached)
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
-          CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
+          PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
+          CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path
+          EIKO_RELEASE_BUILD: "1"
         run: |
           python -m pip install --upgrade pip setuptools wheel ninja build
           
-          # 1. Install PyTorch
+          # 1. Install PyTorch and JAX (+pybind11)
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax pybind11
           
-          # 2. Install pyproject.toml dependencies + jax extras
-          pip install -e ".[jax]" --extra-index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          
-          # 3. Build Wheel
+          # 2. Build Wheel
           python -m build --wheel --no-isolation
           
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
@@ -195,20 +204,20 @@ jobs:
           
       - name: Build 3.12 Wheel
         env:
-          DISTUTILS_USE_SDK: 1
+          DISTUTILS_USE_SDK: "1"  # Crucial: Tells setuptools to use the active MSVC env
+          FORCE_CUDA: "1"        # Forces compilation even if runtime check fails (there is no GPU attached)
           TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;12.0+PTX" 
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.config.torch }}${{ env.cu_version }}"
           PIP_CACHE_DIR: ${{ github.workspace }}/.pip-cache
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
+          EIKO_RELEASE_BUILD: "1"
         run: |
           python -m pip install --upgrade pip setuptools wheel ninja build
           
-          # 1. Install PyTorch
+          # 1. Install PyTorch and JAX (+pybind11)
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          
-          # 2. Install pyproject.toml dependencies + jax extras (Quotes are mandatory in PowerShell)
-          pip install -e ".[jax]" --extra-index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax pybind11
           
           # 3. Build Wheel
           python -m build --wheel --no-isolation
