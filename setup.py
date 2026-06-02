@@ -27,7 +27,6 @@ try:
     import jax
     import pybind11
     
-    # Append pybind11 headers to the include paths for JAX
     jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
     
     ext_modules.append(
@@ -46,8 +45,16 @@ try:
 except ImportError:
     print("\n[Eiko setup.py] JAX or pybind11 not found. Skipping JAX extension build.\n")
 
-# 3. Execute setup
+
+# 3. Process Dynamic Version
+base_version = "0.8.5" # Manage your base version here now
+local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
+full_version = f"{base_version}{local_version}"
+
+
+# 4. Execute setup
 setup(
+    version=full_version, # Injected into the wheel filename and metadata
     ext_modules=ext_modules,
     cmdclass={
         "build_ext": BuildExtension
