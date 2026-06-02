@@ -48,8 +48,22 @@ except ImportError:
 
 
 # 3. Process Dynamic Version
-base_version = __version__
+def get_base_version():
+    # Read __init__.py as plain text to avoid the import paradox
+    init_path = os.path.join(os.path.dirname(__file__), "src", "eiko", "__init__.py")
+    with open(init_path, "r") as f:
+        match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.M)
+        if match:
+            return match.group(1)
+    return "0.0.0"
+
+# Get the clean base version (e.g., "0.1.0")
+base_version = get_base_version()
+
+# Get the CI environment suffix (e.g., "+pt2.12.0cu126")
 local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
+
+# Combine them into a PEP-440 compliant string (e.g., "0.1.0+pt2.12.0cu126")
 full_version = f"{base_version}{local_version}"
 
 
