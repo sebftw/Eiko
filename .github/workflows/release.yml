@@ -92,7 +92,7 @@ jobs:
           
           # Install PyTorch from the explicit wheel index, along with JAX
           python${{ matrix.config.python }} -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          python${{ matrix.config.python }} -m pip install jax jaxlib pybind11
+          python${{ matrix.config.python }} -m pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
           
           # Build the wheel 
           python${{ matrix.config.python }} -m build --wheel --no-isolation
@@ -137,8 +137,8 @@ jobs:
           # - { torch: '2.9.0', cuda: '12.6.2' } 
           
           # PyTorch 2.12 supports 12.6 and 13.x
-          # - { torch: '2.12.0', cuda: '12.6.2' }
-          - { torch: '2.12.0', cuda: '13.0.1' }
+          - { torch: '2.12.0', cuda: '12.6.2' }
+          # - { torch: '2.12.0', cuda: '13.0.1' }
 
     steps:
       - uses: actions/checkout@v4
@@ -198,7 +198,7 @@ jobs:
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11
+          pip install jax pybind11
           
           # Build Wheel
           python -m build --wheel --no-isolation
@@ -227,7 +227,7 @@ jobs:
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11
+          pip install jax pybind11
           
           # Build Wheel
           python -m build --wheel --no-isolation
