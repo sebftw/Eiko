@@ -137,32 +137,19 @@ jobs:
           use-github-cache: 'true'
           # sub-packages: '["nvcc", "visual_studio_integration", "thrust", "cudart"]'
           
-      - name: Format CUDA version for PyTorch
+      - name: Format CUDA version and PATHs for PyTorch
         shell: bash
         id: format-cuda
         run: |
+          # Format CUDA version string
           CUDA_SHORT=$(echo ${{ matrix.config.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
-      
-      - name: Create CUDA Symlink and Set Environment Variables
-        run: |
+
+          # Set CUDA PATHs
+          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
+          echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
+          echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin" >> $GITHUB_PATH
           
-          # 1. Export the space-free path to your environment variables
-          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
-          echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $env:GITHUB_ENV
-          
-          # 2. Force GitHub to use the symlinked nvcc.exe instead of the one in Program Files.
-          # (Writing to GITHUB_PATH prepends it, ensuring it takes priority).
-          echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin" >> $env:GITHUB_PATH
-          
-          # 3. Validate and print the contents of the include directory
-          # Write-Host "--- Validating CUDA Include Directory Contents ---"
-          # if (Test-Path "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include") {
-          #     Get-ChildItem -Path "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include" | Select-Object -Property Name, Length
-          # } else {
-          #     Write-Error "Error: Include directory does not exist at ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\include"
-          #     exit 1
-          # }
 
       - name: Verify CUDA_HOME
         run: |
