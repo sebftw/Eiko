@@ -21,12 +21,13 @@ jobs:
           # - { torch: '2.9.0', cuda: '12.6.2' } 
           
           # PyTorch 2.12 supports 12.6 and 13.x
-          - { torch: '2.12.0', cuda: '12.6.2' }
-          # - { torch: '2.12.0', cuda: '13.0.1' }
+          # - { torch: '2.12.0', cuda: '12.6.2', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '13.0.1', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '12.6.2', os_version: '20.04' }  # If we can compile for Ubuntu 20, then Ubuntu 22 release is redundant.
         
     container:
       # Hardcode ubuntu22.04 for all CUDA versions
-      image: nvidia/cuda:${{ matrix.config.cuda }}-devel-ubuntu22.04
+      image: nvidia/cuda:${{ matrix.config.cuda }}-devel-ubuntu${{ matrix.config.os_version }}
 
     steps:
       - name: Maximize Runner Disk Space
@@ -56,14 +57,25 @@ jobs:
           add-apt-repository -y ppa:deadsnakes/ppa
           apt-get update
           
-          # Install target Python versions at once
-          apt-get install -y python3.11 python3.11-dev python3.11-venv python3.11-distutils
-          apt-get install -y python3.12 python3.12-dev python3.12-venv
-
-          # Bootstrap pip globally for both versions
+          # Detect OS Version
+          OS_REL=$(lsb_release -rs)
+          echo "Detected Ubuntu $OS_REL"
+          
+          # Base packages needed for both
+          PKGS="python3.11 python3.11-dev python3.11-venv"
+          
+          # Add Python 3.12 if not on 20.04 (or if supported by your PPA)
+          if [ "$OS_REL" != "20.04" ]; then
+            PKGS="$PKGS python3.12 python3.12-dev python3.12-venv"
+          fi
+          
+          apt-get install -y $PKGS
+          
+          # Bootstrap pip for all detected versions
           curl -sS https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-          python3.11 get-pip.py
-          python3.12 get-pip.py
+          for py in $(ls /usr/bin/python3* | grep -E '3\.(11|12)$'); do
+            $py get-pip.py
+          done
 
       - name: Format CUDA version for PyTorch
         id: format-cuda
@@ -81,15 +93,17 @@ jobs:
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
         run: |
-          # Compile for each supported Python version.
-          for PY in "python3.11" "python3.12"; do
+          # Find all Python versions that have pip installed
+          AVAILABLE_PY=$(compgen -c | grep -E '^python3\.(11|12)$' | sort -u)
+          
+          for PY in $AVAILABLE_PY; do
             echo "Building for $PY..."
+            
+            $PY -m pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
             
             # 1. Install PyTorch from the explicit wheel index, along with JAX (+pybind11)
             $PY -m pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
             $PY -m pip install jax pybind11
-
-            $PY -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
             
             # 2. Build the wheel 
             $PY -m build --wheel --no-isolation
@@ -105,7 +119,7 @@ jobs:
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-ubuntu-pt${{ matrix.config.torch }}-${{ env.cu_version }}
+          name: wheels-ubuntu${{ matrix.config.os_version }}-pt${{ matrix.config.torch }}-${{ env.cu_version }}
           path: dist/*.whl
 
   build_windows_wheels:
@@ -178,13 +192,12 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path
           EIKO_RELEASE_BUILD: "1"
         run: |
-          # 1. Install PyTorch and JAX (+pybind11)
+          # Install PyTorch and JAX (+pybind11)
+          pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
           
-          python -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          
-          # 3. Build Wheel
+          # Build Wheel
           python -m build --wheel --no-isolation
           
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
@@ -207,13 +220,12 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} # Force PyTorch to see the toolkit path 
           EIKO_RELEASE_BUILD: "1"
         run: |
-          # 1. Install PyTorch and JAX (+pybind11)
+          # Install PyTorch and JAX (+pybind11)
+          pip install "pip>=24.0" "setuptools>=71.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.config.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax pybind11
-
-          python -m pip install "pip>=24.0" "setuptools>=71.0" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
-          # 3. Build Wheel
+          # Build Wheel
           python -m build --wheel --no-isolation
           
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
