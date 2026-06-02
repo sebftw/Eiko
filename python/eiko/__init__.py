@@ -135,8 +135,8 @@ __all__ = ['eiko', 'eiko3d', 'animate_eikonal']
 
 # Define the version number, so it is easily accessible.
 try:
-    from importlib.metadata import version, PackageNotFoundError
-    __version__ = version("eiko")
+    # from importlib.metadata import version, PackageNotFoundError
+    __version__ =  "0.8.5" # version("eiko")
 except PackageNotFoundError:
     # This acts as a fallback when the package is being built
     # or imported from source without being installed first.
