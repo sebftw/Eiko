@@ -119,7 +119,6 @@ jobs:
           BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
 
           # 2. Grab ALL wheel filenames into a comma-separated string to pass to JS
-          # Example output: eiko-0.1.0+pt2.12.0.cu126-cp310-cp310-manylinux_2_35_x86_64.whl,...
           WHEEL_LIST=$(find public/whl -name "*.whl" -exec basename {} \; | tr '\n' ',' | sed 's/,$//')
 
           # 3. Write the HTML file
@@ -144,10 +143,9 @@ jobs:
                   .btn:hover:not(.disabled) { background: #e4e4e4; }
                   .btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; font-weight: 600; }
                   
-                  /* Disabled state styling */
-                  .btn.disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
+                  /* Disabled state styling for CUDA options without wheels */
+                  .btn.disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; background: #fafafa; border-color: transparent; }
                   
-                  /* Green styling for the latest versions */
                   .btn.latest { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
                   .btn.latest:hover:not(.disabled) { background: #dcfce7; }
                   .btn.latest.active { background: #22c55e; border-color: #22c55e; color: white; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.25); }
@@ -160,13 +158,8 @@ jobs:
           <body>
               <div class="container">
                   <h1>Install Eiko</h1>
-                  <p>Select your environment to generate the compatible pip install commands.</p>
+                  <p>Select your PyTorch environment to view compatible compute platforms.</p>
                   
-                  <div class="row">
-                      <div class="label">Operating System</div>
-                      <div class="options" id="os-options"></div>
-                  </div>
-
                   <div class="row">
                       <div class="label">PyTorch Build</div>
                       <div class="options" id="pt-options"></div>
@@ -183,44 +176,34 @@ jobs:
               <script>
           EOF
           
-          # 4. Inject the bash variables into JS cleanly
+          # 4. Inject the bash variables into JS
           echo "const config = { version: '${BASE_VERSION}', baseUrl: '${BASE_URL}' };" >> public/index.html
           echo "const rawWheels = '${WHEEL_LIST}'.split(',');" >> public/index.html
           
-          # 5. Finish the HTML file with the application logic
+          # 5. Finish the HTML file with the master-slave application logic
           cat << 'EOF' >> public/index.html
                   const validCombos = new Set();
-                  const uniqueVars = { os: new Set(), pt: new Set(), cu: new Set() };
+                  const uniqueVars = { pt: new Set(), cu: new Set() };
 
                   // 1. Parse all filenames to discover what actually exists
                   rawWheels.forEach(filename => {
                       if (!filename) return;
                       
-                      // Extract PT and CU using regex based on your local versioning (+pt2.12.0.cu126)
                       const ptMatch = filename.match(/\+pt([0-9\.]+)\./);
                       const cuMatch = filename.match(/\.(cu[0-9]+|cpu)-/);
                       
                       if (ptMatch && cuMatch) {
                           const pt = ptMatch[1];
                           const cu = cuMatch[1];
-                          
-                          // Determine OS from wheel tags
-                          let os = "Linux"; // Default fallback
-                          if (filename.includes("manylinux")) os = "Linux";
-                          if (filename.includes("win")) os = "Windows";
-                          if (filename.includes("mac")) os = "macOS";
-
-                          validCombos.add(`${os}|${pt}|${cu}`);
-                          uniqueVars.os.add(os);
+                          validCombos.add(`${pt}|${cu}`);
                           uniqueVars.pt.add(pt);
                           uniqueVars.cu.add(cu);
                       }
                   });
 
-                  // 2. Sort the arrays (descending for versions, custom for OS)
+                  // 2. Sort the arrays descending
                   const compareVersions = (a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
                   const sorted = {
-                      os: Array.from(uniqueVars.os).sort(),
                       pt: Array.from(uniqueVars.pt).sort(compareVersions),
                       cu: Array.from(uniqueVars.cu).sort((a, b) => {
                           if (a === 'cpu') return 1; if (b === 'cpu') return -1;
@@ -229,58 +212,71 @@ jobs:
                   };
 
                   // 3. Initialize state with the absolute bleeding edge available
-                  let state = { os: sorted.os[0], pt: sorted.pt[0], cu: sorted.cu[0] };
+                  let state = { pt: sorted.pt[0], cu: sorted.cu[0] };
 
                   function renderButtons() {
-                      const buildGroup = (id, type, arr) => {
-                          const container = document.getElementById(id);
-                          container.innerHTML = ''; // Clear existing
+                      // Render PyTorch Buttons (The Master Selector - Never disabled)
+                      const ptContainer = document.getElementById('pt-options');
+                      ptContainer.innerHTML = '';
+                      sorted.pt.forEach((val, index) => {
+                          const btn = document.createElement('div');
+                          btn.className = `btn ${state.pt === val ? 'active' : ''}`;
                           
-                          arr.forEach((val, index) => {
-                              const btn = document.createElement('div');
-                              btn.className = `btn ${state[type] === val ? 'active' : ''}`;
-                              
-                              // Check if this button is valid with the *other* currently selected options
-                              const testCombo = `${type === 'os' ? val : state.os}|${type === 'pt' ? val : state.pt}|${type === 'cu' ? val : state.cu}`;
-                              if (!validCombos.has(testCombo)) {
-                                  btn.classList.add('disabled');
-                              }
-                              
-                              // Highlight the newest version visually
-                              if (index === 0 && type !== 'os') {
-                                  btn.classList.add('latest');
-                                  btn.innerText = `${val} (Latest)`;
-                              } else {
-                                  btn.innerText = val;
-                              }
+                          if (index === 0) {
+                              btn.classList.add('latest');
+                              btn.innerText = `${val} (Latest)`;
+                          } else {
+                              btn.innerText = val;
+                          }
 
-                              btn.onclick = () => updateState(type, val);
-                              container.appendChild(btn);
-                          });
-                      };
+                          btn.onclick = () => updateState('pt', val);
+                          ptContainer.appendChild(btn);
+                      });
 
-                      buildGroup('os-options', 'os', sorted.os);
-                      buildGroup('pt-options', 'pt', sorted.pt);
-                      buildGroup('cu-options', 'cu', sorted.cu);
+                      // Render CUDA Buttons (The Slave Selector)
+                      const cuContainer = document.getElementById('cu-options');
+                      cuContainer.innerHTML = '';
+                      sorted.cu.forEach((val, index) => {
+                          const btn = document.createElement('div');
+                          btn.className = `btn ${state.cu === val ? 'active' : ''}`;
+                          
+                          if (index === 0) {
+                              btn.classList.add('latest');
+                              btn.innerText = `${val} (Latest)`;
+                          } else {
+                              btn.innerText = val;
+                          }
+                          
+                          // Check validity against the current PyTorch Master
+                          if (!validCombos.has(`${state.pt}|${val}`)) {
+                              btn.classList.add('disabled');
+                              // Intentionally do NOT attach an onclick handler here
+                          } else {
+                              // Only attach the click handler if it's a valid combination
+                              btn.onclick = () => updateState('cu', val);
+                          }
+
+                          cuContainer.appendChild(btn);
+                      });
+
                       renderCommand();
                   }
 
                   function updateState(type, val) {
-                      state[type] = val;
-                      
-                      // Auto-Correction constraint solver:
-                      // If the user clicks a disabled button, we must "snap" the other variables 
-                      // to a valid combination so the install command doesn't fail.
-                      if (!validCombos.has(`${state.os}|${state.pt}|${state.cu}`)) {
-                          // Find the first combo that works with the newly clicked value
-                          for (let combo of validCombos) {
-                              const [o, p, c] = combo.split('|');
-                              if ((type === 'os' && o === val) || 
-                                  (type === 'pt' && p === val) || 
-                                  (type === 'cu' && c === val)) {
-                                  state.os = o; state.pt = p; state.cu = c;
-                                  break;
-                              }
+                      if (type === 'pt') {
+                          state.pt = val;
+                          // If the user clicks a new PyTorch, check if the currently selected CUDA is still valid.
+                          // If not, automatically snap to the newest valid CUDA version for this PyTorch.
+                          if (!validCombos.has(`${state.pt}|${state.cu}`)) {
+                              const validCu = sorted.cu.find(c => validCombos.has(`${state.pt}|${c}`));
+                              if (validCu) state.cu = validCu;
+                          }
+                      } else if (type === 'cu') {
+                          // Only allow the user to click the CUDA button if it exists for the current PyTorch version
+                          if (validCombos.has(`${state.pt}|${val}`)) {
+                              state.cu = val;
+                          } else {
+                              return; // Do nothing if they click a disabled button
                           }
                       }
                       renderButtons();
