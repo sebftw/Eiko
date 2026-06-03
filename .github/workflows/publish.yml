@@ -141,10 +141,9 @@ jobs:
                   .row:last-of-type { border-bottom: none; }
                   .label { width: 140px; font-weight: 600; color: #555; flex-shrink: 0; padding-top: 10px; display: flex; align-items: center; }
                   
-                  /* Tooltip icon styling */
                   .info-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: #e0e0e0; color: #555; font-size: 11px; margin-left: 8px; cursor: help; font-weight: bold; }
                   
-                  .options { display: flex; flex-wrap: wrap; gap: 12px; }
+                  .options { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; }
                   .btn { background: #f0f0f0; border: 2px solid transparent; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; user-select: none; color: #444; font-family: inherit; }
                   .btn:hover:not(:disabled) { background: #e4e4e4; }
                   .btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; font-weight: 600; }
@@ -167,6 +166,25 @@ jobs:
                   .copy-btn.copied { background: #22c55e; border-color: #22c55e; }
 
                   .footer { margin-top: 40px; text-align: center; font-size: 13px; color: #888; border-top: 1px solid #eaeaea; padding-top: 20px; }
+
+                  /* ========================================= */
+                  /* MOBILE RESPONSIVE LAYOUT                 */
+                  /* ========================================= */
+                  @media (max-width: 650px) {
+                      body { padding: 20px 15px; }
+                      .container { padding: 25px 20px; }
+                      
+                      /* Stack label above buttons */
+                      .row { flex-direction: column; gap: 12px; padding: 15px 0; }
+                      .label { width: 100%; padding-top: 0; }
+                      
+                      /* Stretch buttons to be thumb-friendly */
+                      .btn { flex-grow: 1; text-align: center; padding: 12px 15px; font-size: 14px; }
+                      
+                      /* Push terminal text down so the Copy button doesn't overlap it */
+                      .terminal { padding: 45px 15px 15px 15px; font-size: 13px; }
+                      .copy-btn { top: 8px; right: 8px; }
+                  }
               </style>
           </head>
           <body>
