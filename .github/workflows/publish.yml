@@ -402,13 +402,18 @@ jobs:
                   let pyRaw = pyMatch[1];
                   let py = pyRaw === '38' ? '3.8' : `3.${pyRaw.substring(1)}`;
 
+                  // Forward-compatibility mapping array
                   let supportedOS = [];
-                  if (filename.includes('manylinux_2_31')) supportedOS = ['Ubuntu 20.04', 'Ubuntu 22.04', 'Ubuntu 24.04'];
-                  else if (filename.includes('manylinux_2_35')) supportedOS = ['Ubuntu 22.04', 'Ubuntu 24.04'];
-                  else if (filename.includes('manylinux_2_39')) supportedOS = ['Ubuntu 24.04'];
-                  else if (filename.includes('win')) supportedOS = ['Windows'];
-                  else if (filename.includes('mac')) supportedOS = ['macOS'];
-                  else supportedOS = ['Linux'];
+                  if (filename.includes('win')) {
+                      supportedOS = ['Windows'];
+                  } else if (filename.includes('mac')) {
+                      supportedOS = ['macOS'];
+                  } else if (filename.includes('manylinux') || filename.includes('linux')) {
+                      // Collapse ALL Linux variants into a single unified option
+                      supportedOS = ['Linux'];
+                  } else {
+                      supportedOS = ['Unknown']; // Fallback
+                  }
 
                   supportedOS.forEach(os => {
                       validCombos.add(`${os}|${py}|${pt}|${cu}`);
@@ -434,7 +439,7 @@ jobs:
               })
           };
 
-          let state = { os: sorted.os[0], py: sorted.py[0], pt: sorted.pt[0], cu: sorted.cu[0] };
+          let state = { os: null, py: null, pt: null, cu: null };
 
           function isValid(testOs, testPy, testPt, testCu) {
               for (let combo of validCombos) {
@@ -525,8 +530,34 @@ jobs:
               });
           }
 
+          function detectBrowserOS(availableOSList) {
+              let osString = "";
+              
+              if (navigator.userAgentData && navigator.userAgentData.platform) {
+                  osString = navigator.userAgentData.platform.toLowerCase();
+              } else {
+                  osString = (navigator.platform || navigator.userAgent).toLowerCase();
+              }
+
+              if (osString.includes("win")) {
+                  return availableOSList.find(os => os === "Windows");
+              } 
+              else if (osString.includes("mac")) {
+                  return availableOSList.find(os => os === "macOS");
+              } 
+              else if (osString.includes("linux") || osString.includes("x11")) {
+                  return availableOSList.find(os => os === "Linux");
+              }
+              
+              return null;
+          }
+          
           document.getElementById('footer-text').innerText = `Generated on ${config.date} for Eiko v${config.version}`;
-          updateState('os', sorted.os[0]);
+
+          // Auto-detect the OS, falling back to the top of the sorted list if unknown
+          const autoOS = detectBrowserOS(sorted.os) || sorted.os[0];
+          
+          updateState('os', autoOS);
           </script>
           </body>
           </html>
