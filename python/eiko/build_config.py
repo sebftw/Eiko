@@ -18,9 +18,17 @@ if sys.platform == "win32":
         '--use_fast_math'
     ]
 else:
-    CXX_ARGS = ['-D_GLIBCXX_USE_CXX11_ABI=0',
+    # Safely detect the ABI flag from the active PyTorch installation
+    try:
+        import torch
+        abi_val = "1" if torch._C._GLIBCXX_USE_CXX11_ABI else "0"
+    except ImportError:
+        # Fallback to "0" (or "1" depending on your project's primary target) if torch isn't installed yet
+        abi_val = "0"
+
+    CXX_ARGS = [f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}',
                 '-O3']
-    NVCC_ARGS = ['-Xcompiler', '-D_GLIBCXX_USE_CXX11_ABI=0',
+    NVCC_ARGS = ['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}',
                  '--use_fast_math']
 
 if IS_RELEASE_BUILD:
