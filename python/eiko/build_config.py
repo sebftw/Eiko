@@ -18,9 +18,9 @@ if sys.platform == "win32":
         '--use_fast_math'
     ]
 else:
-    CXX_ARGS = [#'-std=c++17',
+    CXX_ARGS = ['-D_GLIBCXX_USE_CXX11_ABI=0',
                 '-O3']
-    NVCC_ARGS = [#'-std=c++17', 
+    NVCC_ARGS = ['-Xcompiler', '-D_GLIBCXX_USE_CXX11_ABI=0',
                  '--use_fast_math']
 
 if IS_RELEASE_BUILD:
