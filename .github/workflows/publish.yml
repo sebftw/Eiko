@@ -256,6 +256,11 @@ jobs:
                   // 3. Initialize state with the absolute bleeding edge available
                   let state = { pt: sorted.pt[0], cu: sorted.cu[0] };
 
+                  // Helper function for PyTorch string formatting (strips trailing .0)
+                  function formatPt(val) {
+                      return val.endsWith('.0') ? val.slice(0, -2) : val;
+                  }
+
                   // Helper function to translate "cu126" into "12.6"
                   function formatCu(val) {
                       if (val === 'cpu') return 'CPU';
@@ -273,11 +278,13 @@ jobs:
                           const btn = document.createElement('button');
                           btn.className = `btn ${state.pt === val ? 'active' : ''}`;
                           
+                          const formattedVal = formatPt(val);
+                          
                           if (index === 0) {
                               btn.classList.add('latest');
-                              btn.innerText = `${val} (Latest)`;
+                              btn.innerText = `${formattedVal} (Latest)`;
                           } else {
-                              btn.innerText = val;
+                              btn.innerText = formattedVal;
                           }
 
                           btn.onclick = () => updateState('pt', val);
@@ -315,10 +322,11 @@ jobs:
                   function updateState(type, val) {
                       if (type === 'pt') {
                           state.pt = val;
-                          if (!validCombos.has(`${state.pt}|${state.cu}`)) {
-                              const validCu = sorted.cu.find(c => validCombos.has(`${state.pt}|${c}`));
-                              if (validCu) state.cu = validCu;
-                          }
+                          
+                          // AGGRESSIVE SNAP: Always find the newest valid CUDA version for this PyTorch
+                          const newestValidCu = sorted.cu.find(c => validCombos.has(`${state.pt}|${c}`));
+                          if (newestValidCu) state.cu = newestValidCu;
+                          
                       } else if (type === 'cu') {
                           state.cu = val;
                       }
