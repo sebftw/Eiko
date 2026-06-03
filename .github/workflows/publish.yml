@@ -282,6 +282,9 @@ jobs:
                   print("\nInstallation Complete!")
               else:
                   print("\nAborted. You can copy/paste the commands above when ready.")
+          
+          if __name__ == "__main__":
+              main()
           EOF
 
       - name: 3. Generate HTML UI
