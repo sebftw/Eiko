@@ -172,7 +172,7 @@ jobs:
           <body>
               <div class="container">
                   <h1>Install Eiko</h1>
-                  <p>Select the PyTorch and CUDA version that you want to install Eiko with.</p>
+                  <p>Select your environment to generate the compatible pip install commands.</p>
                   
                   <div class="row">
                       <div class="label">
