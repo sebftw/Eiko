@@ -15,8 +15,8 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
-          - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
-          - { torch: '2.4.0', cuda: '12.1.0', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
+          - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
           - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
           - { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
   
@@ -36,13 +36,13 @@ jobs:
           # 1. OS vs PYTHON REALITY CHECKS
           # ==========================================
           # Ubuntu 20.04 lacks OpenSSL 3.0; exclude modern Python
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
             python_version: '3.10'
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
             python_version: '3.11'
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
             python_version: '3.12'
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
             python_version: '3.13'
 
           - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
@@ -55,7 +55,7 @@ jobs:
             python_version: '3.13'
 
           # Ubuntu 22.04 ships with 3.10 natively; avoid building legacy 3.9 here
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '22.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
             python_version: '3.9'
           - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
             python_version: '3.9'
@@ -78,7 +78,7 @@ jobs:
           # 2. PYTORCH vs PYTHON COMPATIBILITY
           # ==========================================
           # PyTorch 2.4 predates Python 3.13
-          - platform: { torch: '2.4.0', cuda: '12.1.0', os_version: '22.04' }
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
             python_version: '3.13'
             
           # PyTorch 2.12 drops Python 3.10
@@ -240,7 +240,7 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
-          - { torch: '2.4.0', cuda: '12.1.0' }
+          - { torch: '2.4.0', cuda: '12.1.1' }
           - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
