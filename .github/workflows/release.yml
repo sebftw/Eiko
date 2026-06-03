@@ -239,17 +239,23 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          # PyTorch 2.5 supports older CUDA 12.x
-          # - { torch: '2.5.0', cuda: '12.1.1' }
+          # --- Legacy Baseline ---
+          # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
           - { torch: '2.4.0', cuda: '12.1.0' }
-          # - { torch: '2.5.0', cuda: '12.4.0' }
-          
-          # PyTorch 2.9 dropped 12.4, moved to 12.6+
-          # - { torch: '2.9.0', cuda: '12.6.2' } 
-          
-          # PyTorch 2.12 supports 12.6 and 13.x
-          # - { torch: '2.12.0', cuda: '12.6.2' }
-          # - { torch: '2.12.0', cuda: '13.0.1' }
+          - { torch: '2.7.0', cuda: '12.6.3' }
+  
+          # --- Transition Tier ---
+          # Matches the PyTorch 2.10.0 platform
+          - { torch: '2.10.0', cuda: '12.8.2' }
+  
+          # --- Modern Standard ---
+          # Matches the PyTorch 2.11.0 CUDA 13 transition
+          - { torch: '2.11.0', cuda: '13.0.1' }
+  
+          # --- Bleeding Edge ---
+          # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
+          - { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - uses: actions/checkout@v4
