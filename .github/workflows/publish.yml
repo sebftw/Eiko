@@ -133,111 +133,111 @@ jobs:
           echo "RAW_WHEELS = '${WHEEL_LIST}'.split(',')" >> public/install_eiko.py
           
           cat << 'EOF' >> public/install_eiko.py
-            import sys
-            import subprocess
-            import shutil
-            import re
-            
-            # 1. Parse injected wheels to build a set of what actually exists
-            valid_combos = set()
-            for w in RAW_WHEELS:
-                if not w: continue
-                pt_match = re.search(r'\+pt([\d.]+)\.', w)
-                cu_match = re.search(r'\.(cu[\d]+|cpu)-', w)
-                if pt_match and cu_match:
-                    valid_combos.add((pt_match.group(1), cu_match.group(1)))
-            
-            def cu_val(cu_str):
-                """Converts 'cu126' to integer 126 for mathematical comparison."""
-                return int(cu_str[2:]) if cu_str.startswith('cu') else 0
-            
-            def pt_val(pt_str):
-                """Converts '2.12.0' to [2, 12, 0] for sorting."""
-                return [int(x) for x in pt_str.split('.')]
-            
-            def get_hardware_cu():
-                """Detects local driver and returns format like 'cu126'"""
-                if not shutil.which("nvidia-smi"): return "cpu"
-                try:
-                    out = subprocess.check_output(["nvidia-smi"], text=True)
-                    if "CUDA Version:" in out:
-                        v = out.split("CUDA Version:")[1].split()[0]
-                        return f"cu{v.replace('.', '')}"
-                except Exception: pass
-                return "cpu"
-            
-            def get_pytorch_info():
-                """Checks for existing PyTorch installations."""
-                try:
-                    import torch
-                    pt = torch.__version__.split('+')[0]
-                    cu = "cu" + torch.version.cuda.replace(".", "") if torch.cuda.is_available() else "cpu"
-                    return pt, cu
-                except ImportError:
-                    return None, None
-            
-            def main():
-                print(f"=== Eiko v{EIKO_VERSION} Auto-Installer ===\n")
-                
-                pt_ver, pt_cu = get_pytorch_info()
-                
-                # If they have PyTorch, respect their environment. Otherwise, scan hardware.
-                hw_cu = pt_cu if pt_ver else get_hardware_cu()
-                hw_int = cu_val(hw_cu)
-            
-                # Smart Snapping: Find the highest compiled CUDA version that is <= their hardware
-                available_cus = set(cu for pt, cu in valid_combos)
-                compatible_cus = [c for c in available_cus if cu_val(c) <= hw_int and c != 'cpu']
-                
-                best_cu = sorted(compatible_cus, key=cu_val, reverse=True)[0] if compatible_cus else "cpu"
-            
-                if pt_ver:
-                    print(f"Detected PyTorch: {pt_ver} (Backend: {pt_cu})")
-                    target_pt = pt_ver
-                    target_cu = pt_cu
-                    install_pt = False
-                    
-                    if (target_pt, target_cu) not in valid_combos:
-                        print(f"\n[!] Error: You have PyTorch {target_pt} ({target_cu}).")
-                        print("[!] Eiko does not have a compiled wheel for this exact combination.")
-                        print("Please visit the web matrix to manually select a compatible configuration.")
-                        sys.exit(1)
-                else:
-                    print(f"Hardware Detected: {hw_cu} (Mapping to Eiko wheels: {best_cu})")
-                    
-                    # Grab the highest available PyTorch version for their chosen compute platform
-                    supported_pts = [pt for pt, cu in valid_combos if cu == best_cu]
-                    if not supported_pts:
-                        print("\n[!] Error: Could not find any compatible wheels.")
-                        sys.exit(1)
-                        
-                    target_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
-                    target_cu = best_cu
-                    install_pt = True
-            
-                commands = []
-                if install_pt:
-                    commands.append(f"{sys.executable} -m pip install torch=={target_pt} --index-url https://download.pytorch.org/whl/{target_cu}")
-                
-                commands.append(f"{sys.executable} -m pip install \"eiko=={EIKO_VERSION}+pt{target_pt}.{target_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{target_cu}")
-            
-                print("\n--- Recommended Installation Commands ---")
-                for cmd in commands:
-                    print(f"> {cmd}")
-                print("-----------------------------------------\n")
-            
-                ans = input("Would you like to execute these commands now? [y/N]: ")
-                if ans.lower() in ['y', 'yes']:
-                    for cmd in commands:
-                        print(f"\nRunning: {cmd}")
-                        subprocess.run(cmd, shell=True, check=True)
-                    print("\nInstallation Complete!")
-                else:
-                    print("\nAborted. You can copy/paste the commands above when ready.")
-            
-            if __name__ == "__main__":
-                main()
-            EOF
+          import sys
+          import subprocess
+          import shutil
+          import re
+          
+          # 1. Parse injected wheels to build a set of what actually exists
+          valid_combos = set()
+          for w in RAW_WHEELS:
+              if not w: continue
+              pt_match = re.search(r'\+pt([\d.]+)\.', w)
+              cu_match = re.search(r'\.(cu[\d]+|cpu)-', w)
+              if pt_match and cu_match:
+                  valid_combos.add((pt_match.group(1), cu_match.group(1)))
+          
+          def cu_val(cu_str):
+              """Converts 'cu126' to integer 126 for mathematical comparison."""
+              return int(cu_str[2:]) if cu_str.startswith('cu') else 0
+          
+          def pt_val(pt_str):
+              """Converts '2.12.0' to [2, 12, 0] for sorting."""
+              return [int(x) for x in pt_str.split('.')]
+          
+          def get_hardware_cu():
+              """Detects local driver and returns format like 'cu126'"""
+              if not shutil.which("nvidia-smi"): return "cpu"
+              try:
+                  out = subprocess.check_output(["nvidia-smi"], text=True)
+                  if "CUDA Version:" in out:
+                      v = out.split("CUDA Version:")[1].split()[0]
+                      return f"cu{v.replace('.', '')}"
+              except Exception: pass
+              return "cpu"
+          
+          def get_pytorch_info():
+              """Checks for existing PyTorch installations."""
+              try:
+                  import torch
+                  pt = torch.__version__.split('+')[0]
+                  cu = "cu" + torch.version.cuda.replace(".", "") if torch.cuda.is_available() else "cpu"
+                  return pt, cu
+              except ImportError:
+                  return None, None
+          
+          def main():
+              print(f"=== Eiko v{EIKO_VERSION} Auto-Installer ===\n")
+              
+              pt_ver, pt_cu = get_pytorch_info()
+              
+              # If they have PyTorch, respect their environment. Otherwise, scan hardware.
+              hw_cu = pt_cu if pt_ver else get_hardware_cu()
+              hw_int = cu_val(hw_cu)
+          
+              # Smart Snapping: Find the highest compiled CUDA version that is <= their hardware
+              available_cus = set(cu for pt, cu in valid_combos)
+              compatible_cus = [c for c in available_cus if cu_val(c) <= hw_int and c != 'cpu']
+              
+              best_cu = sorted(compatible_cus, key=cu_val, reverse=True)[0] if compatible_cus else "cpu"
+          
+              if pt_ver:
+                  print(f"Detected PyTorch: {pt_ver} (Backend: {pt_cu})")
+                  target_pt = pt_ver
+                  target_cu = pt_cu
+                  install_pt = False
+                  
+                  if (target_pt, target_cu) not in valid_combos:
+                      print(f"\n[!] Error: You have PyTorch {target_pt} ({target_cu}).")
+                      print("[!] Eiko does not have a compiled wheel for this exact combination.")
+                      print("Please visit the web matrix to manually select a compatible configuration.")
+                      sys.exit(1)
+              else:
+                  print(f"Hardware Detected: {hw_cu} (Mapping to Eiko wheels: {best_cu})")
+                  
+                  # Grab the highest available PyTorch version for their chosen compute platform
+                  supported_pts = [pt for pt, cu in valid_combos if cu == best_cu]
+                  if not supported_pts:
+                      print("\n[!] Error: Could not find any compatible wheels.")
+                      sys.exit(1)
+                      
+                  target_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
+                  target_cu = best_cu
+                  install_pt = True
+          
+              commands = []
+              if install_pt:
+                  commands.append(f"{sys.executable} -m pip install torch=={target_pt} --index-url https://download.pytorch.org/whl/{target_cu}")
+              
+              commands.append(f"{sys.executable} -m pip install \"eiko=={EIKO_VERSION}+pt{target_pt}.{target_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{target_cu}")
+          
+              print("\n--- Recommended Installation Commands ---")
+              for cmd in commands:
+                  print(f"> {cmd}")
+              print("-----------------------------------------\n")
+          
+              ans = input("Would you like to execute these commands now? [y/N]: ")
+              if ans.lower() in ['y', 'yes']:
+                  for cmd in commands:
+                      print(f"\nRunning: {cmd}")
+                      subprocess.run(cmd, shell=True, check=True)
+                  print("\nInstallation Complete!")
+              else:
+                  print("\nAborted. You can copy/paste the commands above when ready.")
+          
+          if __name__ == "__main__":
+              main()
+          EOF
 
           # 3. Write the HTML file
           cat << 'EOF' > public/index.html
