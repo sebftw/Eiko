@@ -15,18 +15,18 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
-          #- { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
-          #- { torch: '2.4.0', cuda: '12.1.0', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
+          - { torch: '2.4.0', cuda: '12.1.0', os_version: '20.04' }
+          - { torch: '2.4.0', cuda: '12.1.0', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
           - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-          #- { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
   
           # --- Transition & Modern Tier (All 22.04 base) ---
           - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
-          # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
-          # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+          - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
   
           # --- Bleeding Edge ---
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
   
         # Target active Python versions
         python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
@@ -240,8 +240,8 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
-          #- { torch: '2.4.0', cuda: '12.1.0' }
-          #- { torch: '2.7.0', cuda: '12.6.3' }
+          - { torch: '2.4.0', cuda: '12.1.0' }
+          - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
           # Matches the PyTorch 2.10.0 platform
@@ -253,8 +253,8 @@ jobs:
   
           # --- Bleeding Edge ---
           # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
-          #- { torch: '2.12.0', cuda: '12.6.0' }
-          #- { torch: '2.12.0', cuda: '13.2.0' }
+          - { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - uses: actions/checkout@v4
@@ -298,7 +298,7 @@ jobs:
       # Excluded for PyTorch 2.12+ (Requires 3.11+)
       # ==========================================
       - name: Set up Python 3.9
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
@@ -306,7 +306,7 @@ jobs:
       # --- PYTHON 3.9 BUILD ---
       # Excluded for PyTorch 2.12+ (Requires 3.11+)
       - name: Build 3.9 Wheel
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         env: &build_env
           DISTUTILS_USE_SDK: "1" 
           FORCE_CUDA: "1"        
@@ -324,14 +324,14 @@ jobs:
           python -m build --wheel --no-isolation
 
       - name: Upload 3.9 Wheel
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.9
           path: dist/*.whl
           
       - name: Clean 3.9 Workspace
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         shell: pwsh
         run: |
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
@@ -440,13 +440,13 @@ jobs:
       # Excluded for PyTorch 2.4.0
       # Excluded for PyTorch 2.10 + CUDA 12.8 (missing binaries)
       - name: Set up Python 3.13
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8')
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           
       - name: Build 3.13 Wheel
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8')
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         env: *build_env
         run: |
           pip install --upgrade pip
@@ -456,14 +456,14 @@ jobs:
           python -m build --wheel --no-isolation
 
       - name: Upload 3.13 Wheel
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8')
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.13
           path: dist/*.whl
           
       - name: Clean 3.13 Workspace
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8')
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         shell: pwsh
         run: |
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
