@@ -175,11 +175,25 @@ jobs:
           
           def main():
               print(f"=== Eiko v{EIKO_VERSION} Auto-Installer ===\n")
-              
+
               pt_ver, pt_cu = get_pytorch_info()
               hw_cu = pt_cu if pt_ver else get_hardware_cu()
-              hw_int = cu_val(hw_cu)
 
+              # Fallback to PyTorch's reported CUDA only if nvidia-smi fails/is missing
+              if hw_cu == "cpu" and pt_cu and pt_cu != "cpu":
+                  hw_cu = pt_cu
+              
+              # Explicitly reject CPU-only environments
+              if hw_cu == "cpu":
+                  print("\n[!] ERROR: No NVIDIA GPU detected.")
+                  print("    Eiko requires a compatible NVIDIA GPU and does not currently support CPU-only environments.")
+                  print("\nSuggested next steps:")
+                  print("  1. Verify that you have an NVIDIA GPU. If not, you can run Eiko from Colab: https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb")
+                  print("  2. Ensure the NVIDIA drivers are installed, so the command nvidia-smi is accessible.")
+                  sys.exit(1)
+
+              hw_int = cu_val(hw_cu)
+              
               # ==========================================
               #  Outdated Driver Detection
               # ==========================================
@@ -190,15 +204,17 @@ jobs:
               # If an NVIDIA GPU is detected (hw_int > 0) but the driver is too old
               if 0 < hw_int < min_required_cu:
                   min_cu_name = sorted(gpu_cus, key=cu_val)[0]
-                  
+
                   # Format 'cu118' to '11.8' for human readability
-                  def fmt(cu_str): return f"{cu_str[2:4]}.{cu_str[4:]}"
+                  def fmt(cu_str): 
+                      num = cu_str.replace("cu", "")
+                      return f"{num[:2]}.{num[2:]}" if len(num) > 2 else num
                   
                   print(f"\n[!] ERROR: Outdated NVIDIA Driver Detected.")
                   print(f"    Your current driver supports up to CUDA {fmt(hw_cu)}.")
                   print(f"    Eiko's oldest pre-compiled GPU wheel requires CUDA {fmt(min_cu_name)}.")
                   print("\nSuggested next steps:")
-                  print("  1. Update NVIDIA Drivers: Download the latest drivers for your GPU from:")
+                  print("  1. Update NVIDIA driver: Download the latest drivers for your GPU from:")
                   print("                            https://www.nvidia.com/Download/index.aspx")
                   sys.exit(1)
           
@@ -236,7 +252,7 @@ jobs:
                   if not supported_pts:
                     print(f"\n[!] Error: Eiko does not have pre-compiled wheels matching your hardware ({hw_cu}).")
                     print("\nSuggested next steps:")
-                    print(f"  1. Manual Selection: Visit the web matrix to force a different configuration (e.g., CPU-only):")
+                    print(f"  1. Manual Selection: Visit the web matrix to force a different configuration:")
                     print(f"                       {EIKO_BASE_URL}")
                     print("  2. Build Locally:    Compile Eiko from source to match your exact environment:")
                     print("                       git clone https://github.com/sebftw/Eiko.git")
