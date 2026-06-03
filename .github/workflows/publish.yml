@@ -46,14 +46,19 @@ jobs:
           mkdir -p public/whl
           
           # 1. Sort NEW wheels
-          for wheel in wheelhouse/*.whl; do
-            filename=$(basename "$wheel")
-            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+) ]]; then
-              cuda_tag="${BASH_REMATCH[1]}"
-              cuda_tag=$(echo "$cuda_tag" | sed 's/da//; s/[-_\.]//g')
+          for artifact_dir in wheelhouse/wheels-*; do
+            dirname=$(basename "$artifact_dir")
+            
+            # Look for -cuXXX- or -cpu- in the middle of the artifact string
+            # Example: wheels-ubuntu22.04-pt2.12.0-cu126-py3.10 matches "cu126"
+            if [[ "$dirname" =~ -(cu[0-9]+|cpu)- ]]; then
+              tag="${BASH_REMATCH[1]}"
               
-              mkdir -p "public/whl/$cuda_tag/eiko"
-              cp "$wheel" "public/whl/$cuda_tag/eiko/"
+              echo "Routing $dirname to $tag..."
+              mkdir -p "public/whl/$tag/eiko"
+              cp "$artifact_dir"/*.whl "public/whl/$tag/eiko/"
+            else
+              echo "Warning: Could not extract CUDA/CPU tag from $dirname"
             fi
           done
 
