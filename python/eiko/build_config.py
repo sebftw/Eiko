@@ -14,6 +14,8 @@ if sys.platform == "win32":
         '-Xcompiler', '/wd3189', 
         '-Xcompiler=/permissive-',
         '-Xcompiler', '/EHsc',
+        '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
+        '/DTHRUST_FORCE_COMPATIBILITY',
         '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
         '-DNOMINMAX', 
         '--use_fast_math'
