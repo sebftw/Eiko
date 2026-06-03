@@ -6,13 +6,14 @@ import sys
 IS_RELEASE_BUILD = os.environ.get("EIKO_RELEASE_BUILD", "0") == "1"
 
 if sys.platform == "win32":
-    CXX_ARGS = ['/permissive',
+    CXX_ARGS = ['/permissive-', '/EHsc', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', '/DTHRUST_FORCE_COMPATIBILITY',
                 '/Zc:preprocessor', '/DNOMINMAX', '/wd3189']
     NVCC_ARGS = [
         '-allow-unsupported-compiler', 
         '-Xcompiler', '/Zc:preprocessor', 
         '-Xcompiler', '/wd3189', 
-        '-Xcompiler=/permissive',
+        '-Xcompiler=/permissive-',
+        '-Xcompiler', '/EHsc',
         '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
         '-DNOMINMAX', 
         '--use_fast_math'
