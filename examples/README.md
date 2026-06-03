@@ -1,5 +1,5 @@
 # Examples
-This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover a range of applications, from simple visualization and validation to advanced tasks such as acoustic lens design and differentiable travel-time tomography.
+This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover a wide range of applications, from simple visualization and validation to advanced tasks such as acoustic lens design and differentiable travel-time tomography.
 
 - [Examples](#examples)
   * [Prerequisites](#prerequisites)
