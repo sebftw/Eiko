@@ -84,9 +84,7 @@ source eiko/bin/activate
 ```
 After activation, your command line prompt should begin with `(eiko)`.
 
-Now you can install PyTorch.
-
-Now you can install Pytorch. Navigate to [PyTorch Get Started](https://pytorch.org/get-started/) and select **Stable**, **Linux**, **Pip**, and **Python**. For **Compute Platform**, select the CUDA version that matches the output of `nvcc --version`.
+Now you can install PyTorch. Navigate to [PyTorch Get Started](https://pytorch.org/get-started/) and select **Stable**, **Linux**, **Pip**, and **Python**. For **Compute Platform**, select the CUDA version that matches the output of `nvcc --version`.
 The webpage will then tell you which commands to run to get PyTorch.
 
 > If you get an error "`Command 'pip3' not found`" you must replace the line "`pip3 ...`" with "`python3 -m pip ...`".
