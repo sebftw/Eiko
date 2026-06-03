@@ -34,7 +34,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
 dependencies = [
-    "torch>=2.0.0",
+    "torch>=2.4.0",
     "ninja"
 ]
 
@@ -83,9 +83,6 @@ include-package-data = true  # <-- Crucial for JIT compilation architectures
 [tool.setuptools.package-data]
 "eiko.src" = ["*.cuh"]
 "eiko.src.bindings" = ["*.cu"]
-
-[tool.setuptools.dynamic]
-version = {attr = "eiko.__version__"}
 
 [tool.pytest.ini_options]
 testpaths = ["python/test"]
