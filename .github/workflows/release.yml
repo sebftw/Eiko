@@ -512,11 +512,12 @@ jobs:
           for wheel in wheelhouse/*.whl; do
             filename=$(basename "$wheel")
             
-            if [[ "$filename" =~ (cu[0-9]+) ]]; then
+            # This matches 'cu118', 'cuda118', 'cuda-11.8', 'cu_12', etc.
+            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+) ]]; then
               cuda_tag="${BASH_REMATCH[1]}"
-            else
-              cuda_tag="cpu"
-            fi
+             # Optional: Normalize the tag to strip out "da", hyphens, or periods 
+             # so your folder names stay clean (e.g., turning "cuda11.8" into "cu118")
+             cuda_tag=$(echo "$cuda_tag" | sed 's/da//; s/[-_\.]//g')
             
             mkdir -p "public/whl/$cuda_tag/eiko"
             cp "$wheel" "public/whl/$cuda_tag/eiko/"
