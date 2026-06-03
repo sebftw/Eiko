@@ -16,17 +16,17 @@ jobs:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
           - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
-          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
-          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+          - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
   
           # --- Transition & Modern Tier (All 22.04 base) ---
-          # - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
-          # - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
-          # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+          - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+          - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
   
           # --- Bleeding Edge ---
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
   
         # Target active Python versions
         python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
@@ -240,20 +240,20 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
-          # - { torch: '2.4.0', cuda: '12.1.1' }
-          # - { torch: '2.7.0', cuda: '12.6.3' }
+          - { torch: '2.4.0', cuda: '12.1.1' }
+          - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
           # Matches the PyTorch 2.10.0 platform
-          # - { torch: '2.10.0', cuda: '12.8.1' }
+          - { torch: '2.10.0', cuda: '12.8.1' }
   
           # --- Modern Standard ---
           # Matches the PyTorch 2.11.0 CUDA 13 transition
-          # - { torch: '2.11.0', cuda: '13.0.2' }
+          - { torch: '2.11.0', cuda: '13.0.2' }
   
           # --- Bleeding Edge ---
           # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
-          # - { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '12.6.0' }
           - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
@@ -479,7 +479,7 @@ jobs:
     name: Generate Siloed HTML Indexes and Publish
     needs: [build_ubuntu_wheels, build_windows_wheels]
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    #if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     permissions:
       contents: write
 
@@ -549,3 +549,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./public
           keep_files: true
+          publish_branch: gh-pages-test
