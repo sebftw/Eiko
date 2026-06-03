@@ -21,7 +21,7 @@ jobs:
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
         with:
-          ref: gh-pages
+          ref: gh-pages-test
           path: public
         continue-on-error: true
 
