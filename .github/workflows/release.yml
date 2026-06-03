@@ -15,19 +15,19 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
-          - { torch: '2.4.0', cuda: '12.1', os_version: '20.04' }
-          - { torch: '2.4.0', cuda: '12.1', os_version: '22.04' }
+          # - { torch: '2.4.0', cuda: '12.1', os_version: '20.04' }
+          # - { torch: '2.4.0', cuda: '12.1', os_version: '22.04' }  # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
           
           - { torch: '2.7.0', cuda: '12.6', os_version: '20.04' }
-          - { torch: '2.7.0', cuda: '12.6', os_version: '22.04' }
+          # - { torch: '2.7.0', cuda: '12.6', os_version: '22.04' }
   
           # --- Transition & Modern Tier (All 22.04 base) ---
           - { torch: '2.10.0', cuda: '12.8', os_version: '22.04' }
-          - { torch: '2.11.0', cuda: '13.0', os_version: '22.04' }
-          - { torch: '2.12.0', cuda: '12.6', os_version: '22.04' }
+          #- { torch: '2.11.0', cuda: '13.0', os_version: '22.04' }
+          #- { torch: '2.12.0', cuda: '12.6', os_version: '22.04' }
   
           # --- Bleeding Edge ---
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          #- { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
   
         # Target active Python versions
         python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
@@ -246,16 +246,16 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
-          - { torch: '2.4.0', cuda: '12.1' }
-          - { torch: '2.7.0', cuda: '12.6' }
+          #- { torch: '2.4.0', cuda: '12.1' }
+          #- { torch: '2.7.0', cuda: '12.6' }
   
           # --- Transition Tier ---
           # Matches the PyTorch 2.10.0 platform
-          - { torch: '2.10.0', cuda: '12.8' }
+          #- { torch: '2.10.0', cuda: '12.8' }
   
           # --- Modern Standard ---
           # Matches the PyTorch 2.11.0 CUDA 13 transition
-          - { torch: '2.11.0', cuda: '13.0' }
+          #- { torch: '2.11.0', cuda: '13.0' }
   
           # --- Bleeding Edge ---
           # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
