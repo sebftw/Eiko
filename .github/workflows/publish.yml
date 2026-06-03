@@ -179,6 +179,28 @@ jobs:
               pt_ver, pt_cu = get_pytorch_info()
               hw_cu = pt_cu if pt_ver else get_hardware_cu()
               hw_int = cu_val(hw_cu)
+
+              # ==========================================
+              #  Outdated Driver Detection
+              # ==========================================
+              available_cus = set(cu for pt, cu in valid_combos)
+              gpu_cus = [c for c in available_cus if c != 'cpu']
+              min_required_cu = min(cu_val(c) for c in gpu_cus) if gpu_cus else 0
+          
+              # If an NVIDIA GPU is detected (hw_int > 0) but the driver is too old
+              if 0 < hw_int < min_required_cu:
+                  min_cu_name = sorted(gpu_cus, key=cu_val)[0]
+                  
+                  # Format 'cu118' to '11.8' for human readability
+                  def fmt(cu_str): return f"{cu_str[2:4]}.{cu_str[4:]}"
+                  
+                  print(f"\n[!] ERROR: Outdated NVIDIA Driver Detected.")
+                  print(f"    Your current driver supports up to CUDA {fmt(hw_cu)}.")
+                  print(f"    Eiko's oldest pre-compiled GPU wheel requires CUDA {fmt(min_cu_name)}.")
+                  print("\nSuggested next steps:")
+                  print("  1. Update NVIDIA Drivers: Download the latest drivers for your GPU from:")
+                  print("                            https://www.nvidia.com/Download/index.aspx")
+                  sys.exit(1)
           
               available_cus = set(cu for pt, cu in valid_combos)
               compatible_cus = [c for c in available_cus if cu_val(c) <= hw_int and c != 'cpu']
@@ -188,15 +210,38 @@ jobs:
                   print(f"Detected PyTorch: {pt_ver} (Backend: {pt_cu})")
                   target_pt, target_cu, install_pt = pt_ver, pt_cu, False
                   if (target_pt, target_cu) not in valid_combos:
-                      print(f"\n[!] Error: You have PyTorch {target_pt} ({target_cu}).")
-                      print("[!] Eiko does not have a compiled wheel for this combination.")
+                      print(f"\n[!] Error: Eiko does not have a pre-compiled wheel for PyTorch {target_pt} ({target_cu}).")
+            
+                      # Find all PyTorch versions Eiko supports for their current CUDA backend
+                      supported_pts = [pt for pt, cu in valid_combos if cu == target_cu]
+                      
+                      print("\nSuggested next steps:")
+                      if supported_pts:
+                          best_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
+                          print(f"  1. Upgrade PyTorch: Eiko supports {target_cu} using PyTorch {best_pt}. Run:")
+                          print(f"                      python -m pip install torch=={best_pt} --index-url https://download.pytorch.org/whl/{target_cu}")
+                          print(f"                      python -m pip install \"eiko=={EIKO_VERSION}+pt{best_pt}.{target_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{target_cu}")
+                      else:
+                          print(f"  1. Update Backend:  Eiko does not support your current compute backend ({target_cu}).")
+                          print(f"                      Please visit the web matrix to select a compatible configuration:")
+                          print(f"                      {EIKO_BASE_URL}")
+                          
+                      print("  2. Build Locally:   Compile Eiko from source to match your exact environment:")
+                      print("                      git clone https://github.com/sebftw/Eiko.git")
+                      print("                      cd eiko && pip install .")
                       sys.exit(1)
               else:
                   print(f"Hardware Detected: {hw_cu} (Mapping to Eiko wheels: {best_cu})")
                   supported_pts = [pt for pt, cu in valid_combos if cu == best_cu]
                   if not supported_pts:
-                      print("\n[!] Error: Could not find any compatible wheels.")
-                      sys.exit(1)
+                    print(f"\n[!] Error: Eiko does not have pre-compiled wheels matching your hardware ({hw_cu}).")
+                    print("\nSuggested next steps:")
+                    print(f"  1. Manual Selection: Visit the web matrix to force a different configuration (e.g., CPU-only):")
+                    print(f"                       {EIKO_BASE_URL}")
+                    print("  2. Build Locally:    Compile Eiko from source to match your exact environment:")
+                    print("                       git clone https://github.com/sebftw/Eiko.git")
+                    print("                       cd eiko && pip install .")
+                    sys.exit(1)
                   target_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
                   target_cu = best_cu
                   install_pt = True
@@ -278,7 +323,7 @@ jobs:
           <body>
               <div class="container">
                   <h1>Install Eiko</h1>
-                  <p>Select your environment to generate compatible pip install command.</p>
+                  <p>Select your environment to generate a compatible pip install command.</p>
                   
                   <div class="row">
                       <div class="label">Operating System</div>
