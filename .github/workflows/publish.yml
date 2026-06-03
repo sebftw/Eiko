@@ -190,8 +190,18 @@ jobs:
           <body>
               <div class="container">
                   <h1>Install Eiko</h1>
-                  <p>Select your environment to generate the compatible pip install commands.</p>
+                  <p>Select your environment to generate compatible pip install command.</p>
                   
+                  <div class="row">
+                      <div class="label">Operating System</div>
+                      <div class="options" id="os-options"></div>
+                  </div>
+
+                  <div class="row">
+                      <div class="label">Python version</div>
+                      <div class="options" id="py-options"></div>
+                  </div>
+
                   <div class="row">
                       <div class="label">
                           PyTorch version 
@@ -201,7 +211,7 @@ jobs:
                   </div>
 
                   <div class="row">
-                      <div class="label">CUDA version<span class="info-icon" title="Select the CUDA version that matches your PyTorch installation (and if you do not have PyTorch, just select the highest version).">?</span></div>
+                      <div class="label">CUDA version</div>
                       <div class="options" id="cu-options"></div>
                   </div>
 
@@ -224,7 +234,7 @@ jobs:
           # 5. Finish the HTML file with the master-slave application logic
           cat << 'EOF' >> public/index.html
                   const validCombos = new Set();
-                  const uniqueVars = { pt: new Set(), cu: new Set() };
+                  const uniqueVars = { os: new Set(), py: new Set(), pt: new Set(), cu: new Set() };
                   let currentCommandText = "";
 
                   // 1. Parse all filenames to discover what actually exists
@@ -233,102 +243,135 @@ jobs:
                       
                       const ptMatch = filename.match(/\+pt([0-9\.]+)\./);
                       const cuMatch = filename.match(/\.(cu[0-9]+|cpu)-/);
-                      
-                      if (ptMatch && cuMatch) {
+                      const pyMatch = filename.match(/-cp(\d+)-/);
+
+                      if (ptMatch && cuMatch && pyMatch) {
                           const pt = ptMatch[1];
                           const cu = cuMatch[1];
-                          validCombos.add(`${pt}|${cu}`);
+                          
+                          // Convert cp310 to 3.10
+                          let pyRaw = pyMatch[1];
+                          let py = pyRaw === '38' ? '3.8' : `3.${pyRaw.substring(1)}`;
+
+                          // Convert manylinux tags to readable OS strings
+                          let os = 'Linux';
+                          if (filename.includes('manylinux_2_31')) os = 'Ubuntu 20.04';
+                          else if (filename.includes('manylinux_2_35')) os = 'Ubuntu 22.04';
+                          else if (filename.includes('manylinux_2_39')) os = 'Ubuntu 24.04';
+                          else if (filename.includes('win')) os = 'Windows';
+                          else if (filename.includes('mac')) os = 'macOS';
+
+                          validCombos.add(`${os}|${py}|${pt}|${cu}`);
+                          uniqueVars.os.add(os);
+                          uniqueVars.py.add(py);
                           uniqueVars.pt.add(pt);
                           uniqueVars.cu.add(cu);
                       }
                   });
 
-                  // 2. Sort the arrays descending
-                  const compareVersions = (a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+                  // Sorting Helpers
+                  const compareDesc = (a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
+                  const comparePy = (a, b) => {
+                      const [ma, miA] = a.split('.').map(Number);
+                      const [mb, miB] = b.split('.').map(Number);
+                      if (ma !== mb) return mb - ma;
+                      return miB - miA;
+                  };
+
                   const sorted = {
-                      pt: Array.from(uniqueVars.pt).sort(compareVersions),
+                      os: Array.from(uniqueVars.os).sort(compareDesc),
+                      py: Array.from(uniqueVars.py).sort(comparePy),
+                      pt: Array.from(uniqueVars.pt).sort(compareDesc),
                       cu: Array.from(uniqueVars.cu).sort((a, b) => {
                           if (a === 'cpu') return 1; if (b === 'cpu') return -1;
-                          return compareVersions(a, b);
+                          return compareDesc(a, b);
                       })
                   };
 
-                  // 3. Initialize state with the absolute bleeding edge available
-                  let state = { pt: sorted.pt[0], cu: sorted.cu[0] };
+                  let state = { os: sorted.os[0], py: sorted.py[0], pt: sorted.pt[0], cu: sorted.cu[0] };
 
-                  // Helper function for PyTorch string formatting (strips trailing .0)
-                  function formatPt(val) {
-                      return val.endsWith('.0') ? val.slice(0, -2) : val;
+                  // Determines if a specific combination exists anywhere in the valid map
+                  function isValid(testOs, testPy, testPt, testCu) {
+                      for (let combo of validCombos) {
+                          const [o, p, t, c] = combo.split('|');
+                          if ((!testOs || testOs === o) && 
+                              (!testPy || testPy === p) && 
+                              (!testPt || testPt === t) && 
+                              (!testCu || testCu === c)) {
+                              return true;
+                          }
+                      }
+                      return false;
                   }
 
-                  // Helper function to translate "cu126" into "12.6"
+                  function formatPt(val) { return val.endsWith('.0') ? val.slice(0, -2) : val; }
                   function formatCu(val) {
                       if (val === 'cpu') return 'CPU';
-                      if (val.startsWith('cu')) {
-                          return val.substring(2, 4) + '.' + val.substring(4);
-                      }
+                      if (val.startsWith('cu')) return val.substring(2, 4) + '.' + val.substring(4);
                       return val;
                   }
 
+                  function createBtn(val, displayVal, isActive, isDisabled, isLatest, onClick) {
+                      const btn = document.createElement('button');
+                      btn.className = `btn ${isActive ? 'active' : ''}`;
+                      if (isLatest) btn.classList.add('latest');
+                      btn.innerText = isLatest ? `${displayVal} (Latest)` : displayVal;
+                      btn.disabled = isDisabled;
+                      if (!isDisabled) btn.onclick = onClick;
+                      return btn;
+                  }
+
                   function renderButtons() {
-                      // Render PyTorch Buttons
+                      // 1. Render OS
+                      const osContainer = document.getElementById('os-options');
+                      osContainer.innerHTML = '';
+                      sorted.os.forEach(val => {
+                          osContainer.appendChild(createBtn(val, val, state.os === val, false, false, () => updateState('os', val)));
+                      });
+
+                      // 2. Render Python
+                      const pyContainer = document.getElementById('py-options');
+                      pyContainer.innerHTML = '';
+                      sorted.py.forEach(val => {
+                          const valid = isValid(state.os, val, null, null);
+                          pyContainer.appendChild(createBtn(val, val, state.py === val, !valid, false, () => updateState('py', val)));
+                      });
+
+                      // 3. Render PyTorch
                       const ptContainer = document.getElementById('pt-options');
                       ptContainer.innerHTML = '';
                       sorted.pt.forEach((val, index) => {
-                          const btn = document.createElement('button');
-                          btn.className = `btn ${state.pt === val ? 'active' : ''}`;
-                          
-                          const formattedVal = formatPt(val);
-                          
-                          if (index === 0) {
-                              btn.classList.add('latest');
-                              btn.innerText = `${formattedVal} (Latest)`;
-                          } else {
-                              btn.innerText = formattedVal;
-                          }
-
-                          btn.onclick = () => updateState('pt', val);
-                          ptContainer.appendChild(btn);
+                          const valid = isValid(state.os, state.py, val, null);
+                          ptContainer.appendChild(createBtn(val, formatPt(val), state.pt === val, !valid, index === 0, () => updateState('pt', val)));
                       });
 
-                      // Render CUDA Buttons
+                      // 4. Render CUDA
                       const cuContainer = document.getElementById('cu-options');
                       cuContainer.innerHTML = '';
                       sorted.cu.forEach((val, index) => {
-                          const btn = document.createElement('button');
-                          btn.className = `btn ${state.cu === val ? 'active' : ''}`;
-                          
-                          const formattedVal = formatCu(val);
-                          
-                          if (index === 0) {
-                              btn.classList.add('latest');
-                              btn.innerText = `${formattedVal} (Latest)`;
-                          } else {
-                              btn.innerText = formattedVal;
-                          }
-                          
-                          if (!validCombos.has(`${state.pt}|${val}`)) {
-                              btn.disabled = true;
-                          } else {
-                              btn.onclick = () => updateState('cu', val);
-                          }
-
-                          cuContainer.appendChild(btn);
+                          const valid = isValid(state.os, state.py, state.pt, val);
+                          cuContainer.appendChild(createBtn(val, formatCu(val), state.cu === val, !valid, index === 0, () => updateState('cu', val)));
                       });
 
                       renderCommand();
                   }
 
                   function updateState(type, val) {
-                      if (type === 'pt') {
-                          state.pt = val;
-                          
-                          // AGGRESSIVE SNAP: Always find the newest valid CUDA version for this PyTorch
-                          const newestValidCu = sorted.cu.find(c => validCombos.has(`${state.pt}|${c}`));
-                          if (newestValidCu) state.cu = newestValidCu;
-                          
-                      } else if (type === 'cu') {
-                          state.cu = val;
+                      state[type] = val;
+                      
+                      // CASCADING SNAP LOGIC
+                      // Triggers downwards ensuring subsequent layers always snap to their newest valid configuration
+                      if (type === 'os') {
+                          if (!isValid(state.os, state.py, null, null)) state.py = sorted.py.find(p => isValid(state.os, p, null, null));
+                          if (!isValid(state.os, state.py, state.pt, null)) state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
+                          if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
+                      } 
+                      else if (type === 'py') {
+                          if (!isValid(state.os, state.py, state.pt, null)) state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
+                          if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
+                      } 
+                      else if (type === 'pt') {
+                          if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
                       }
                       
                       const copyBtn = document.getElementById('copy-btn');
@@ -344,7 +387,6 @@ jobs:
                       const eikoCmd = `pip install "eiko==${config.version}+pt${state.pt}.${state.cu}" --extra-index-url ${config.baseUrl}/whl/${state.cu}`;
                       
                       currentCommandText = `${ptCmd}\n${eikoCmd}`;
-                      
                       box.innerHTML = `<div class="cmd-line">${ptCmd}</div><div class="cmd-line">${eikoCmd}</div>`;
                   }
                   
@@ -353,19 +395,14 @@ jobs:
                           const btn = document.getElementById('copy-btn');
                           btn.innerText = 'Copied!';
                           btn.classList.add('copied');
-                          
-                          setTimeout(() => {
-                              btn.innerText = 'Copy';
-                              btn.classList.remove('copied');
-                          }, 1000);
-                      }).catch(err => {
-                          console.error('Failed to copy text: ', err);
-                      });
+                          setTimeout(() => { btn.innerText = 'Copy'; btn.classList.remove('copied'); }, 1500);
+                      }).catch(err => { console.error('Failed to copy text: ', err); });
                   }
 
                   // Boot up the UI and populate the footer
                   document.getElementById('footer-text').innerText = `Generated on ${config.date} for Eiko v${config.version}`;
-                  renderButtons();
+                  // Initial snap to guarantee the default selections are perfectly valid
+                  updateState('os', sorted.os[0]);
               </script>
           </body>
           </html>
