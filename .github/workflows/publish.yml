@@ -51,7 +51,7 @@ jobs:
 
           # 1. Define the regex in a variable to prevent Bash parsing errors
           regex="-pt([0-9.]+)-(cu[0-9]+|cpu)-"
-
+          artifacts=(wheelhouse/wheels-*)
           for artifact_dir in "${artifacts[@]}"; do
             dirname=$(basename "$artifact_dir")
             echo "Inspecting folder: $dirname"
