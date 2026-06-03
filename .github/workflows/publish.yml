@@ -175,100 +175,103 @@ jobs:
           
           def main():
               print(f"=== Eiko v{EIKO_VERSION} Auto-Installer ===\n")
-
-              pt_ver, pt_cu = get_pytorch_info()
-              hw_cu = pt_cu if pt_ver else get_hardware_cu()
-
-              # Fallback to PyTorch's reported CUDA only if nvidia-smi fails/is missing
-              if hw_cu == "cpu" and pt_cu and pt_cu != "cpu":
-                  hw_cu = pt_cu
               
+              pt_ver, pt_cu = get_pytorch_info()
+              
+              # 1. ALWAYS determine the true hardware driver ceiling
+              hw_driver = get_hardware_cu()
+              
+              # Fallback to PyTorch's reported CUDA only if nvidia-smi fails/is missing
+              if hw_driver == "cpu" and pt_cu and pt_cu != "cpu":
+                  hw_driver = pt_cu
+                  
               # Explicitly reject CPU-only environments
-              if hw_cu == "cpu":
+              if hw_driver == "cpu":
                   print("\n[!] ERROR: No NVIDIA GPU detected.")
                   print("    Eiko requires a compatible NVIDIA GPU and does not currently support CPU-only environments.")
                   print("\nSuggested next steps:")
-                  print("  1. Verify that you have an NVIDIA GPU. If not, you can run Eiko from Colab: https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb")
-                  print("  2. Ensure the NVIDIA drivers are installed, so the command nvidia-smi is accessible.")
+                  print("  1. If you have an NVIDIA GPU, ensure its drivers are installed and up-to-date.")
+                  print("  2. If you don't have a GPU, you can use Eiko through Google Colab at https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb")
+                  
                   sys.exit(1)
-
-              hw_int = cu_val(hw_cu)
-              
-              # ==========================================
-              #  Outdated Driver Detection
-              # ==========================================
+          
+              hw_int = cu_val(hw_driver)
+          
+              # 2. Outdated Driver Detection
               available_cus = set(cu for pt, cu in valid_combos)
               gpu_cus = [c for c in available_cus if c != 'cpu']
               min_required_cu = min(cu_val(c) for c in gpu_cus) if gpu_cus else 0
           
-              # If an NVIDIA GPU is detected (hw_int > 0) but the driver is too old
               if 0 < hw_int < min_required_cu:
                   min_cu_name = sorted(gpu_cus, key=cu_val)[0]
-
-                  # Format 'cu118' to '11.8' for human readability
+                  
                   def fmt(cu_str): 
                       num = cu_str.replace("cu", "")
                       return f"{num[:2]}.{num[2:]}" if len(num) > 2 else num
                   
                   print(f"\n[!] ERROR: Outdated NVIDIA Driver Detected.")
-                  print(f"    Your current driver supports up to CUDA {fmt(hw_cu)}.")
-                  print(f"    Eiko's oldest pre-compiled GPU wheel requires CUDA {fmt(min_cu_name)}.")
+                  print(f"    Your current driver supports up to CUDA {fmt(hw_driver)}.")
+                  print(f"    Eiko's oldest pre-compiled wheel requires CUDA {fmt(min_cu_name)}.")
                   print("\nSuggested next steps:")
-                  print("  1. Update NVIDIA driver: Download the latest drivers for your GPU from:")
-                  print("                            https://www.nvidia.com/Download/index.aspx")
+                  print("  1. Update NVIDIA Drivers: Download the latest drivers for your GPU.")
                   sys.exit(1)
           
-              available_cus = set(cu for pt, cu in valid_combos)
-              compatible_cus = [c for c in available_cus if cu_val(c) <= hw_int and c != 'cpu']
-              best_cu = sorted(compatible_cus, key=cu_val, reverse=True)[0] if compatible_cus else "cpu"
+              # 3. Find all valid PyTorch+CUDA combinations supported by their hardware
+              valid_upgrades = [(pt, cu) for pt, cu in valid_combos if cu_val(cu) <= hw_int and cu != 'cpu']
+              
+              # Sort by highest PyTorch version first, then highest CUDA version
+              valid_upgrades.sort(key=lambda x: (pt_val(x[0]), cu_val(x[1])), reverse=True)
           
               if pt_ver:
                   print(f"Detected PyTorch: {pt_ver} (Backend: {pt_cu})")
-                  target_pt, target_cu, install_pt = pt_ver, pt_cu, False
-                  if (target_pt, target_cu) not in valid_combos:
-                      print(f"\n[!] Error: Eiko does not have a pre-compiled wheel for PyTorch {target_pt} ({target_cu}).")
-            
-                      # Find all PyTorch versions Eiko supports for their current CUDA backend
-                      supported_pts = [pt for pt, cu in valid_combos if cu == target_cu]
-                      
+                  
+                  # If their current installation is perfectly valid, use it
+                  if (pt_ver, pt_cu) in valid_combos:
+                      target_pt, target_cu, install_pt = pt_ver, pt_cu, False
+                  else:
+                      print(f"\n[!] Error: Eiko does not have a pre-compiled wheel for PyTorch {pt_ver} ({pt_cu}).")
                       print("\nSuggested next steps:")
-                      if supported_pts:
-                          best_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
-                          print(f"  1. Upgrade PyTorch: Eiko supports {target_cu} using PyTorch {best_pt}. Run:")
-                          print(f"                      python -m pip install torch=={best_pt} --index-url https://download.pytorch.org/whl/{target_cu}")
-                          print(f"                      python -m pip install \"eiko=={EIKO_VERSION}+pt{best_pt}.{target_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{target_cu}")
+                      
+                      if valid_upgrades:
+                          best_pt, best_cu = valid_upgrades[0]
+                          print(f"  1. Upgrade PyTorch: The best Eiko match is PyTorch {best_pt} with {best_cu}. Run:")
+                          print(f"                      python -m pip install torch=={best_pt} --index-url https://download.pytorch.org/whl/{best_cu}")
+                          print(f"                      python -m pip install \"eiko=={EIKO_VERSION}+pt{best_pt}.{best_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{best_cu}")
                       else:
-                          print(f"  1. Update Backend:  Eiko does not support your current compute backend ({target_cu}).")
-                          print(f"                      Please visit the web matrix to select a compatible configuration:")
-                          print(f"                      {EIKO_BASE_URL}")
+                          print(f"  1. Check Compatibility: Eiko does not have wheels supporting your hardware ({hw_driver}).")
+                          print(f"                          Visit the web matrix to view supported configurations:")
+                          print(f"                          {EIKO_BASE_URL}")
                           
-                      print("  2. Build Locally:   Compile Eiko from source to match your exact environment:")
-                      print("                      git clone https://github.com/sebftw/Eiko.git")
-                      print("                      cd eiko && pip install .")
+                      print("  2. Build Locally:       Compile Eiko from source to match your exact environment:")
+                      print("                          git clone https://github.com/sebftw/Eiko.git")
+                      print("                          cd eiko && pip install .")
                       sys.exit(1)
               else:
-                  print(f"Hardware Detected: {hw_cu} (Mapping to Eiko wheels: {best_cu})")
-                  supported_pts = [pt for pt, cu in valid_combos if cu == best_cu]
-                  if not supported_pts:
-                    print(f"\n[!] Error: Eiko does not have pre-compiled wheels matching your hardware ({hw_cu}).")
-                    print("\nSuggested next steps:")
-                    print(f"  1. Manual Selection: Visit the web matrix to force a different configuration:")
-                    print(f"                       {EIKO_BASE_URL}")
-                    print("  2. Build Locally:    Compile Eiko from source to match your exact environment:")
-                    print("                       git clone https://github.com/sebftw/Eiko.git")
-                    print("                       cd eiko && pip install .")
-                    sys.exit(1)
-                  target_pt = sorted(supported_pts, key=pt_val, reverse=True)[0]
-                  target_cu = best_cu
+                  print(f"Hardware Detected: {hw_driver}")
+                  
+                  if not valid_upgrades:
+                      print(f"\n[!] Error: Eiko does not have pre-compiled wheels matching your hardware ({hw_driver}).")
+                      print("\nSuggested next steps:")
+                      print(f"  1. Check Compatibility: Visit the web matrix to view supported configurations:")
+                      print(f"                       {EIKO_BASE_URL}")
+                      print("  2. Build Locally:    Compile Eiko from source to match your exact environment:")
+                      print("                       git clone https://github.com/sebftw/Eiko.git")
+                      print("                       cd eiko && pip install .")
+                      sys.exit(1)
+                      
+                  target_pt, target_cu = valid_upgrades[0]
+                  print(f"Mapping to best available Eiko wheels: PyTorch {target_pt} ({target_cu})")
                   install_pt = True
           
+              # 4. Final Command Execution
               commands = []
               if install_pt:
                   commands.append(f"{sys.executable} -m pip install torch=={target_pt} --index-url https://download.pytorch.org/whl/{target_cu}")
               commands.append(f"{sys.executable} -m pip install \"eiko=={EIKO_VERSION}+pt{target_pt}.{target_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{target_cu}")
           
               print("\n--- Recommended Installation Commands ---")
-              for cmd in commands: print(f"> {cmd}")
+              for cmd in commands: 
+                  print(f"> {cmd}")
               print("-----------------------------------------\n")
           
               ans = input("Would you like to execute these commands now? [y/N]: ")
@@ -278,10 +281,7 @@ jobs:
                       subprocess.run(cmd, shell=True, check=True)
                   print("\nInstallation Complete!")
               else:
-                  print("\nAborted.")
-          
-          if __name__ == "__main__":
-              main()
+                  print("\nAborted. You can copy/paste the commands above when ready.")
           EOF
 
       - name: 3. Generate HTML UI
