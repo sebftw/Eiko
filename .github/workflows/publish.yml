@@ -234,17 +234,15 @@ jobs:
                       
                       if valid_upgrades:
                           best_pt, best_cu = valid_upgrades[0]
-                          print(f"  1. Upgrade PyTorch: The best Eiko match is PyTorch {best_pt} with {best_cu}. Run:")
+                          print(f"  Upgrade PyTorch: The best Eiko match is PyTorch {best_pt} with {best_cu}. Run:")
                           print(f"                      python -m pip install torch=={best_pt} --index-url https://download.pytorch.org/whl/{best_cu}")
                           print(f"                      python -m pip install \"eiko=={EIKO_VERSION}+pt{best_pt}.{best_cu}\" --extra-index-url {EIKO_BASE_URL}/whl/{best_cu}")
                       else:
-                          print(f"  1. Check Compatibility: Eiko does not have wheels supporting your hardware ({hw_driver}).")
-                          print(f"                          Visit the web matrix to view supported configurations:")
-                          print(f"                          {EIKO_BASE_URL}")
+                          print("  Build Locally:       Compile Eiko from source to match your exact environment:")
+                          print("                          git clone https://github.com/sebftw/Eiko.git")
+                          print("                          cd eiko && pip install .")
                           
-                      print("  2. Build Locally:       Compile Eiko from source to match your exact environment:")
-                      print("                          git clone https://github.com/sebftw/Eiko.git")
-                      print("                          cd eiko && pip install .")
+                      
                       sys.exit(1)
               else:
                   print(f"Hardware Detected: {hw_driver}")
