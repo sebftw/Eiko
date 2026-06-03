@@ -28,8 +28,6 @@ jobs:
       - name: Prepare Public Directory
         run: |
           mkdir -p public
-          # Copy the auto-installer so it gets hosted on GitHub Pages
-          cp install_eiko.py public/ || echo "Warning: install_eiko.py not found"
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
