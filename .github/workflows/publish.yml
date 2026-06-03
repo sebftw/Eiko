@@ -310,7 +310,7 @@ jobs:
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
                           Auto-Detect Script
                       </h3>
-                      <p>Prefer the command line? Download our Python installer to automatically detect your hardware, check your current PyTorch installation, and run the correct commands.</p>
+                      <p>Don't know which settings to choose? Download our Python installer that automatically runs the correct commands.</p>
                       <div class="terminal" id="auto-script-box" style="margin-top: 10px; min-height: auto;"></div>
                   </div>
                   <div class="footer" id="footer-text"></div>
@@ -420,8 +420,13 @@ jobs:
 
           function updateState(type, val) {
               state[type] = val;
+              
+              // CASCADING SNAP LOGIC
               if (type === 'os') {
-                  if (!isValid(state.os, state.py, null, null)) state.py = sorted.py.find(p => isValid(state.os, p, null, null));
+                  // FIX: Always snap Python to the newest valid version for the selected OS
+                  state.py = sorted.py.find(p => isValid(state.os, p, null, null));
+                  
+                  // Cascade down to ensure PyTorch and CUDA remain valid with this new Python version
                   if (!isValid(state.os, state.py, state.pt, null)) state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
                   if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
               } 
@@ -434,7 +439,9 @@ jobs:
               }
               
               const copyBtn = document.getElementById('copy-btn');
-              copyBtn.innerText = 'Copy'; copyBtn.classList.remove('copied');
+              copyBtn.innerText = 'Copy'; 
+              copyBtn.classList.remove('copied');
+              
               renderButtons();
           }
 
