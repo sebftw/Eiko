@@ -16,14 +16,14 @@ jobs:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
           - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
-          - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
-          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-          - { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+          #- { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
+          #- { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          #- { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
   
           # --- Transition & Modern Tier (All 22.04 base) ---
-          - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
-          - { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
-          - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+          #- { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+          #- { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
+          #- { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
   
           # --- Bleeding Edge ---
           - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
@@ -240,20 +240,20 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
-          - { torch: '2.4.0', cuda: '12.1.1' }
-          - { torch: '2.7.0', cuda: '12.6.3' }
+          #- { torch: '2.4.0', cuda: '12.1.1' }
+          #- { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
           # Matches the PyTorch 2.10.0 platform
-          - { torch: '2.10.0', cuda: '12.8.1' }
+          #- { torch: '2.10.0', cuda: '12.8.1' }
   
           # --- Modern Standard ---
           # Matches the PyTorch 2.11.0 CUDA 13 transition
-          - { torch: '2.11.0', cuda: '13.0.2' }
+          #- { torch: '2.11.0', cuda: '13.0.2' }
   
           # --- Bleeding Edge ---
           # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
-          - { torch: '2.12.0', cuda: '12.6.0' }
+          #- { torch: '2.12.0', cuda: '12.6.0' }
           - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
@@ -475,79 +475,3 @@ jobs:
           Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
           if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
           
-  publish_gh_pages:
-    name: Generate Siloed HTML Indexes and Publish
-    needs: [build_ubuntu_wheels, build_windows_wheels]
-    runs-on: ubuntu-latest
-    #if: github.event_name == 'release' || github.ref == 'refs/heads/main'
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout gh-pages branch to preserve history
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: public
-        continue-on-error: true # Fails gracefully if this is the first ever release
-
-      - name: Create fallback directory
-        run: mkdir -p public
-
-      - name: Download all wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: wheelhouse
-          pattern: wheels-*
-          merge-multiple: true
-
-      - name: Generate PEP-503 compliant Siloed Indexes
-        run: |
-          # Prevent bash from looping over literal '*.whl' if the directory is empty
-          shopt -s nullglob
-          
-          mkdir -p public/whl
-          
-          # 1. Sort NEW wheels into the existing PEP-503 structure
-          for wheel in wheelhouse/*.whl; do
-            filename=$(basename "$wheel")
-            
-            # This matches 'cu118', 'cuda118', 'cuda-11.8', 'cu_12', etc.
-            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+) ]]; then
-              cuda_tag="${BASH_REMATCH[1]}"
-             # Optional: Normalize the tag to strip out "da", hyphens, or periods 
-             # so your folder names stay clean (e.g., turning "cuda11.8" into "cu118")
-             cuda_tag=$(echo "$cuda_tag" | sed 's/da//; s/[-_\.]//g')
-            
-            mkdir -p "public/whl/$cuda_tag/eiko"
-            cp "$wheel" "public/whl/$cuda_tag/eiko/"
-          done
-
-          # 2. Regenerate index files for ALL wheels (old + new)
-          cd public/whl
-          for dir in cu* cpu; do
-            if [ -d "$dir" ]; then
-              echo "<!DOCTYPE html><html><body><a href=\"eiko/\">eiko</a></body></html>" > "$dir/index.html"
-              
-              cd "$dir/eiko"
-              echo "<!DOCTYPE html><html><head><title>Links for eiko ($dir)</title></head><body>" > index.html
-              echo "<h1>Links for eiko</h1>" >> index.html
-              
-              for w in *.whl; do
-                if [ "$w" != "index.html" ]; then
-                  echo "<a href=\"$w\">$w</a><br>" >> index.html
-                fi
-              done
-              
-              echo "</body></html>" >> index.html
-              cd ../..
-            fi
-          done
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          keep_files: true
-          publish_branch: gh-pages-test
