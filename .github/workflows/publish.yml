@@ -112,15 +112,15 @@ jobs:
       - name: Generate Interactive Install Guide (PyTorch Style)
         run: |
           # 1. Dynamically extract the base package version and repository URL
-          FIRST_WHEEL=$(ls public/whl/*/*/*.whl | head -n 1 2>/dev/null || echo "eiko-0.0.0-")
+          FIRST_WHEEL=$(find public/whl -name "*.whl" | head -n 1 2>/dev/null || echo "eiko-0.0.0-")
           BASE_VERSION=$(basename "$FIRST_WHEEL" | cut -d'-' -f2 | cut -d'+' -f1)
           REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
           BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
-
+          
           # 2. Grab ALL wheel filenames into a comma-separated string to pass to JS
           WHEEL_LIST=$(find public/whl -name "*.whl" -exec basename {} \; | tr '\n' ',' | sed 's/,$//')
-
+          
           # 3. Write the HTML file
           cat << 'EOF' > public/index.html
           <!DOCTYPE html>
@@ -139,20 +139,26 @@ jobs:
                   .label { width: 140px; font-weight: 600; color: #555; flex-shrink: 0; padding-top: 10px; }
                   
                   .options { display: flex; flex-wrap: wrap; gap: 12px; }
-                  .btn { background: #f0f0f0; border: 2px solid transparent; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; user-select: none; color: #444; }
-                  .btn:hover:not(.disabled) { background: #e4e4e4; }
+                  /* Updated .btn to reflect <button> reset styling */
+                  .btn { background: #f0f0f0; border: 2px solid transparent; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; user-select: none; color: #444; font-family: inherit; }
+                  .btn:hover:not(:disabled) { background: #e4e4e4; }
                   .btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; font-weight: 600; }
                   
-                  /* Disabled state styling for CUDA options without wheels */
-                  .btn.disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; background: #fafafa; border-color: transparent; }
+                  /* Disabled state using native pseudo-class */
+                  .btn:disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; background: #fafafa; border-color: transparent; }
                   
                   .btn.latest { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
-                  .btn.latest:hover:not(.disabled) { background: #dcfce7; }
+                  .btn.latest:hover:not(:disabled) { background: #dcfce7; }
                   .btn.latest.active { background: #22c55e; border-color: #22c55e; color: white; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.25); }
-
-                  .terminal { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; margin-top: 30px; font-size: 15px; overflow-x: auto; line-height: 1.6; }
+          
+                  .terminal-container { position: relative; margin-top: 30px; }
+                  .terminal { background: #1e1e1e; color: #d4d4d4; padding: 20px 20px 20px 20px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; font-size: 15px; overflow-x: auto; line-height: 1.6; min-height: 50px; }
                   .cmd-line { white-space: nowrap; }
                   .cmd-line::before { content: "$ "; color: #4af626; }
+                  
+                  .copy-btn { position: absolute; top: 12px; right: 12px; background: #333; color: #fff; border: 1px solid #555; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: background 0.2s; font-family: inherit; }
+                  .copy-btn:hover { background: #444; }
+                  .copy-btn.copied { background: #22c55e; border-color: #22c55e; }
               </style>
           </head>
           <body>
@@ -164,15 +170,18 @@ jobs:
                       <div class="label">PyTorch Build</div>
                       <div class="options" id="pt-options"></div>
                   </div>
-
+          
                   <div class="row">
                       <div class="label">Compute Platform</div>
                       <div class="options" id="cu-options"></div>
                   </div>
-
-                  <div class="terminal" id="command-box"></div>
+          
+                  <div class="terminal-container">
+                      <button class="copy-btn" id="copy-btn" onclick="copyCommand()">Copy</button>
+                      <div class="terminal" id="command-box"></div>
+                  </div>
               </div>
-
+          
               <script>
           EOF
           
@@ -184,7 +193,8 @@ jobs:
           cat << 'EOF' >> public/index.html
                   const validCombos = new Set();
                   const uniqueVars = { pt: new Set(), cu: new Set() };
-
+                  let currentCommandText = "";
+          
                   // 1. Parse all filenames to discover what actually exists
                   rawWheels.forEach(filename => {
                       if (!filename) return;
@@ -200,7 +210,7 @@ jobs:
                           uniqueVars.cu.add(cu);
                       }
                   });
-
+          
                   // 2. Sort the arrays descending
                   const compareVersions = (a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
                   const sorted = {
@@ -210,16 +220,16 @@ jobs:
                           return compareVersions(a, b);
                       })
                   };
-
+          
                   // 3. Initialize state with the absolute bleeding edge available
                   let state = { pt: sorted.pt[0], cu: sorted.cu[0] };
-
+          
                   function renderButtons() {
                       // Render PyTorch Buttons (The Master Selector - Never disabled)
                       const ptContainer = document.getElementById('pt-options');
                       ptContainer.innerHTML = '';
                       sorted.pt.forEach((val, index) => {
-                          const btn = document.createElement('div');
+                          const btn = document.createElement('button'); // Changed to semantic button
                           btn.className = `btn ${state.pt === val ? 'active' : ''}`;
                           
                           if (index === 0) {
@@ -228,16 +238,16 @@ jobs:
                           } else {
                               btn.innerText = val;
                           }
-
+          
                           btn.onclick = () => updateState('pt', val);
                           ptContainer.appendChild(btn);
                       });
-
+          
                       // Render CUDA Buttons (The Slave Selector)
                       const cuContainer = document.getElementById('cu-options');
                       cuContainer.innerHTML = '';
                       sorted.cu.forEach((val, index) => {
-                          const btn = document.createElement('div');
+                          const btn = document.createElement('button'); // Changed to semantic button
                           btn.className = `btn ${state.cu === val ? 'active' : ''}`;
                           
                           if (index === 0) {
@@ -249,47 +259,64 @@ jobs:
                           
                           // Check validity against the current PyTorch Master
                           if (!validCombos.has(`${state.pt}|${val}`)) {
-                              btn.classList.add('disabled');
-                              // Intentionally do NOT attach an onclick handler here
+                              btn.disabled = true; // Use native HTML disabled attribute
                           } else {
-                              // Only attach the click handler if it's a valid combination
                               btn.onclick = () => updateState('cu', val);
                           }
-
+          
                           cuContainer.appendChild(btn);
                       });
-
+          
                       renderCommand();
                   }
-
+          
                   function updateState(type, val) {
                       if (type === 'pt') {
                           state.pt = val;
-                          // If the user clicks a new PyTorch, check if the currently selected CUDA is still valid.
-                          // If not, automatically snap to the newest valid CUDA version for this PyTorch.
+                          // Auto-snap to the newest valid CUDA version if current becomes invalid
                           if (!validCombos.has(`${state.pt}|${state.cu}`)) {
                               const validCu = sorted.cu.find(c => validCombos.has(`${state.pt}|${c}`));
                               if (validCu) state.cu = validCu;
                           }
                       } else if (type === 'cu') {
-                          // Only allow the user to click the CUDA button if it exists for the current PyTorch version
-                          if (validCombos.has(`${state.pt}|${val}`)) {
-                              state.cu = val;
-                          } else {
-                              return; // Do nothing if they click a disabled button
-                          }
+                          state.cu = val;
                       }
+                      
+                      // Reset copy button visual state on change
+                      const copyBtn = document.getElementById('copy-btn');
+                      copyBtn.innerText = 'Copy';
+                      copyBtn.classList.remove('copied');
+                      
                       renderButtons();
                   }
-
+          
                   function renderCommand() {
                       const box = document.getElementById('command-box');
                       const ptCmd = `pip install torch==${state.pt} --index-url https://download.pytorch.org/whl/${state.cu}`;
                       const eikoCmd = `pip install "eiko==${config.version}+pt${state.pt}.${state.cu}" --extra-index-url ${config.baseUrl}/whl/${state.cu}`;
                       
+                      // Store raw text for the copy function
+                      currentCommandText = `${ptCmd}\n${eikoCmd}`;
+                      
                       box.innerHTML = `<div class="cmd-line">${ptCmd}</div><div class="cmd-line">${eikoCmd}</div>`;
                   }
-
+                  
+                  function copyCommand() {
+                      navigator.clipboard.writeText(currentCommandText).then(() => {
+                          const btn = document.getElementById('copy-btn');
+                          btn.innerText = 'Copied!';
+                          btn.classList.add('copied');
+                          
+                          // Revert back after 2 seconds
+                          setTimeout(() => {
+                              btn.innerText = 'Copy';
+                              btn.classList.remove('copied');
+                          }, 2000);
+                      }).catch(err => {
+                          console.error('Failed to copy text: ', err);
+                      });
+                  }
+          
                   // Boot up the UI
                   renderButtons();
               </script>
