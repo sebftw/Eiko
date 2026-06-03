@@ -172,6 +172,38 @@ jobs:
                       renderCommand();
                   }
 
+                  function updateButtons(groupId, activeVal) {
+                      const container = document.getElementById(groupId);
+                      const buttons = container.getElementsByClassName('btn');
+                      for (let btn of buttons) {
+                          if (btn.getAttribute('onclick').includes(activeVal)) {
+                              btn.classList.add('active');
+                          } else {
+                              btn.classList.remove('active');
+                          }
+                      }
+                  }
+
+                  function renderCommand() {
+                      const box = document.getElementById('command-box');
+                      
+                      // 1. PyTorch Official Install Command
+                      const ptCmd = \`pip install torch==\${state.pt} --index-url https://download.pytorch.org/whl/\${state.cu}\`;
+                      
+                      // 2. Eiko Custom Install Command
+                      const eikoCmd = \`pip install "eiko==\${config.version}+pt\${state.pt}.\${state.cu}" --extra-index-url \${config.baseUrl}/whl/\${state.cu}\`;
+                      
+                      // Render them on separate lines with the terminal prompt prefix
+                      box.innerHTML = \`<div class="cmd-line">\${ptCmd}</div><div class="cmd-line">\${eikoCmd}</div>\`;
+                  }
+
+                  // Initialize the UI command box
+                  renderCommand();
+              </script>
+          </body>
+          </html>
+          EOF
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
