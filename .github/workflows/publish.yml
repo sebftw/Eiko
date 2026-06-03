@@ -482,7 +482,7 @@ jobs:
 
           function updateState(type, val) {
               // GUARD: If the user clicks the already-active button, do nothing.
-              if (state[type] === selectedValue) {
+              if (state[type] === val) {
                   return; 
               }
               
