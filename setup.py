@@ -71,6 +71,7 @@ full_version = f"{base_version}{local_version}"
 setup(
     version=full_version, # Injected into the wheel filename and metadata
     ext_modules=ext_modules,
+    license="BSD-3-Clause",
     cmdclass={
         "build_ext": BuildExtension
     }
