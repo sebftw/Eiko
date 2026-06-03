@@ -25,8 +25,11 @@ jobs:
           path: public
         continue-on-error: true
 
-      - name: Create fallback directory
-        run: mkdir -p public
+      - name: Prepare Public Directory
+        run: |
+          mkdir -p public
+          # Copy the auto-installer so it gets hosted on GitHub Pages
+          cp install_eiko.py public/ || echo "Warning: install_eiko.py not found"
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -167,6 +170,10 @@ jobs:
 
                   .footer { margin-top: 40px; text-align: center; font-size: 13px; color: #888; border-top: 1px solid #eaeaea; padding-top: 20px; }
 
+                  .auto-install-box { margin-top: 40px; padding: 25px; border: 1px solid #e0e7ff; background: #f8fafc; border-radius: 8px; }
+                  .auto-install-box h3 { margin-top: 0; color: #3730a3; font-size: 18px; display: flex; align-items: center; gap: 8px; }
+                  .auto-install-box p { font-size: 14px; color: #475569; margin-bottom: 15px; }
+
                   /* ========================================= */
                   /* MOBILE RESPONSIVE LAYOUT                 */
                   /* ========================================= */
@@ -220,7 +227,14 @@ jobs:
                       <button class="copy-btn" id="copy-btn" onclick="copyCommand()">Copy</button>
                       <div class="terminal" id="command-box"></div>
                   </div>
-
+                  <div class="auto-install-box">
+                      <h3>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                          Auto-Detect Script
+                      </h3>
+                      <p>Prefer the command line? Download our Python installer to automatically detect your hardware, check your current PyTorch installation, and run the correct commands.</p>
+                      <div class="terminal" id="auto-script-box" style="margin-top: 10px; min-height: auto;"></div>
+                  </div>
                   <div class="footer" id="footer-text"></div>
               </div>
 
@@ -240,7 +254,6 @@ jobs:
                   // 1. Parse all filenames to discover what actually exists
                   rawWheels.forEach(filename => {
                       if (!filename) return;
-                      
                       const ptMatch = filename.match(/\+pt([0-9\.]+)\./);
                       const cuMatch = filename.match(/\.(cu[0-9]+|cpu)-/);
                       const pyMatch = filename.match(/-cp(\d+)-/);
@@ -253,16 +266,28 @@ jobs:
                           let pyRaw = pyMatch[1];
                           let py = pyRaw === '38' ? '3.8' : `3.${pyRaw.substring(1)}`;
 
-                          // Convert manylinux tags to readable OS strings
-                          let os = 'Linux';
-                          if (filename.includes('manylinux_2_31')) os = 'Ubuntu 20.04';
-                          else if (filename.includes('manylinux_2_35')) os = 'Ubuntu 22.04';
-                          else if (filename.includes('manylinux_2_39')) os = 'Ubuntu 24.04';
-                          else if (filename.includes('win')) os = 'Windows';
-                          else if (filename.includes('mac')) os = 'macOS';
+                          // Forward-compatibility mapping array
+                          let supportedOS = [];
+                          if (filename.includes('manylinux_2_31')) {
+                              supportedOS = ['Ubuntu 20.04', 'Ubuntu 22.04', 'Ubuntu 24.04'];
+                          } else if (filename.includes('manylinux_2_35')) {
+                              supportedOS = ['Ubuntu 22.04', 'Ubuntu 24.04'];
+                          } else if (filename.includes('manylinux_2_39')) {
+                              supportedOS = ['Ubuntu 24.04'];
+                          } else if (filename.includes('win')) {
+                              supportedOS = ['Windows'];
+                          } else if (filename.includes('mac')) {
+                              supportedOS = ['macOS'];
+                          } else {
+                              supportedOS = ['Linux'];
+                          }
 
-                          validCombos.add(`${os}|${py}|${pt}|${cu}`);
-                          uniqueVars.os.add(os);
+                          // Register the combination for every OS it supports
+                          supportedOS.forEach(os => {
+                              validCombos.add(`${os}|${py}|${pt}|${cu}`);
+                              uniqueVars.os.add(os);
+                          });
+                          
                           uniqueVars.py.add(py);
                           uniqueVars.pt.add(pt);
                           uniqueVars.cu.add(cu);
@@ -388,6 +413,11 @@ jobs:
                       
                       currentCommandText = `${ptCmd}\n${eikoCmd}`;
                       box.innerHTML = `<div class="cmd-line">${ptCmd}</div><div class="cmd-line">${eikoCmd}</div>`;
+                      
+                      // One-liner cross-platform remote execution (In-Memory)
+                      const scriptBox = document.getElementById('auto-script-box');
+                      const oneLiner = `python -c "import urllib.request; exec(urllib.request.urlopen('${config.baseUrl}/install_eiko.py').read().decode('utf-8'))"`;
+                      scriptBox.innerHTML = `<div class="cmd-line">${oneLiner}</div>`;
                   }
                   
                   function copyCommand() {
