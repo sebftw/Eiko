@@ -84,6 +84,94 @@ jobs:
             fi
           done
 
+      - name: Generate Interactive Install Guide (PyTorch Style)
+        run: |
+          # 1. Dynamically extract the base package version from the first compiled wheel
+          FIRST_WHEEL=$(ls public/whl/*/*/*.whl | head -n 1 2>/dev/null || echo "eiko-0.0.0-")
+          BASE_VERSION=$(basename "$FIRST_WHEEL" | cut -d'-' -f2 | cut -d'+' -f1)
+          
+          # 2. Extract repository owner and name for the URL
+          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
+
+          # 3. Write the HTML file to the root of the GitHub Pages site
+          cat << EOF > public/index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Eiko Installation Guide</title>
+              <style>
+                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f9f9f9; color: #333; display: flex; justify-content: center; padding: 50px 20px; }
+                  .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 800px; width: 100%; }
+                  h1 { margin-top: 0; font-size: 28px; }
+                  .row { display: flex; align-items: center; border-bottom: 1px solid #eaeaea; padding: 20px 0; }
+                  .row:last-of-type { border-bottom: none; }
+                  .label { width: 180px; font-weight: 600; color: #555; }
+                  .options { display: flex; flex-wrap: wrap; gap: 12px; }
+                  .btn { background: #f0f0f0; border: 2px solid transparent; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 15px; transition: all 0.2s; user-select: none; }
+                  .btn:hover { background: #e4e4e4; }
+                  .btn.active { background: #eef2ff; border-color: #4f46e5; color: #4f46e5; font-weight: 600; }
+                  
+                  /* Updated Terminal Styling for Multiple Lines */
+                  .terminal { background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 8px; font-family: 'Courier New', Courier, monospace; margin-top: 30px; font-size: 15px; overflow-x: auto; line-height: 1.6; }
+                  .cmd-line::before { content: "$ "; color: #4af626; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>Install Eiko</h1>
+                  <p>Select your environment to generate the compatible pip install commands.</p>
+                  
+                  <div class="row">
+                      <div class="label">PyTorch Build</div>
+                      <div class="options" id="pt-options">
+                          <div class="btn active" onclick="setPt('2.12.0')">2.12.0</div>
+                          <div class="btn" onclick="setPt('2.11.0')">2.11.0</div>
+                          <div class="btn" onclick="setPt('2.10.0')">2.10.0</div>
+                          <div class="btn" onclick="setPt('2.7.0')">2.7.0</div>
+                          <div class="btn" onclick="setPt('2.4.0')">2.4.0</div>
+                      </div>
+                  </div>
+
+                  <div class="row">
+                      <div class="label">Compute Platform</div>
+                      <div class="options" id="cu-options">
+                          <div class="btn" onclick="setCu('cu132')">CUDA 13.2</div>
+                          <div class="btn" onclick="setCu('cu130')">CUDA 13.0</div>
+                          <div class="btn" onclick="setCu('cu128')">CUDA 12.8</div>
+                          <div class="btn active" onclick="setCu('cu126')">CUDA 12.6</div>
+                          <div class="btn" onclick="setCu('cu121')">CUDA 12.1</div>
+                          <div class="btn" onclick="setCu('cpu')">CPU</div>
+                      </div>
+                  </div>
+
+                  <div class="terminal" id="command-box"></div>
+              </div>
+
+              <script>
+                  // Bash injects these variables during the GitHub Action run
+                  const config = {
+                      version: '${BASE_VERSION}',
+                      baseUrl: '${BASE_URL}'
+                  };
+
+                  let state = { pt: '2.12.0', cu: 'cu126' };
+
+                  function setPt(val) {
+                      state.pt = val;
+                      updateButtons('pt-options', val);
+                      renderCommand();
+                  }
+
+                  function setCu(val) {
+                      state.cu = val;
+                      updateButtons('cu-options', val);
+                      renderCommand();
+                  }
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
