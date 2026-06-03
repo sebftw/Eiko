@@ -49,50 +49,42 @@ jobs:
           # Set this flag to "true" to patch old wheels, or "false" to skip
           PATCH_LEGACY_WHEELS="true"
 
+          # 1. Define the regex in a variable to prevent Bash parsing errors
+          regex="-pt([0-9.]+)-(cu[0-9]+|cpu)-"
+
           for artifact_dir in "${artifacts[@]}"; do
             dirname=$(basename "$artifact_dir")
             echo "Inspecting folder: $dirname"
             
-            # Match both PyTorch and CUDA tags from the directory name
-            if [[ "$dirname" =~ -pt([0-9\.]+)-(cu[0-9]+|cpu)- ]]; then
+            # 2. Use the unquoted regex variable
+            if [[ "$dirname" =~ $regex ]]; then
               pt_tag="${BASH_REMATCH[1]}"
               cu_tag="${BASH_REMATCH[2]}"
               
-              echo "  -> Routing $dirname to $cu_tag..."
+              echo "  -> SUCCESS: Found PyTorch $pt_tag and $cu_tag"
               mkdir -p "public/whl/$cu_tag/eiko"
               
-              # Loop through individual wheels inside the artifact directory
               for wheel in "$artifact_dir"/*.whl; do
                 wheel_name=$(basename "$wheel")
                 
-                # If the flag is on AND the wheel doesn't already have the +pt tag
                 if [[ "$PATCH_LEGACY_WHEELS" == "true" ]] && [[ ! "$wheel_name" == *"+pt"* ]]; then
                   echo "  -> Patching legacy wheel: $wheel_name"
                   
-                  # 1. Isolate the package name (everything before the first hyphen)
                   pkg_name="${wheel_name%%-*}"
-                  
-                  # 2. Isolate the rest of the string
                   remainder="${wheel_name#*-}"
-                  
-                  # 3. Isolate the version (the next chunk before the second hyphen)
                   version="${remainder%%-*}"
-                  
-                  # 4. Isolate the build/platform tags (everything else)
                   tags="${remainder#*-}"
                   
-                  # 5. Reassemble with the PEP-440 local version injected
                   new_name="${pkg_name}-${version}+pt${pt_tag}.${cu_tag}-${tags}"
                   
                   cp "$wheel" "public/whl/$cu_tag/eiko/$new_name"
                   echo "     Saved as: $new_name"
                 else
-                  # Normal copy for wheels that are already named correctly
                   cp "$wheel" "public/whl/$cu_tag/eiko/"
                 fi
               done
             else
-              echo "  -> FAILED: Regex could not find PyTorch/CUDA tags in '$dirname'"
+              echo "  -> FAILED: Regex could not match '$dirname'"
             fi
           done
 
