@@ -481,23 +481,25 @@ jobs:
           }
 
           function updateState(type, val) {
+              // GUARD: If the user clicks the already-active button, do nothing.
+              if (state[type] === selectedValue) {
+                  return; 
+              }
+              
               state[type] = val;
               
-              // CASCADING SNAP LOGIC
+              // CASCADING SNAP LOGIC (Snap to latest versions when possible).
               if (type === 'os') {
-                  // FIX: Always snap Python to the newest valid version for the selected OS
                   state.py = sorted.py.find(p => isValid(state.os, p, null, null));
-                  
-                  // Cascade down to ensure PyTorch and CUDA remain valid with this new Python version
-                  if (!isValid(state.os, state.py, state.pt, null)) state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
-                  if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
+                  state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
+                  state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
               } 
               else if (type === 'py') {
-                  if (!isValid(state.os, state.py, state.pt, null)) state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
-                  if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
+                  state.pt = sorted.pt.find(p => isValid(state.os, state.py, p, null));
+                  state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
               } 
               else if (type === 'pt') {
-                  if (!isValid(state.os, state.py, state.pt, state.cu)) state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
+                  state.cu = sorted.cu.find(c => isValid(state.os, state.py, state.pt, c));
               }
               
               const copyBtn = document.getElementById('copy-btn');
