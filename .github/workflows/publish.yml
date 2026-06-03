@@ -33,7 +33,7 @@ jobs:
         with:
           path: wheelhouse
           pattern: wheels-*
-          merge-multiple: true
+          merge-multiple: false
           # If triggered manually, use the provided run_id.
           # If triggered by the orchestrator, default to the current run context.
           run-id: ${{ inputs.run_id || github.run_id }}
@@ -42,6 +42,7 @@ jobs:
 
       - name: Generate PEP-503 compliant Siloed Indexes
         run: |
+          ls -R wheelhouse/
           shopt -s nullglob
           mkdir -p public/whl
           
