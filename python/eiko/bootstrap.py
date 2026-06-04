@@ -80,26 +80,31 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
 
     expected_hash = matched_build.get("sha256")
     max_allowed_size = 50 * 1024 * 1024  # 50 MB safety limit
+    chunk_size = 256 * 1024  # 256 KB chunks (large chunks reduce loop overhead and system calls)
     
     try:
         if not os.path.exists(wheel_path):
-            # print(f"[Eiko] Downloading wheel to temporary cache...")
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
             
-            sha256_hash = hashlib.sha256()
-            downloaded_size = 0
-            
-            with urllib.request.urlopen(req, timeout=15.0) as response, open(tmp_wheel_path, 'wb') as out_file:
-                # Read and write the file in 8KB chunks
-                while chunk := response.read(8192):
-                    downloaded_size += len(chunk)
-                    
-                    # Defend against infinite streams / DoS
-                    if downloaded_size > max_allowed_size:
-                        raise ValueError(f"Download exceeded the maximum allowed size of {max_allowed_size} bytes.")
-                    
-                    out_file.write(chunk)
-                    sha256_hash.update(chunk)
+            with urllib.request.urlopen(req, timeout=5.0) as response:
+                # Fast-fail: Check headers before downloading anything (assuming an honest server)
+                content_length = response.getheader('Content-Length')
+                if content_length and int(content_length) > max_allowed_size:
+                    raise ValueError(f"Reported size ({content_length} bytes) exceeds maximum allowed size.")
+
+                sha256_hash = hashlib.sha256()
+                downloaded_size = 0
+                
+                with open(tmp_wheel_path, 'wb') as out_file:
+                    while chunk := response.read(chunk_size):
+                        downloaded_size += len(chunk)
+                        
+                        # Defend against infinite streams / DoS
+                        if downloaded_size > max_allowed_size:
+                            raise ValueError(f"Download exceeded the maximum allowed size of {max_allowed_size} bytes.")
+                        
+                        out_file.write(chunk)
+                        sha256_hash.update(chunk)
             
             # Verify the hash before moving it to the active path
             if expected_hash:
