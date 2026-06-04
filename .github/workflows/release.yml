@@ -542,12 +542,19 @@ jobs:
           # Build the wheel
           python -m build --wheel --no-isolation
 
-          # Repair the wheel targeting manylinux_2_31 (Ubuntu 20.04+)
-          # Note: We removed the torch/jax exclusions since they are no longer in the environment
-          echo "Repairing wheel for manylinux_2_31 compatibility..."
-          python -m auditwheel repair dist/*.whl \
-            --plat manylinux_2_31_x86_64 \
-            -w repaired_dist/
+          # Check if the generated wheel is a platform wheel or pure Python
+          if ls dist/*-none-any.whl >/dev/null 2>&1; then
+            echo "Pure Python wheel detected (*-none-any.whl). Skipping auditwheel repair."
+          else
+            echo "Platform-specific wheel detected. Repairing for manylinux_2_31 compatibility..."
+            python${{ matrix.python-version }} -m auditwheel repair dist/*.whl \
+              --plat manylinux_2_31_x86_64 \
+              -w repaired_dist/
+
+            # Clean up and stage repaired wheel
+            rm dist/*.whl
+            mv repaired_dist/*.whl dist/
+          fi
 
           # Clean up and stage repaired wheel
           rm dist/*.whl
