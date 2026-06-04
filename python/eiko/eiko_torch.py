@@ -58,28 +58,59 @@ except ImportError:
             print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko! :)")
             
         except Exception as e:
-            # Catch PyTorch's ugly traceback and format a human-readable diagnosis
             error_msg = str(e).lower()
             
-            print("\n" + "="*70)
+            print("\n" + "="*75)
             print("[Eiko] FATAL ERROR: Local C++/CUDA compilation failed.")
-            print("="*70)
-            print("1. We could not find a compatible precompiled wheel for your system.")
+            print("="*75)
+            print("1. We could not find a compatible precompiled wheel for your exact system.")
             print("2. We attempted to compile the extension from source, but it failed.\n")
             
-            if sys.platform == "win32" and ("cl.exe" in error_msg or "cl' returned non-zero" in error_msg):
+            # --- DIAGNOSIS ROUTINES ---
+            # 1. MSVC Missing (Windows)
+            if sys.platform == "win32" and ("cl.exe" in error_msg or "['where', 'cl']" in error_msg):
                 print("DIAGNOSIS: Microsoft Visual Studio C++ compiler ('cl.exe') was not found.")
-                print("FIX: Please install the 'Desktop development with C++' workload via the Visual Studio Installer.")
-            elif "nvcc" in error_msg:
+                print("FIX: 1) Install the 'Desktop development with C++' workload via the Visual Studio Installer.")
+                print("     2) Ensure you run Python inside the 'x64 Native Tools Command Prompt for VS'.")
+            
+            # 2. GCC/G++ Missing (Linux)
+            elif sys.platform != "win32" and ("['which', 'c++']" in error_msg or "['which', 'g++']" in error_msg or "gcc" in error_msg):
+                print("DIAGNOSIS: A C++ host compiler (like GCC or G++) was not found.")
+                print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
+                
+            # 3. NVCC Missing (Cross-Platform)
+            elif "nvcc" in error_msg or "cuda" in error_msg:
                 print("DIAGNOSIS: The NVIDIA CUDA Toolkit ('nvcc') was not found or failed to execute.")
                 print("FIX: Ensure the CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
-            else:
-                print(f"COMPILER OUTPUT:\n{str(e)}")
+                print("🔗 Download CUDA here: https://developer.nvidia.com/cuda-downloads")
                 
-            print("\nPlease resolve the compiler issue or open an issue on GitHub to request a wheel for your setup.")
-            print("="*70 + "\n")
+            # 4. Generic Compilation Failure
+            else:
+                print("COMPILER OUTPUT:")
+                print(str(e))
+                
+            # --- FASTEST FIX ADVICE ---
+            print("\n" + "-"*75)
+            print("FASTEST FIX: UPDATE PYTORCH")
+            print("Eiko provides precompiled wheels for the newest PyTorch releases.")
+            print(f"You are currently running PyTorch {t_ver}. Updating PyTorch to the latest version")
+            print("will likely bypass this compilation step entirely:")
+            print("👉 pip install --upgrade torch")
+                
+            # --- GITHUB ISSUE TEMPLATE ---
+            print("\n" + "-"*75)
+            print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
+            print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
+            print("Please copy and paste the following system information into your issue description:\n")
+            print("```text")
+            print(f"OS:      {os_name}")
+            print(f"Python:  {py_ver}")
+            print(f"PyTorch: {t_ver}")
+            print(f"CUDA:    {c_ver}")
+            print("```")
+            print("="*75 + "\n")
             
-            # Re-raise as a clean RuntimeError, using 'from None' to suppress the previous traceback chain
+            # Suppress the massive traceback and raise a clean error
             raise RuntimeError("Eiko initialization failed due to missing C++ build tools.") from None
 
 #------------------------------------------------------------------------
