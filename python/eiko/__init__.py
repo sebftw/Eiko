@@ -122,7 +122,7 @@ def clear_caches():
 # ---------------------------------------------------------
 from .animate_eikonal import animate_eikonal
 
-# Add the new utility functions to your public API exports
+# Add these functions and fields to the public API exports
 __all__ = [
     'eiko', 
     'eiko3d', 
