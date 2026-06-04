@@ -83,10 +83,21 @@ def clear_binary_cache():
     Useful if you switch CUDA drivers or encounter corrupted compilation states.
     """
     if os.path.exists(BIN_CACHE_DIR):
-        shutil.rmtree(BIN_CACHE_DIR)
-        print(f"[Eiko] Cleared binary cache at: {BIN_CACHE_DIR}")
-    else:
-        print("[Eiko] Binary cache is already empty.")
+        try:
+            shutil.rmtree(BIN_CACHE_DIR)
+            print(f"[Eiko] Cleared binary cache at: {BIN_CACHE_DIR}")
+        except PermissionError:
+            print("\n" + "="*75)
+            print("[Eiko] CACHE CLEAR FAILED WITH PERMISSION ERROR: Binaries at {BIN_CACHE_DIR} are probably currently in use.")
+            print("="*75)
+            print("The operating system cannot delete the files because they")
+            print("are already loaded into the active Python memory space.")
+            print("\nHOW TO FIX:")
+            print("1. Restart your Python session (or restart your Jupyter kernel).")
+            print("2. Run the cache clearing command *before* calling any Eiko solvers.")
+            print("="*75 + "\n")
+        except OSError as e:
+            print(f"[Eiko] Failed to clear binary cache due to an OS error: {e}")
 
 def clear_download_cache():
     """
@@ -94,10 +105,9 @@ def clear_download_cache():
     """
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     if os.path.exists(eiko_tmp_dir):
-        shutil.rmtree(eiko_tmp_dir)
-        print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
-    else:
-        print("[Eiko] Download cache is already empty.")
+        try:
+            shutil.rmtree(eiko_tmp_dir)
+            print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
 
 def clear_cache():
     """
