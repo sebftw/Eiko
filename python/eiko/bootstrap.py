@@ -8,18 +8,14 @@ import platform
 import zipfile
 import tempfile
 import shutil
+import uuid
 
 REGISTRY_URL = "https://sebftw.github.io/Eiko/registry.json"
 
 def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target_dir, target_impl="eiko_torch_impl"):
-    """
-    Attempts to download and extract the precompiled wheel.
-    Caches the wheel in the OS temporary directory to prevent duplicate downloads.
-    Compatible with Python 3.8 - 3.12.
-    """
     os.makedirs(target_dir, exist_ok=True)
     
-    # 0. Early Exit: Check if the binary was already extracted in a previous run
+    # Early Exit
     existing_binaries = [f for f in os.listdir(target_dir) if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
     if existing_binaries:
         print(f"[Eiko] Binary already exists in {target_dir}. Skipping download.")
@@ -39,13 +35,11 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         print(f"[Eiko] Failed to parse registry. Falling back to JIT.")
         return False
 
-    # 2. Match Environment (OS and Python)
+    # 2. Match Environment
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
     os_name = "windows" if platform.system().lower() == "windows" else "linux"
     
     builds = registry.get("versions", {}).get(package_version, [])
-    
-    # Filter by base system compatibility
     valid_builds = []
     for b in builds:
         if b["os"] == os_name and b["python"] == py_ver:
@@ -63,36 +57,43 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         digits = re.findall(r'\d+', build_item.get("cuda", ""))
         return int(digits[0]) if digits else 0
 
-    # 3. Select the Best Variant
+    # 3. Select Variant
     matched_build = None
     if cuda_version is not None:
         matched_build = next((b for b in valid_builds if b["cuda"] == cuda_version), None)
-        
     if not matched_build:
         matched_build = max(valid_builds, key=get_cuda_score)
 
     print(f"[Eiko] Selected wheel: {matched_build['filename']} (CUDA target: {matched_build['cuda']})")
 
-    # 4. Cache, Download & Extract
+    # 4. Multiprocessing-Safe Download & Extract
     wheel_url = matched_build["url"]
-    
-    # Create an isolation folder in the system's temp directory
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     os.makedirs(eiko_tmp_dir, exist_ok=True)
     
     wheel_path = os.path.join(eiko_tmp_dir, matched_build["filename"])
     
+    # Generate a unique suffix for this specific process/thread
+    tmp_suffix = f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+    tmp_wheel_path = wheel_path + tmp_suffix
+    
     try:
-        # Download only if it's not already cached
+        # Atomic Download Phase
         if not os.path.exists(wheel_path):
             print(f"[Eiko] Downloading wheel to temporary cache...")
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
-            with urllib.request.urlopen(req, timeout=15.0) as response, open(wheel_path, 'wb') as out_file:
+            
+            # Download to a temporary unique file first
+            with urllib.request.urlopen(req, timeout=15.0) as response, open(tmp_wheel_path, 'wb') as out_file:
                 shutil.copyfileobj(response, out_file)
+            
+            # Atomically rename the finished tmp file to the final wheel path.
+            # If two processes do this at the exact same time, the OS guarantees one overwrites the other cleanly.
+            os.replace(tmp_wheel_path, wheel_path)
         else:
             print(f"[Eiko] Using cached wheel from {wheel_path}")
         
-        # Extract the specific binary payload
+        # Atomic Extraction Phase
         with zipfile.ZipFile(wheel_path, 'r') as z:
             binary_files = [f for f in z.namelist() if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
             if not binary_files:
@@ -100,15 +101,23 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
                 
             for bf in binary_files:
                 filename = os.path.basename(bf)
-                with z.open(bf) as source, open(os.path.join(target_dir, filename), "wb") as target:
+                final_target_path = os.path.join(target_dir, filename)
+                tmp_target_path = final_target_path + tmp_suffix
+                
+                # Extract to a temporary unique file first
+                with z.open(bf) as source, open(tmp_target_path, "wb") as target:
                     shutil.copyfileobj(source, target)
+                
+                # Atomically swap the temporary binary into its final location
+                os.replace(tmp_target_path, final_target_path)
                     
         print("[Eiko] Successfully extracted cached precompiled binaries.")
         return True
         
     except Exception as e:
         print(f"[Eiko] Download or extraction failed: {e}. Falling back to JIT.")
-        # If extraction failed, the cached wheel might be corrupted; delete it to force a fresh download next time.
-        if os.path.exists(wheel_path):
-            os.remove(wheel_path)
+        # Cleanup unique temp files if something went wrong
+        if os.path.exists(tmp_wheel_path):
+            os.remove(tmp_wheel_path)
+        # Avoid deleting the shared wheel_path on error, as another process might be reading it!
         return False
