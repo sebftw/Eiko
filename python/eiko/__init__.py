@@ -105,9 +105,8 @@ def clear_download_cache():
     """
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     if os.path.exists(eiko_tmp_dir):
-        try:
-            shutil.rmtree(eiko_tmp_dir)
-            print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
+        shutil.rmtree(eiko_tmp_dir)
+        print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
 
 def clear_cache():
     """
