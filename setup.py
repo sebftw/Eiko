@@ -1,4 +1,3 @@
-# setup.py
 import sys
 import os
 from setuptools import setup
@@ -9,26 +8,36 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 
-# 1. Define the base PyTorch Extension
-ext_modules = [
-    CUDAExtension(
-        name="eiko.eiko_torch_impl",
-        sources=["src/bindings/torch_bindings.cu"],
-        extra_compile_args={
-            "cxx": CXX_ARGS,
-            "nvcc": NVCC_ARGS,
-        },
-        include_dirs=EXTRA_INCLUDE_PATHS,
-    )
-]
+# 1. Determine Build Mode
+# If EIKO_LOCAL_VERSION is set, we are in the CI wheel-building pipeline.
+local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
+IS_CI_BUILD = bool(local_version)
 
-# 2. Conditionally attempt to add the JAX Extension
-try:
+ext_modules = []
+
+if IS_CI_BUILD:
+    print(f"\n[Eiko setup.py] CI environment detected (Suffix: {local_version}).")
+    print("[Eiko setup.py] Compiling PyTorch and JAX AOT extensions...\n")
+    
+    # Mandate JAX and pybind11 availability for CI builds
     import jax
     import pybind11
     
-    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+    # Define PyTorch Extension
+    ext_modules.append(
+        CUDAExtension(
+            name="eiko.eiko_torch_impl",
+            sources=["src/bindings/torch_bindings.cu"],
+            extra_compile_args={
+                "cxx": CXX_ARGS,
+                "nvcc": NVCC_ARGS,
+            },
+            include_dirs=EXTRA_INCLUDE_PATHS,
+        )
+    )
     
+    # Define JAX Extension
+    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
     ext_modules.append(
         CUDAExtension(
             name="eiko.eiko_jax_impl",
@@ -40,15 +49,9 @@ try:
             include_dirs=jax_includes,
         )
     )
-    print("\n[Eiko setup.py] JAX environment detected. Queuing JAX extension for build.\n")
-    
-except ImportError:
-    print("\n[Eiko setup.py] JAX or pybind11 not found. Skipping JAX extension build.\n")
 
-
-# 3. Process Dynamic Version
+# 2. Process Dynamic Version
 def get_base_version():
-    # Read __init__.py as plain text to avoid the import paradox
     import re
     init_path = os.path.join(os.path.dirname(__file__), "python", "eiko", "__init__.py")
     with open(init_path, "r") as f:
@@ -57,22 +60,16 @@ def get_base_version():
             return match.group(1)
     return "0.0.0"
 
-# Get the clean base version (e.g., "0.1.0")
 base_version = get_base_version()
-
-# Get the CI environment suffix (e.g., "+pt2.12.0cu126")
-local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
-
-# Combine them into a PEP-440 compliant string (e.g., "0.1.0+pt2.12.0cu126")
 full_version = f"{base_version}{local_version}"
 
 
-# 4. Execute setup
+# 3. Execute setup
 setup(
-    version=full_version, # Injected into the wheel filename and metadata
+    version=full_version,
     ext_modules=ext_modules,
     license="BSD-3-Clause",
     cmdclass={
         "build_ext": BuildExtension
-    }
+    } if IS_CI_BUILD else {}  # Avoid forcing torch dependency checks on basic sdist installs
 )
