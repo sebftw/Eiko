@@ -511,13 +511,75 @@ jobs:
 
   build_ubuntu_standard_wheels:
     name: Ubuntu Standard Wheel - Python ${{ matrix.python-version }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install System Utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils
+
+      - name: Compile Standard Wheel
+        env:
+          EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14" pybind11
+
+          # Build the wheel
+          python -m build --wheel --no-isolation
+
+          # Repair the wheel targeting manylinux_2_31 (Ubuntu 20.04+)
+          # Note: We removed the torch/jax exclusions since they are no longer in the environment
+          echo "Repairing wheel for manylinux_2_31 compatibility..."
+          python -m auditwheel repair dist/*.whl \
+            --plat manylinux_2_31_x86_64 \
+            -w repaired_dist/
+
+          # Clean up and stage repaired wheel
+          rm dist/*.whl
+          mv repaired_dist/*.whl dist/
+
+      - name: Verify Wheel Contents
+        run: |
+          WHEEL_FILES=$(unzip -l dist/*.whl)
+          echo "$WHEEL_FILES"
+          
+          # Quick verification check to ensure no accidental binary bloat leaked in
+          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib" > /dev/null; then
+            echo "Warning: External shared libraries were bundled into the CPU wheel."
+          else
+            echo "Success: Clean, dependency-free standard wheel generated."
+          fi
+
+      - name: Upload Standard Wheel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-ubuntu-standard-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+  build_ubuntu20_standard_wheels:
+    name: Ubuntu 20.04 Standard Wheel - Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     container:
       image: ubuntu:20.04
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.8']
 
     steps:
       - name: Check out repository
@@ -544,7 +606,7 @@ jobs:
           fi
           
           # Dynamically choose the correct get-pip URL
-          if [ "${{ matrix.python-version }}" = "3.9" ]; then
+          if [ "${{ matrix.python-version }}" = "3.8" ]; then  # ----------------------------------- Note, Python 3.8!
             PIP_URL="https://bootstrap.pypa.io/pip/${{ matrix.python-version }}/get-pip.py"
           else
             PIP_URL="https://bootstrap.pypa.io/get-pip.py"
