@@ -61,7 +61,7 @@ except ImportError:
     # 4. Pure JIT Compilation Fallback via NVCC
     # --------------------------------------------------------------------
     if not is_loaded:
-        print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc...")
+        print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc... (This might take a minute)")
         sys.stdout.flush()
 
         import sysconfig
