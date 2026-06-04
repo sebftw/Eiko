@@ -26,7 +26,7 @@ jobs:
           #- { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
   
           # --- Bleeding Edge ---
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
   
         # Target active Python versions
         python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
@@ -342,13 +342,13 @@ jobs:
       # --- PYTHON 3.10 BUILD ---
       # Excluded for PyTorch 2.12+ 
       - name: Set up Python 3.10
-        if: matrix.platform.torch != '2.12.0'
+        # if: matrix.platform.torch != '2.12.0'
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           
       - name: Build 3.10 Wheel
-        if: matrix.platform.torch != '2.12.0'
+        # if: matrix.platform.torch != '2.12.0'
         env: *build_env
         run: |
           pip install --upgrade pip
@@ -359,7 +359,7 @@ jobs:
           pip uninstall torch jax -y
 
       - name: Upload 3.10 Wheel
-        if: matrix.platform.torch != '2.12.0'
+        # if: matrix.platform.torch != '2.12.0'
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.10
