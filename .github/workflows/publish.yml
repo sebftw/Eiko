@@ -150,7 +150,7 @@ jobs:
           # but rglob will catch all files on disk anyway.
           
           all_versions = []
-
+          # use sorted for deterministic ordering.
           for wheel_path in sorted(whl_dir.rglob("*.whl")):
               filename = wheel_path.name
               parts = filename[:-4].split("-")
@@ -211,7 +211,7 @@ jobs:
           with open(output_path, "w") as f:
               json.dump(registry, f, indent=2, sort_keys=True)
               
-          print(f"Success: Generated registry tracking {len(registry['versions'])} distinct version releases.")
+          print(f"Success: Generated registry tracking {len(registry["versions"])} distinct version releases.")
           '
           
       - name: 2. Generate Python Auto-Installer
