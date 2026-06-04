@@ -44,13 +44,13 @@ jax = [
     "pybind11"
 ]
 jax-local = [
-    "jax[cuda12_local]>=0.4.30; sys_platform == 'linux'",  # This is only for HPC users ("modules load cuda/12.0").
+    "jax[cuda12-local]>=0.4.30; sys_platform == 'linux'",  # This is only for HPC users ("modules load cuda/12.0").
     "pybind11"
 ]
 # Dependencies require to run examples.
 examples = [
     "matplotlib>=3.5.0", 
-    "jax[cuda12_pip]>=0.4.30; sys_platform == 'linux'",
+    "jax[cuda12]>=0.4.30; sys_platform == 'linux'",
     "pybind11",
     "optax",
     "scipy>=1.7.0",
