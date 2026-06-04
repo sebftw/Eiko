@@ -10,7 +10,7 @@ try:
             "[Eiko] ERROR: CPU-only PyTorch installation detected.\n"
             + "="*75 + "\n"
             "You have a CPU-only version of PyTorch.\n"
-            "Eiko strictly requires a GPU-enabled version of PyTorch.\n\n"
+            "Eiko strictly requires a GPU-enabled (CUDA) version of PyTorch.\n\n"
             "HOW TO FIX:\n"
             "1. Uninstall your current version:  pip uninstall torch\n"
             "2. Get the correct GPU command at:  👉 https://pytorch.org/get-started/\n"
