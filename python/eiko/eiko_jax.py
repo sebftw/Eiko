@@ -1,9 +1,7 @@
 import os
 import sys
-import struct
-import torch
-from functools import partial
-from torch.utils.cpp_extension import load, _get_build_directory
+import subprocess
+from pathlib import Path
 
 try:
     import jax
@@ -12,16 +10,13 @@ try:
 except ImportError as e:
     raise ImportError(
         f"\n[Eiko] JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
-        f" Please install the required environment via: pip install \"eiko[jax]\"\n"
+        f" Please install via: pip install \"eiko[jax]\"\n"
     ) from e
 
 import jax.numpy as jnp
 from jax import core
-from jax.interpreters import batching
-from jax.interpreters import xla
-from jax.interpreters import mlir
+from jax.interpreters import batching, xla, mlir
 
-# Robust Primitive resolution for modern JAX.
 if not hasattr(core, "Primitive"):
     from jax._src.core import Primitive
     core.Primitive = Primitive
@@ -35,34 +30,35 @@ from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
 from eiko import SRC_DIR, __version__
 
 # ------------------------------------------------------------------------
-# 1. Setup Cache Path & Native Resolution
+# 1. Setup OS-Agnostic Cache Path
 # ------------------------------------------------------------------------
-# Note: PyTorch tracks this in a separate folder from eiko_torch_impl
-build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
+if sys.platform == "win32":
+    cache_base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    ext = ".pyd"
+else:
+    cache_base = Path.home() / ".cache"
+    ext = ".so"
+
+build_dir = str(cache_base / "eiko" / "jax_impl")
+os.makedirs(build_dir, exist_ok=True)
 
 if build_dir not in sys.path:
     sys.path.insert(0, build_dir)
 
 try:
     # --------------------------------------------------------------------
-    # 2. The Fastest Path
+    # 2. The Fastest Path (Cached Import)
     # --------------------------------------------------------------------
     import eiko_jax_impl as _fim_jax_impl
 
 except ImportError:
     # --------------------------------------------------------------------
-    # 3. Runtime Download Fallback
+    # 3. Runtime Download Fallback (Picks highest matching CUDA version)
     # --------------------------------------------------------------------
     from eiko.bootstrap import fetch_precompiled_wheel
     is_loaded = False
 
-    # We still query PyTorch versions because your wheel matrix is built 
-    # against the PyTorch/CUDA ecosystem ABI
-    torch_v = torch.__version__
-    cuda_v = torch.version.cuda or "cpu"
-
-    # Notice the added target_impl argument (explained below)
-    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, build_dir, target_impl="eiko_jax_impl"):
+    if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=build_dir, target_impl="eiko_jax_impl"):
         try:
             import eiko_jax_impl as _fim_jax_impl
             is_loaded = True
@@ -71,29 +67,38 @@ except ImportError:
             print(f"[Eiko] Falling back to local compilation.")
 
     # --------------------------------------------------------------------
-    # 4. Final JIT Compilation Fallback
+    # 4. Pure JIT Compilation Fallback via NVCC
     # --------------------------------------------------------------------
     if not is_loaded:
-        print("[Eiko] First-time JAX initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+        print("[Eiko] Precompiled binary not found or failed to load. Compiling kernels via nvcc...")
         sys.stdout.flush()
 
+        import sysconfig
         jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
-        jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+        output_lib = os.path.join(build_dir, f"eiko_jax_impl{ext}")
+        
+        includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
+        include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
+        
+        cmd = ["nvcc", "-shared", jax_source, "-o", output_lib]
+        cmd += NVCC_ARGS
+        cmd += [f"-Xcompiler={arg}" for arg in CXX_ARGS]
+        cmd += include_flags
 
-        _fim_jax_impl = load(
-            name="eiko_jax_impl",
-            sources=[jax_source],
-            extra_cflags=CXX_ARGS,
-            extra_cuda_cflags=NVCC_ARGS,
-            extra_include_paths=jax_includes,
-            verbose=False
-        )
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            import eiko_jax_impl as _fim_jax_impl
+            print("[Eiko] Compilation complete. JAX bindings are ready! :)")
+        except subprocess.CalledProcessError as e:
+            print(f"\n[Eiko] Local compilation failed via nvcc.")
+            print(f"Compiler Error:\n{e.stderr.decode('utf-8')}")
+            raise RuntimeError("Failed to compile Eiko JAX CUDA bindings.") from e
+        except Exception as e:
+            raise RuntimeError(f"Failed to load compiled JAX library: {e}") from e
 
-        print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko with JAX! :)")
-
-# ---------------------------------------------------------
-# XLA Custom Call Registration
-# ---------------------------------------------------------
+# ------------------------------------------------------------------------
+# 5. XLA Custom Call Registration
+# ------------------------------------------------------------------------
 for name, target in _fim_jax_impl.registrations().items():
     xla_client.register_custom_call_target(name, target, platform="gpu")
 
