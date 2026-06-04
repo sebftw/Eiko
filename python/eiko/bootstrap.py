@@ -18,10 +18,10 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     # Early Exit
     existing_binaries = [f for f in os.listdir(target_dir) if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
     if existing_binaries:
-        print(f"[Eiko] Binary already exists in {target_dir}. Skipping download.")
+        # print(f"[Eiko] Binary already exists in {target_dir}. Skipping download.")
         return True
 
-    print(f"[Eiko] Looking for precompiled binaries for {target_impl}...")
+    # print(f"[Eiko] Looking for precompiled binaries for {target_impl}...")
     
     # 1. Fetch Registry
     try:
@@ -64,7 +64,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     if not matched_build:
         matched_build = max(valid_builds, key=get_cuda_score)
 
-    print(f"[Eiko] Selected wheel: {matched_build['filename']} (CUDA target: {matched_build['cuda']})")
+    # print(f"[Eiko] Selected wheel: {matched_build['filename']} (CUDA target: {matched_build['cuda']})")
 
     # 4. Multiprocessing-Safe Download & Extract
     wheel_url = matched_build["url"]
@@ -80,7 +80,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     try:
         # Atomic Download Phase
         if not os.path.exists(wheel_path):
-            print(f"[Eiko] Downloading wheel to temporary cache...")
+            # print(f"[Eiko] Downloading wheel to temporary cache...")
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
             
             # Download to a temporary unique file first
@@ -90,8 +90,8 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
             # Atomically rename the finished tmp file to the final wheel path.
             # If two processes do this at the exact same time, the OS guarantees one overwrites the other cleanly.
             os.replace(tmp_wheel_path, wheel_path)
-        else:
-            print(f"[Eiko] Using cached wheel from {wheel_path}")
+        #else:
+        #    print(f"[Eiko] Using cached wheel from {wheel_path}")
         
         # Atomic Extraction Phase
         with zipfile.ZipFile(wheel_path, 'r') as z:
@@ -111,7 +111,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
                 # Atomically swap the temporary binary into its final location
                 os.replace(tmp_target_path, final_target_path)
                     
-        print("[Eiko] Successfully extracted cached precompiled binaries.")
+        # print("[Eiko] Successfully extracted cached precompiled binaries.")
         return True
         
     except Exception as e:
