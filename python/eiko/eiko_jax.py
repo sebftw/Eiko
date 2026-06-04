@@ -147,6 +147,9 @@ except ImportError:
                 print(raw_error)
                 
             # --- GITHUB ISSUE TEMPLATE ---
+            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            os_name = platform.system()
+            j_ver = jax.__version__
             print("\n" + "-"*75)
             print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
             print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
