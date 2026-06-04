@@ -1,45 +1,67 @@
-import os, sys
+import os
+import sys
 import torch
 
-# Import centralized configuration
+from torch.utils.cpp_extension import load, _get_build_directory
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
-from eiko import SRC_DIR
+from eiko import SRC_DIR, __version__
 
+# Add the cache directory to sys.path immediately. 
+# Python will now natively search here for the binary.
+build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
+if build_dir not in sys.path:
+    sys.path.insert(0, build_dir)
 
-# ------------------------------------------------------------------------
-# JIT Compilation & Loading
-# ------------------------------------------------------------------------
 try:
-    # 1. Attempt to import the pre-compiled binary 
-    from eiko import eiko_torch_impl as _fim_cuda_impl
-    
+    # --------------------------------------------------------------------
+    # The Fastest Path
+    # --------------------------------------------------------------------
+    # This succeeds if the binary is in site-packages, built in-place, 
+    # downloaded in a previous run, or JIT-compiled in a previous run.
+    import eiko_torch_impl as _fim_cuda_impl
+
 except ImportError:
-    # 2. Fallback to JIT compilation if the pre-compiled binary is missing
-    from torch.utils.cpp_extension import load, _get_build_directory
+    # --------------------------------------------------------------------
+    # Runtime Precompiled Binary Download Fallback
+    # --------------------------------------------------------------------
+    # Attempt to download precompiled binary, as this is fast and
+    # it does not require a compiler.
+    from eiko.bootstrap import fetch_precompiled_wheel
+    is_loaded = False
+
+    torch_v = torch.__version__
+    cuda_v = torch.version.cuda or "cpu"
+
+    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, build_dir):
+        try:
+            import eiko_torch_impl as _fim_cuda_impl
+            is_loaded = True
+        except ImportError as e:
+            # Catches corrupted downloads or obscure OS-level linkage errors
+            print(f"[Eiko] Downloaded binary failed to load natively ({e}).")
+            print(f"[Eiko] Falling back to local compilation.")
     
-    # Get the native PyTorch build directory for this specific extension name.
-    build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
-
-    # Check if the extension has already been compiled in a previous session.
-    is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
-
-    if not is_cached:
+    # --------------------------------------------------------------------
+    # JIT Compilation Fallback
+    # --------------------------------------------------------------------
+    # If the downoad failed (no internet, or no precompiled binary exists),
+    # try to JIT compile Eiko locally.
+    if not is_loaded:
         print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
         sys.stdout.flush()
 
-    # JIT compilation.
-    torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
-    _fim_cuda_impl = load(
-        name="eiko_torch_impl",
-        sources=[torch_source],
-        extra_cflags=CXX_ARGS,
-        extra_cuda_cflags=NVCC_ARGS,
-        extra_include_paths=EXTRA_INCLUDE_PATHS,
-        verbose=False
-    )
+        torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
+        
+        _fim_cuda_impl = load(
+            name="eiko_torch_impl",
+            sources=[torch_source],
+            extra_cflags=CXX_ARGS,
+            extra_cuda_cflags=NVCC_ARGS,
+            extra_include_paths=EXTRA_INCLUDE_PATHS,
+            verbose=False
+        )
 
-    if not is_cached:
-        print("Congratulations, you are now ready to use Eiko! :)")
+        print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko! :)")
 
 #------------------------------------------------------------------------
 # Global Solver Cache
