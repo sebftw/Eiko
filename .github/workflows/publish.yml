@@ -110,7 +110,7 @@ jobs:
             fi
           done
 
-      - name: 1. Setup Environment Variables
+      - name: Setup Environment Variables
         run: |
           # Dynamically extract the base package version and repository URL
           FIRST_WHEEL=$(find public/whl -name "*.whl" | head -n 1 2>/dev/null || echo "eiko-0.0.0-")
@@ -127,7 +127,7 @@ jobs:
           echo "GEN_DATE=${GEN_DATE}" >> $GITHUB_ENV
           echo "WHEEL_LIST=${WHEEL_LIST}" >> $GITHUB_ENV
 
-      - name: 2. Generate registry.json for Smart PyPI Package
+      - name: Generate registry.json for Smart PyPI Package
         run: |
           python3 -c '
           import os
@@ -157,14 +157,12 @@ jobs:
               python_tag = parts[2]
               platform_tag = parts[-1]
               
-              # 1. Parse PyTorch and CUDA versions from your patched local version tag
-              # Example version_part: 1.0.0+pt2.2.0.cu121
+              # 1. Parse PyTorch and CUDA versions
               torch_ver = "unknown"
               cuda_ver = "unknown"
               
               if "+pt" in version_part:
                   base_ver, local_ver = version_part.split("+pt", 1)
-                  # local_ver is now "2.2.0.cu121" or "2.2.0.cpu"
                   if ".cu" in local_ver:
                       torch_ver, cuda_ver = local_ver.rsplit(".", 1)
                   elif ".cpu" in local_ver:
@@ -182,12 +180,11 @@ jobs:
               elif "win" in platform_tag:
                   os_name = "windows"
               
-              # 4. Calculate SHA256 for secure downloading in your bootstrap package
+              # 4. Calculate SHA256
               with open(wheel_path, "rb") as f:
                   sha256_hash = hashlib.sha256(f.read()).hexdigest()
                   
-              # 5. Construct the full download URL
-              # relative_to gets us "whl/cu121/eiko/filename.whl"
+              # 5. Construct full download URL
               rel_path = wheel_path.relative_to(public_dir).as_posix()
               full_url = f"{base_url}/{rel_path}"
               
@@ -201,12 +198,13 @@ jobs:
                   "filename": filename
               })
 
-          # Write out the JSON file to the root of the GitHub Pages site
+          # Write out the JSON file
           output_path = public_dir / "registry.json"
           with open(output_path, "w") as f:
               json.dump(registry, f, indent=2)
               
-          print(f"Success: Generated registry.json containing {len(registry['builds'])} builds.")
+          num_builds = len(registry["builds"])
+          print(f"Success: Generated registry.json containing {num_builds} builds.")
           '
           
       - name: 2. Generate Python Auto-Installer
