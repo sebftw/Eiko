@@ -29,18 +29,18 @@ except ImportError:
             import eiko_torch_impl as _fim_cuda_impl
             is_loaded = True
         except ImportError as e:
-            print(f"[Eiko] Downloaded PyTorch binary failed to load natively ({e}).")
+            print(f"[Eiko] Downloaded PyTorch binary failed to load ({e}).")
             
             # Debugging helper: Print exactly what is inside the directory
             found_files = os.listdir(BIN_CACHE_DIR) if os.path.exists(BIN_CACHE_DIR) else []
-            print(f"[Eiko] Debug - Files currently in cache ({BIN_CACHE_DIR}): {found_files}")
-            print(f"[Eiko] Falling back to local compilation.")
+            # print(f"[Eiko] Debug - Files currently in cache ({BIN_CACHE_DIR}): {found_files}")
+            print(f"[Eiko] Falling back to JIT compilation.")
 
     # --------------------------------------------------------------------
     # Final JIT Compilation Fallback (With User-Friendly Error Catching)
     # --------------------------------------------------------------------
     if not is_loaded:
-        print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+        print("[Eiko] JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
         sys.stdout.flush()
 
         torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
@@ -93,7 +93,7 @@ except ImportError:
             print("\n" + "-"*75)
             print("FASTEST FIX: UPDATE PYTORCH")
             print("Eiko provides precompiled wheels for the newest PyTorch releases.")
-            print(f"You are currently running PyTorch {t_ver}. Updating PyTorch to the latest version")
+            print(f"You are currently running PyTorch {torch_v}. Updating PyTorch to the latest version")
             print("will likely bypass this compilation step entirely:")
             print("👉 pip install --upgrade torch")
                 
