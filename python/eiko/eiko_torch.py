@@ -6,10 +6,6 @@ from torch.utils.cpp_extension import load
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
 from eiko import SRC_DIR, __version__
 
-# Inject the shared cache directory into sys.path immediately
-if BIN_CACHE_DIR not in sys.path:
-    sys.path.insert(0, BIN_CACHE_DIR)
-
 try:
     # --------------------------------------------------------------------
     # 1. The Fastest Path (Cached Import)
