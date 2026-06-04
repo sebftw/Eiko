@@ -40,7 +40,7 @@ classifiers = [
 # Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
 # Dependencies required for JAX.
 jax = [
-    "jax[cuda12]>=0.4.30",       # Installs the GPU-enabled JAX backend via pip.
+    "jax[cuda12]>=0.4.30; sys_platform == 'linux'",       # Installs the GPU-enabled JAX backend via pip.
     "pybind11"
 ]
 jax-local = [
