@@ -6,6 +6,25 @@ try:
     import jax
     import pybind11
     import jaxlib
+
+    # Immediately trap CPU-only installations or missing GPU hardware
+    if jax.default_backend() == "cpu":
+        raise RuntimeError(
+            "\n" + "="*75 + "\n"
+            "[Eiko] ERROR: CPU-only JAX or missing GPU detected.\n"
+            + "="*75 + "\n"
+            "You have JAX installed, but it is currently defaulting to the CPU backend.\n"
+            "Eiko strictly requires a GPU-enabled version of JAX to run.\n\n"
+            "HOW TO FIX:\n"
+            "1. If you have the CPU-only version, uninstall it first:\n"
+            "   👉 pip uninstall jax jaxlib\n"
+            "2. Install the CUDA-enabled version of JAX (e.g., for CUDA 12):\n"
+            "   👉 pip install -U \"jax[cuda12]\"\n"
+            "3. Ensure your NVIDIA drivers are correctly installed and visible to Python.\n\n"
+            "For full installation details, visit:\n"
+            "👉 https://jax.readthedocs.io/en/latest/installation.html\n"
+            + "="*75 + "\n"
+        )
 except ImportError as e:
     raise ImportError(
         f"\n[Eiko] JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
