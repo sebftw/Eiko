@@ -108,7 +108,7 @@ def clear_download_cache():
         print(f"[Eiko] Clearing downloaded wheels at: {eiko_tmp_dir}")
         shutil.rmtree(eiko_tmp_dir)
 
-def clear_cache():
+def clear_caches():
     """
     Completely resets the Eiko installation footprint by wiping both 
     downloaded wheels and compiled binaries.
@@ -116,7 +116,6 @@ def clear_cache():
     clear_download_cache()
     clear_binary_cache()
 
-clear_caches = clear_cache # Alias
 
 # ---------------------------------------------------------
 # MODULE IMPORTS & EXPORTS
@@ -131,5 +130,5 @@ __all__ = [
     '__version__',
     'clear_binary_cache',
     'clear_download_cache',
-    'clear_cache'
+    'clear_caches'
 ]
