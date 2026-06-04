@@ -47,10 +47,7 @@ jax-local = [
     "jax[cuda12-local]>=0.4.30",  # This is only for HPC users ("modules load cuda/12.0").
     "pybind11"
 ]
-torch = [
-    "torch>=2.4.0",
-    "ninja"  # For faster compilation.
-]
+torch = ["torch>=2.4.0"]
 # Dependencies require to run examples.
 examples = [
     "torch>=2.4.0",
