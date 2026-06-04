@@ -84,8 +84,8 @@ def clear_binary_cache():
     """
     if os.path.exists(BIN_CACHE_DIR):
         try:
+            print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
             shutil.rmtree(BIN_CACHE_DIR)
-            print(f"[Eiko] Cleared binary cache at: {BIN_CACHE_DIR}")
         except PermissionError:
             print("\n" + "="*75)
             print("[Eiko] CACHE CLEAR FAILED WITH PERMISSION ERROR: Binaries at {BIN_CACHE_DIR} are probably currently in use.")
@@ -105,8 +105,8 @@ def clear_download_cache():
     """
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     if os.path.exists(eiko_tmp_dir):
+        print(f"[Eiko] Clearing downloaded wheels at: {eiko_tmp_dir}")
         shutil.rmtree(eiko_tmp_dir)
-        print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
 
 def clear_cache():
     """
