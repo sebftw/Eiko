@@ -98,6 +98,8 @@ except ImportError:
             print("👉 pip install --upgrade torch")
                 
             # --- GITHUB ISSUE TEMPLATE ---
+            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            os_name = platform.system()
             print("\n" + "-"*75)
             print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
             print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
@@ -105,8 +107,8 @@ except ImportError:
             print("```text")
             print(f"OS:      {os_name}")
             print(f"Python:  {py_ver}")
-            print(f"PyTorch: {t_ver}")
-            print(f"CUDA:    {c_ver}")
+            print(f"PyTorch: {torch_v}")
+            print(f"CUDA:    {cuda_ver}")
             print("```")
             print("="*75 + "\n")
             
