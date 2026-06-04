@@ -1,7 +1,6 @@
 import os
 import sys
 import subprocess
-from pathlib import Path
 
 try:
     import jax
@@ -26,39 +25,31 @@ try:
 except ImportError:
     from jax.lib import xla_client
 
-from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+# 1. Import our centralized configuration
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
 from eiko import SRC_DIR, __version__
 
-# ------------------------------------------------------------------------
-# 1. Setup OS-Agnostic Cache Path
-# ------------------------------------------------------------------------
-if sys.platform == "win32":
-    cache_base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
-    ext = ".pyd"
-else:
-    cache_base = Path.home() / ".cache"
-    ext = ".so"
+ext = ".pyd" if sys.platform == "win32" else ".so"
 
-build_dir = str(cache_base / "eiko" / "jax_impl")
-os.makedirs(build_dir, exist_ok=True)
-
-if build_dir not in sys.path:
-    sys.path.insert(0, build_dir)
+# Ensure the shared cache directory exists
+os.makedirs(BIN_CACHE_DIR, exist_ok=True)
 
 try:
     # --------------------------------------------------------------------
     # 2. The Fastest Path (Cached Import)
+    # (sys.path is already handled by __init__.py)
     # --------------------------------------------------------------------
     import eiko_jax_impl as _fim_jax_impl
 
 except ImportError:
     # --------------------------------------------------------------------
-    # 3. Runtime Download Fallback (Picks highest matching CUDA version)
+    # 3. Runtime Download Fallback
     # --------------------------------------------------------------------
     from eiko.bootstrap import fetch_precompiled_wheel
     is_loaded = False
 
-    if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=build_dir, target_impl="eiko_jax_impl"):
+    # Download into BIN_CACHE_DIR so both backends share the same folder
+    if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
         try:
             import eiko_jax_impl as _fim_jax_impl
             is_loaded = True
@@ -75,7 +66,9 @@ except ImportError:
 
         import sysconfig
         jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
-        output_lib = os.path.join(build_dir, f"eiko_jax_impl{ext}")
+        
+        # Output directly to BIN_CACHE_DIR
+        output_lib = os.path.join(BIN_CACHE_DIR, f"eiko_jax_impl{ext}")
         
         includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
         include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
