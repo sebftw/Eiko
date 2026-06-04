@@ -114,8 +114,8 @@ def clear_cache():
     Completely resets the Eiko installation footprint by wiping both 
     downloaded wheels and compiled binaries.
     """
-    clear_binary_cache()
     clear_download_cache()
+    clear_binary_cache()
     print("[Eiko] All caches cleared. The next import will trigger a fresh download or JIT compilation.")
 
 clear_caches = clear_cache # Alias
