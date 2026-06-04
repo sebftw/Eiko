@@ -38,4 +38,14 @@ if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')
 else:
     NVCC_ARGS.append('-arch=native')
+
 EXTRA_INCLUDE_PATHS = [os.path.abspath("src")]
+
+# Shared Binary Cache Directory
+if sys.platform == "win32":
+    _cache_base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+else:
+    _cache_base = Path.home() / ".cache"
+
+# Both PyTorch and JAX binaries will live seamlessly in this single directory
+BIN_CACHE_DIR = str(_cache_base / "eiko" / "binaries")
