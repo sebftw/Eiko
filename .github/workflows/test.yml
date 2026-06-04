@@ -9,9 +9,9 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Target your self-hosted hardware for native JIT compilation and execution
+    runs-on: [self-hosted, linux, gpu]
     strategy:
-      # Prevents the workflow from cancelling other versions if one fails
       fail-fast: false 
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
@@ -31,12 +31,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install tox tox-gh-actions
 
-    - name: Run Tox
+    - name: Run Tox (JIT Compile & Execute)
+      # Tox will pass your system's CUDA_HOME and PATH into its isolated environments, 
+      # allowing pybind11/setuptools to compile the C++/.cu extensions from source.
       run: tox
 
-
     - name: Rename coverage file
-      # Appends the python version to the filename so they don't overwrite each other
       run: mv .coverage .coverage.${{ matrix.python-version }}
 
     - name: Upload coverage data
@@ -48,7 +48,8 @@ jobs:
 
   coverage:
     name: Combine Coverage
-    needs: test # Waits for all matrix jobs to finish
+    needs: test # Waits for all GPU matrix jobs to finish
+    # Offload the lightweight combination task to GitHub's free runners
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -72,4 +73,3 @@ jobs:
 
     - name: Run coverage combination and report
       run: tox -e coverage
-    
