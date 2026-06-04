@@ -1,6 +1,20 @@
 import os
 import sys
-import torch
+
+try:
+    import torch
+except ImportError as e:
+    raise ImportError(
+        "\n" + "="*65 + "\n"
+        f"\n[Eiko] PyTorch bindings require 'torch' to be installed.\n"
+        + "="*65 + "\n"
+        "Eiko requires a GPU-enabled version of PyTorch.\n"
+        "A standard 'pip install torch' installs a CPU-only version, \n"
+        "which will cause Eiko to crash during compilation.\n\n"
+        "To get the correct GPU installation command for your system, visit:\n"
+        "👉 https://pytorch.org/get-started/locally/\n"
+        + "="*65 + "\n"
+    ) from e
 
 from torch.utils.cpp_extension import load
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
