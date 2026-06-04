@@ -51,7 +51,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
             valid_builds.append(b)
 
     if not valid_builds:
-        print(f"[Eiko] No precompiled wheels found matching OS: {os_name}, Python: {py_ver}")
+        print(f"[Eiko] No precompiled wheels found matching OS: {os_name}, Python: {py_ver}. Falling back to JIT.")
         return False
 
     def get_cuda_score(build_item):
@@ -119,7 +119,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         with zipfile.ZipFile(wheel_path, 'r') as z:
             binary_files = [f for f in z.namelist() if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
             if not binary_files:
-                raise ValueError(f"Target binary artifact '{target_impl}' not found inside the wheel footprint.")
+                raise ValueError(f"Target binary artifact '{target_impl}' not found inside the wheel footprint. Falling back to JIT.")
                 
             for bf in binary_files:
                 filename = os.path.basename(bf)
