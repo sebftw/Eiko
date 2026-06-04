@@ -25,6 +25,9 @@ except ImportError:
         cuda_v = f"cu{cuda_v.replace('.', '')}"
 
     if fetch_precompiled_wheel(__version__, torch_v, cuda_v, BIN_CACHE_DIR, target_impl="eiko_torch_impl"):
+        # Force Python to rescan sys.path directories, so it sees the new file
+        import importlib
+        importlib.invalidate_caches()
         try:
             import eiko_torch_impl as _fim_cuda_impl
             is_loaded = True
