@@ -35,10 +35,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
-dependencies = [
-    "torch>=2.4.0",
-    "ninja"
-]
 
 [project.optional-dependencies]
 # Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
