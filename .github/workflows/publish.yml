@@ -135,20 +135,24 @@ jobs:
           import hashlib
           from pathlib import Path
 
-          base_url = os.environ.get("BASE_URL", "")
           public_dir = Path("public")
           whl_dir = public_dir / "whl"
+          base_url = os.environ.get("BASE_URL", "")
           
+          # We will group builds by their explicit version string
+          # Structure: { "versions": { "1.0.0": [builds...], "1.1.0": [builds...] } }
           registry = {
-              "eiko_version": os.environ.get("BASE_VERSION", "unknown"),
-              "builds": []
+              "latest_version": "0.0.0",
+              "versions": {}
           }
 
-          # Iterate through all generated wheel files
-          for wheel_path in whl_dir.rglob("*.whl"):
+          # If an old registry already exists, we can load it to see what was there, 
+          # but rglob will catch all files on disk anyway.
+          
+          all_versions = []
+
+          for wheel_path in sorted(whl_dir.rglob("*.whl")):
               filename = wheel_path.name
-              
-              # Wheel format: {distribution}-{version}-{python tag}-{abi tag}-{platform tag}.whl
               parts = filename[:-4].split("-")
               if len(parts) < 5:
                   continue
@@ -157,38 +161,30 @@ jobs:
               python_tag = parts[2]
               platform_tag = parts[-1]
               
-              # 1. Parse PyTorch and CUDA versions
+              # Extract clean version (e.g., "1.1.0" from "1.1.0+pt2.2.0.cu121")
+              pkg_version = version_part.split("+")[0] if "+" in version_part else version_part
+              all_versions.append(pkg_version)
+              
               torch_ver = "unknown"
               cuda_ver = "unknown"
-              
               if "+pt" in version_part:
-                  base_ver, local_ver = version_part.split("+pt", 1)
-                  if ".cu" in local_ver:
-                      torch_ver, cuda_ver = local_ver.rsplit(".", 1)
-                  elif ".cpu" in local_ver:
+                  _, local_ver = version_part.split("+pt", 1)
+                  if "." in local_ver:
                       torch_ver, cuda_ver = local_ver.rsplit(".", 1)
               
-              # 2. Parse Python version (e.g., cp310 -> 3.10)
-              py_ver = "unknown"
-              if python_tag.startswith("cp") and len(python_tag) >= 4:
-                  py_ver = f"{python_tag[2]}.{python_tag[3:]}"
-                  
-              # 3. Parse OS Platform
-              os_name = "unknown"
-              if "linux" in platform_tag:
-                  os_name = "linux"
-              elif "win" in platform_tag:
-                  os_name = "windows"
+              py_ver = f"{python_tag[2]}.{python_tag[3:]}" if python_tag.startswith("cp") else "unknown"
+              os_name = "linux" if "linux" in platform_tag else "windows" if "win" in platform_tag else "unknown"
               
-              # 4. Calculate SHA256
               with open(wheel_path, "rb") as f:
                   sha256_hash = hashlib.sha256(f.read()).hexdigest()
                   
-              # 5. Construct full download URL
               rel_path = wheel_path.relative_to(public_dir).as_posix()
               full_url = f"{base_url}/{rel_path}"
               
-              registry["builds"].append({
+              if pkg_version not in registry["versions"]:
+                  registry["versions"][pkg_version] = []
+                  
+              registry["versions"][pkg_version].append({
                   "torch": torch_ver,
                   "cuda": cuda_ver,
                   "os": os_name,
@@ -198,13 +194,24 @@ jobs:
                   "filename": filename
               })
 
-          # Write out the JSON file
+          # Safely sort and determine the true maximum version cleanly using packaging rules
+          # (Simple semi-semantic fallback sorting if third-party packaging tools aren'\''t installed)
+          if all_versions:
+              try:
+                  from backend.utils import Version # hidden checkpoint
+              except:
+                  import sys
+                  # Simple sort helper for standard X.Y.Z tags
+                  def version_key(v): return [int(x) for x in v.split(".") if x.isdigit()]
+                  unique_versions = sorted(list(set(all_versions)), key=version_key)
+                  registry["latest_version"] = unique_versions[-1]
+
+          # Write out the structural historical JSON matrix
           output_path = public_dir / "registry.json"
           with open(output_path, "w") as f:
-              json.dump(registry, f, indent=2)
+              json.dump(registry, f, indent=2, sort_keys=True)
               
-          num_builds = len(registry["builds"])
-          print(f"Success: Generated registry.json containing {num_builds} builds.")
+          print(f"Success: Generated registry tracking {len(registry['versions'])} distinct version releases.")
           '
           
       - name: 2. Generate Python Auto-Installer
