@@ -23,6 +23,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         return True
 
     # print(f"[Eiko] Looking for precompiled binaries for {target_impl}...")
+    print(f"[Eiko] Downloading precompiled CUDA kernels for your setup {target_impl} ... (This may take a minute)")
     
     # 1. Fetch Registry
     try:
