@@ -26,6 +26,7 @@ if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
     try:
         os.add_dll_directory(BIN_CACHE_DIR)
         # Also ensure PyTorch's own lib directory is discoverable for c10.dll/torch.dll
+        import torch
         torch_lib_path = os.path.join(os.path.dirname(torch.__file__), 'lib')
         if os.path.exists(torch_lib_path):
             os.add_dll_directory(torch_lib_path)
