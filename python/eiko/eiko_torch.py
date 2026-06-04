@@ -23,7 +23,7 @@ except ImportError as e:
         + "="*65 + "\n"
         "Eiko requires a GPU-enabled version of PyTorch.\n"
         "A standard 'pip install torch' installs a CPU-only version. \n\n"
-        "To get the correct GPU installation for your system, visit:\n"
+        "To get the correct GPU (CUDA) installation, visit:\n"
         "👉 https://pytorch.org/get-started/\n"
         + "="*65 + "\n"
     ) from e
