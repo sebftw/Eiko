@@ -1,7 +1,6 @@
 import sys
 import os
 from setuptools import setup
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
 # Add 'python' to sys.path so we can import 'eiko.build_config'
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
@@ -16,6 +15,7 @@ IS_CI_BUILD = bool(local_version)
 ext_modules = []
 
 if IS_CI_BUILD:
+    from torch.utils.cpp_extension import BuildExtension, CUDAExtension
     print(f"\n[Eiko setup.py] CI environment detected (Suffix: {local_version}).")
     print("[Eiko setup.py] Compiling PyTorch and JAX AOT extensions...\n")
     
