@@ -65,30 +65,43 @@ except ImportError:
         sys.stdout.flush()
 
         import sysconfig
+        import uuid # Added for atomic naming
+        
         jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
         
-        # Output directly to BIN_CACHE_DIR
-        output_lib = os.path.join(BIN_CACHE_DIR, f"eiko_jax_impl{ext}")
+        # Define the final target and the temporary target
+        final_output_lib = os.path.join(build_dir, f"eiko_jax_impl{ext}")
+        tmp_suffix = f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+        tmp_output_lib = final_output_lib + tmp_suffix
         
         includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
         include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
         
-        # Explicitly enforce C++17 for the pure NVCC JAX compilation path
-        cmd = ["nvcc", "-shared", "-std=c++17", jax_source, "-o", output_lib]
-        
+        # Point nvcc output directly to the temporary file
+        cmd = ["nvcc", "-shared", "-std=c++17", jax_source, "-o", tmp_output_lib]
         cmd += NVCC_ARGS
         cmd += [f"-Xcompiler={arg}" for arg in CXX_ARGS]
         cmd += include_flags
 
         try:
+            # 1. Compile atomically to the unique temp file
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # 2. Atomically swap it into the active path
+            os.replace(tmp_output_lib, final_output_lib)
+            
             import eiko_jax_impl as _fim_jax_impl
             print("[Eiko] Compilation complete. JAX bindings are ready! :)")
+            
         except subprocess.CalledProcessError as e:
+            if os.path.exists(tmp_output_lib):
+                os.remove(tmp_output_lib)
             print(f"\n[Eiko] Local compilation failed via nvcc.")
             print(f"Compiler Error:\n{e.stderr.decode('utf-8')}")
             raise RuntimeError("Failed to compile Eiko JAX CUDA bindings.") from e
         except Exception as e:
+            if os.path.exists(tmp_output_lib):
+                os.remove(tmp_output_lib)
             raise RuntimeError(f"Failed to load compiled JAX library: {e}") from e
 
 # ------------------------------------------------------------------------
