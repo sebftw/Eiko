@@ -70,7 +70,7 @@ except ImportError:
     # 4. Pure JIT Compilation Fallback via NVCC
     # --------------------------------------------------------------------
     if not is_loaded:
-        print("[Eiko] Precompiled binary not found or failed to load. Compiling kernels via nvcc...")
+        print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc...")
         sys.stdout.flush()
 
         import sysconfig
@@ -80,7 +80,9 @@ except ImportError:
         includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
         include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
         
-        cmd = ["nvcc", "-shared", jax_source, "-o", output_lib]
+        # Explicitly enforce C++17 for the pure NVCC JAX compilation path
+        cmd = ["nvcc", "-shared", "-std=c++17", jax_source, "-o", output_lib]
+        
         cmd += NVCC_ARGS
         cmd += [f"-Xcompiler={arg}" for arg in CXX_ARGS]
         cmd += include_flags
