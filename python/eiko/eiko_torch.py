@@ -1,6 +1,7 @@
 import os
 import sys
 import torch
+import platform
 
 from torch.utils.cpp_extension import load
 from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
