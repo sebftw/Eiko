@@ -88,7 +88,7 @@ def clear_binary_cache():
             shutil.rmtree(BIN_CACHE_DIR)
         except PermissionError:
             print("\n" + "="*75)
-            print("[Eiko] CACHE CLEAR FAILED WITH PERMISSION ERROR: Binaries at {BIN_CACHE_DIR} are probably currently in use.")
+            print("[Eiko] PERMISSION ERROR: Binaries are probably currently in use.")
             print("="*75)
             print("The operating system cannot delete the files because they")
             print("are already loaded into the active Python memory space.")
