@@ -1,6 +1,7 @@
 import os
 import sys
 import struct
+import torch
 from functools import partial
 from torch.utils.cpp_extension import load, _get_build_directory
 
@@ -25,51 +26,74 @@ if not hasattr(core, "Primitive"):
     from jax._src.core import Primitive
     core.Primitive = Primitive
 
-# Version-agnostic xla_client import.
 try:
     from jaxlib import xla_client
 except ImportError:
     from jax.lib import xla_client
 
-# Version-agnostic custom_call import.
-#try:
-#    from jaxlib.hlo_helpers import custom_call
-#except ImportError:
-#    from jax.interpreters.mlir import custom_call
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+from eiko import SRC_DIR, __version__
 
-from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+# ------------------------------------------------------------------------
+# 1. Setup Cache Path & Native Resolution
+# ------------------------------------------------------------------------
+# Note: PyTorch tracks this in a separate folder from eiko_torch_impl
+build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
 
-# ---------------------------------------------------------
-# JIT COMPILATION & LOADING
-# ---------------------------------------------------------
+if build_dir not in sys.path:
+    sys.path.insert(0, build_dir)
+
 try:
-    # 1. Attempt to import the pre-compiled binary 
-    from eiko import eiko_jax_impl as _fim_jax_impl
-    
-except ImportError:
-    # 2. Fallback to JIT compilation if the pre-compiled binary is missing
-    build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
-    is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
+    # --------------------------------------------------------------------
+    # 2. The Fastest Path
+    # --------------------------------------------------------------------
+    import eiko_jax_impl as _fim_jax_impl
 
-    if not is_cached:
+except ImportError:
+    # --------------------------------------------------------------------
+    # 3. Runtime Download Fallback
+    # --------------------------------------------------------------------
+    from eiko.bootstrap import fetch_precompiled_wheel
+    is_loaded = False
+
+    # We still query PyTorch versions because your wheel matrix is built 
+    # against the PyTorch/CUDA ecosystem ABI
+    torch_v = torch.__version__
+    cuda_v = torch.version.cuda or "cpu"
+
+    # Notice the added target_impl argument (explained below)
+    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, build_dir, target_impl="eiko_jax_impl"):
+        try:
+            import eiko_jax_impl as _fim_jax_impl
+            is_loaded = True
+        except ImportError as e:
+            print(f"[Eiko] Downloaded JAX binary failed to load natively ({e}).")
+            print(f"[Eiko] Falling back to local compilation.")
+
+    # --------------------------------------------------------------------
+    # 4. Final JIT Compilation Fallback
+    # --------------------------------------------------------------------
+    if not is_loaded:
         print("[Eiko] First-time JAX initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
         sys.stdout.flush()
 
-    jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
-    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+        jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
+        jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
 
-    _fim_jax_impl = load(
-        name="eiko_jax_impl",
-        sources=[jax_source],
-        extra_cflags=CXX_ARGS,
-        extra_cuda_cflags=NVCC_ARGS,
-        extra_include_paths=jax_includes,
-        verbose=False
-    )
-    
-    if not is_cached:
-        print("Congratulations, you are now ready to use Eiko with JAX! :)")
+        _fim_jax_impl = load(
+            name="eiko_jax_impl",
+            sources=[jax_source],
+            extra_cflags=CXX_ARGS,
+            extra_cuda_cflags=NVCC_ARGS,
+            extra_include_paths=jax_includes,
+            verbose=False
+        )
 
+        print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko with JAX! :)")
+
+# ---------------------------------------------------------
+# XLA Custom Call Registration
+# ---------------------------------------------------------
 for name, target in _fim_jax_impl.registrations().items():
     xla_client.register_custom_call_target(name, target, platform="gpu")
 
