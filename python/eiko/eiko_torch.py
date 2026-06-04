@@ -125,7 +125,7 @@ except ImportError:
             print(f"OS:      {os_name}")
             print(f"Python:  {py_ver}")
             print(f"PyTorch: {torch_v}")
-            print(f"CUDA:    {cuda_ver}")
+            print(f"CUDA:    {cuda_v}")
             print("```")
             print("="*75 + "\n")
             
