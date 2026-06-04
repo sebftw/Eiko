@@ -3,6 +3,19 @@ import sys
 
 try:
     import torch
+    # Immediately trap CPU-only installations before doing anything else
+    if torch.version.cuda is None:
+        raise RuntimeError(
+            "\n" + "="*75 + "\n"
+            "[Eiko] ERROR: CPU-only PyTorch installation detected.\n"
+            + "="*75 + "\n"
+            "You have a CPU-only version of PyTorch.\n"
+            "Eiko strictly requires a GPU-enabled version of PyTorch.\n\n"
+            "HOW TO FIX:\n"
+            "1. Uninstall your current version:  pip uninstall torch\n"
+            "2. Get the correct GPU command at:  👉 https://pytorch.org/get-started/\n"
+            + "="*75 + "\n"
+        )
 except ImportError as e:
     raise ImportError(
         "\n" + "="*65 + "\n"
@@ -33,7 +46,7 @@ except ImportError:
     is_loaded = False
 
     torch_v = torch.__version__
-    cuda_v = torch.version.cuda or "cpu"
+    cuda_v = torch.version.cuda or "cpu."
     if cuda_v != "cpu":
         cuda_v = f"cu{cuda_v.replace('.', '')}"
 
@@ -109,9 +122,9 @@ except ImportError:
             print("\n" + "-"*75)
             print("FASTEST FIX: UPDATE PYTORCH")
             print("Eiko provides precompiled wheels for the newest PyTorch releases.")
-            print(f"You are currently running PyTorch {torch_v}. Updating PyTorch to the latest version")
-            print("will likely bypass this compilation step entirely:")
-            print("👉 pip install --upgrade torch")
+            print(f"You are currently running PyTorch {torch_v}. Updating PyTorch to the latest")
+            print("version will likely bypass this compilation step entirely.")
+            print("👉 https://pytorch.org/get-started/")
                 
             # --- GITHUB ISSUE TEMPLATE ---
             import platform
@@ -121,13 +134,11 @@ except ImportError:
             print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
             print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
             print("Please copy and paste the following system information into your issue description:\n")
-            print("```text")
             print(f"OS:      {os_name}")
             print(f"Python:  {py_ver}")
             print(f"PyTorch: {torch_v}")
             print(f"CUDA:    {cuda_v}")
-            print("```")
-            print("="*75 + "\n")
+            print("\n" + "="*75 + "\n")
             
             # Suppress the massive traceback and raise a clean error
             raise RuntimeError("Eiko initialization failed due to missing C++ build tools.") from None
