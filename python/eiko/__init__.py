@@ -1,5 +1,7 @@
 import os
 import sys
+import shutil
+import tempfile
 
 # ---------------------------------------------------------
 # PACKAGE METADATA & VERSION
@@ -61,9 +63,51 @@ def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
 eiko = eiko2d
 
 # ---------------------------------------------------------
+# CACHE MANAGEMENT UTILITIES
+# ---------------------------------------------------------
+def clear_binary_cache():
+    """
+    Removes all precompiled and JIT-compiled binaries from the persistent local cache.
+    Useful if you switch CUDA drivers or encounter corrupted compilation states.
+    """
+    if os.path.exists(BIN_CACHE_DIR):
+        shutil.rmtree(BIN_CACHE_DIR)
+        print(f"[Eiko] Cleared binary cache at: {BIN_CACHE_DIR}")
+    else:
+        print("[Eiko] Binary cache is already empty.")
+
+def clear_download_cache():
+    """
+    Removes any cached wheel archives from the temporary download directory.
+    """
+    eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
+    if os.path.exists(eiko_tmp_dir):
+        shutil.rmtree(eiko_tmp_dir)
+        print(f"[Eiko] Cleared downloaded wheels at: {eiko_tmp_dir}")
+    else:
+        print("[Eiko] Download cache is already empty.")
+
+def clear_cache():
+    """
+    Completely resets the Eiko installation footprint by wiping both 
+    downloaded wheels and compiled binaries.
+    """
+    clear_binary_cache()
+    clear_download_cache()
+    print("[Eiko] All caches cleared. The next import will trigger a fresh download or JIT compilation.")
+
+# ---------------------------------------------------------
 # MODULE IMPORTS & EXPORTS
 # ---------------------------------------------------------
 from .animate_eikonal import animate_eikonal
 
-# Define what is imported when a user runs `from eiko import *`
-__all__ = ['eiko', 'eiko3d', 'animate_eikonal', '__version__']
+# Add the new utility functions to your public API exports
+__all__ = [
+    'eiko', 
+    'eiko3d', 
+    'animate_eikonal', 
+    '__version__',
+    'clear_binary_cache',
+    'clear_download_cache',
+    'clear_cache'
+]
