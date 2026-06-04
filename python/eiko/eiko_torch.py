@@ -2,63 +2,61 @@ import os
 import sys
 import torch
 
-from torch.utils.cpp_extension import load, _get_build_directory
-from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+from torch.utils.cpp_extension import load
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
 from eiko import SRC_DIR, __version__
 
-# Add the cache directory to sys.path immediately. 
-# Python will now natively search here for the binary.
-build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
-if build_dir not in sys.path:
-    sys.path.insert(0, build_dir)
+# Inject the shared cache directory into sys.path immediately
+if BIN_CACHE_DIR not in sys.path:
+    sys.path.insert(0, BIN_CACHE_DIR)
 
 try:
     # --------------------------------------------------------------------
-    # The Fastest Path
+    # 1. The Fastest Path (Cached Import)
     # --------------------------------------------------------------------
-    # This succeeds if the binary is in site-packages, built in-place, 
-    # downloaded in a previous run, or JIT-compiled in a previous run.
     import eiko_torch_impl as _fim_cuda_impl
 
 except ImportError:
     # --------------------------------------------------------------------
-    # Runtime Precompiled Binary Download Fallback
+    # 2. Runtime Download Fallback
     # --------------------------------------------------------------------
-    # Attempt to download precompiled binary, as this is fast and
-    # it does not require a compiler.
     from eiko.bootstrap import fetch_precompiled_wheel
     is_loaded = False
 
     torch_v = torch.__version__
     cuda_v = torch.version.cuda or "cpu"
 
-    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, build_dir):
+    # Normalize CUDA version string to match your registry format (e.g., "cu121")
+    if cuda_v != "cpu":
+        cuda_v = f"cu{cuda_v.replace('.', '')}"
+
+    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, BIN_CACHE_DIR, target_impl="eiko_torch_impl"):
         try:
             import eiko_torch_impl as _fim_cuda_impl
             is_loaded = True
         except ImportError as e:
-            # Catches corrupted downloads or obscure OS-level linkage errors
-            print(f"[Eiko] Downloaded binary failed to load natively ({e}).")
+            print(f"[Eiko] Downloaded PyTorch binary failed to load natively ({e}).")
             print(f"[Eiko] Falling back to local compilation.")
-    
+
     # --------------------------------------------------------------------
-    # JIT Compilation Fallback
+    # 3. Final JIT Compilation Fallback
     # --------------------------------------------------------------------
-    # If the downoad failed (no internet, or no precompiled binary exists),
-    # try to JIT compile Eiko locally.
     if not is_loaded:
         print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
         sys.stdout.flush()
 
         torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
         
+        # We pass build_directory=BIN_CACHE_DIR to force PyTorch's compiler 
+        # to drop the output .so/.pyd right next to the JAX ones.
         _fim_cuda_impl = load(
             name="eiko_torch_impl",
             sources=[torch_source],
             extra_cflags=CXX_ARGS,
             extra_cuda_cflags=NVCC_ARGS,
             extra_include_paths=EXTRA_INCLUDE_PATHS,
-            verbose=False
+            verbose=False,
+            build_directory=BIN_CACHE_DIR
         )
 
         print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko! :)")
