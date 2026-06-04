@@ -108,6 +108,8 @@ def clear_cache():
     clear_download_cache()
     print("[Eiko] All caches cleared. The next import will trigger a fresh download or JIT compilation.")
 
+clear_caches = clear_cache # Alias
+
 # ---------------------------------------------------------
 # MODULE IMPORTS & EXPORTS
 # ---------------------------------------------------------
