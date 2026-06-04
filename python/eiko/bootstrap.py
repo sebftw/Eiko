@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import re
+import hashlib
 import urllib.request
 import urllib.error
 import platform
@@ -76,21 +77,42 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     # Generate a unique suffix for this specific process/thread
     tmp_suffix = f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
     tmp_wheel_path = wheel_path + tmp_suffix
+
+    expected_hash = matched_build.get("sha256")
+    max_allowed_size = 50 * 1024 * 1024  # 50 MB safety limit
     
     try:
-        # Atomic Download Phase
         if not os.path.exists(wheel_path):
             # print(f"[Eiko] Downloading wheel to temporary cache...")
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
             
-            # Download to a temporary unique file first
-            with urllib.request.urlopen(req, timeout=15.0) as response, open(tmp_wheel_path, 'wb') as out_file:
-                shutil.copyfileobj(response, out_file)
+            sha256_hash = hashlib.sha256()
+            downloaded_size = 0
             
-            # Atomically rename the finished tmp file to the final wheel path.
-            # If two processes do this at the exact same time, the OS guarantees one overwrites the other cleanly.
+            with urllib.request.urlopen(req, timeout=15.0) as response, open(tmp_wheel_path, 'wb') as out_file:
+                # Read and write the file in 8KB chunks
+                while chunk := response.read(8192):
+                    downloaded_size += len(chunk)
+                    
+                    # Defend against infinite streams / DoS
+                    if downloaded_size > max_allowed_size:
+                        raise ValueError(f"Download exceeded the maximum allowed size of {max_allowed_size} bytes.")
+                    
+                    out_file.write(chunk)
+                    sha256_hash.update(chunk)
+            
+            # Verify the hash before moving it to the active path
+            if expected_hash:
+                calculated_hash = sha256_hash.hexdigest()
+                if calculated_hash != expected_hash:
+                    raise ValueError(
+                        f"Hash mismatch!\nExpected: {expected_hash}\nGot:      {calculated_hash}\n"
+                        "The file may be corrupted or compromised."
+                    )
+            
+            # Atomically rename the verified tmp file to the final wheel path.
             os.replace(tmp_wheel_path, wheel_path)
-        #else:
+        # else:
         #    print(f"[Eiko] Using cached wheel from {wheel_path}")
         
         # Atomic Extraction Phase
