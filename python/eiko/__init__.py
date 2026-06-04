@@ -21,6 +21,17 @@ from eiko.build_config import SRC_DIR, BIN_CACHE_DIR
 if BIN_CACHE_DIR not in sys.path:
     sys.path.insert(0, BIN_CACHE_DIR)
 
+# Windows Python 3.8+ requires explicit DLL directory registration
+if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    try:
+        os.add_dll_directory(BIN_CACHE_DIR)
+        # Also ensure PyTorch's own lib directory is discoverable for c10.dll/torch.dll
+        torch_lib_path = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib_path):
+            os.add_dll_directory(torch_lib_path)
+    except Exception:
+        pass
+
 # ---------------------------------------------------------
 # INTERNAL UTILITIES
 # ---------------------------------------------------------
