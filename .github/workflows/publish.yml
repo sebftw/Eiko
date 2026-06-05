@@ -27,37 +27,58 @@ jobs:
         with:
           python-version: '3.10' # Required for the inline scripts and wheel CLI
 
-      - name: Verify Tag Matches __init__.py Version
+      - name: Verify Tag, __init__.py, and CITATION.cff Versions Match
         run: |
-          # Extract the version securely without importing the package
-          INIT_VERSION=$(python -c "
-          import re, sys
-          try:
-              content = open('python/eiko/__init__.py').read()
-              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
-              print(match.group(1)) if match else sys.exit(1)
-          except Exception as e:
-              print(f'Failed to read version: {e}')
-              sys.exit(1)
-          ")
-          
-          # Get the Git tag that triggered the run
           TAG_VERSION="${{ github.ref_name }}"
-          
-          # Optional: Strip a leading 'v' from the tag if you use them (e.g., v1.0.0 -> 1.0.0)
+          # Strip leading 'v' and '-test' suffix for matching
           TAG_VERSION="${TAG_VERSION#v}"
-          
-          # Optional: Strip '-test' suffix for your sandbox testing
           TAG_VERSION="${TAG_VERSION%-test}"
           
-          echo "Package version: $INIT_VERSION"
-          echo "Git tag version: $TAG_VERSION"
+          python -c "
+          import re, sys
           
-          if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag is '$TAG_VERSION'"
-            exit 1
-          fi
-          echo "Version match verified."
+          tag_version = '$TAG_VERSION'
+          
+          # 1. Read __init__.py
+          try:
+              init_content = open('python/eiko/__init__.py').read()
+              init_match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', init_content, re.MULTILINE)
+              init_version = init_match.group(1) if init_match else None
+          except FileNotFoundError:
+              print('::error::python/eiko/__init__.py not found!')
+              sys.exit(1)
+              
+          # 2. Read CITATION.cff
+          try:
+              cff_content = open('CITATION.cff').read()
+              # Matches 'version: 1.0.0' or 'version: \"1.0.0\"'
+              cff_match = re.search(r'^version:\s*([^\s]+)', cff_content, re.MULTILINE)
+              cff_version = cff_match.group(1).strip('\'\"') if cff_match else None
+          except FileNotFoundError:
+              print('::error::CITATION.cff not found!')
+              sys.exit(1)
+          
+          print(f'Git tag version:     {tag_version}')
+          print(f'__init__.py version: {init_version}')
+          print(f'CITATION.cff version:{cff_version}')
+          
+          # 3. Validate
+          if not init_version:
+              print('::error::Could not parse __version__ from __init__.py')
+              sys.exit(1)
+          if not cff_version:
+              print('::error::Could not parse version from CITATION.cff')
+              sys.exit(1)
+              
+          if init_version != tag_version:
+              print(f'::error::__init__.py ({init_version}) does not match tag ({tag_version})')
+              sys.exit(1)
+          if cff_version != tag_version:
+              print(f'::error::CITATION.cff ({cff_version}) does not match tag ({tag_version})')
+              sys.exit(1)
+              
+          print('All versions match perfectly.')
+          "
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
