@@ -1,9 +1,11 @@
 name: Publish Base Wheel and Release Binaries
 
 on:
-  push:
-    tags:
-      - 'v*' # Wakes up automatically for v0.8.5, v1.0.0-test-1, etc.
+  workflow_run:
+    # This must match the exact "name:" defined at the very top of your build.yml file
+    workflows: ["Package Eiko Multi-Language Release"] 
+    types:
+      - completed
   workflow_dispatch:
     inputs:
       run_id:
