@@ -16,7 +16,7 @@ on:
         description: 'Test Run (Creates a temporary tag and uploads to TestPyPI)'
         required: true
         type: boolean
-        default: false
+        default: true
 
 jobs:
   bump_and_tag:
