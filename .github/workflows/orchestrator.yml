@@ -35,58 +35,46 @@ jobs:
           # Use a Personal Access Token (PAT) if your repository settings require it to trigger actions,
           # or ensure your branch protections allow the default token to push.
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
+      
       - name: Install Bump Tool
         run: pip install bump-my-version
-
-      - name: Configure Git Author
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
 
       - name: Bump Version and Generate Tag
         id: version_logic
         run: |
-          # Configure Git Author immediately so commits/tags work
+          # Configure Git Author
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+
+          # Bash function to extract version cleanly without Python indentation issues
+          extract_version() {
+            if [ ! -f "python/eiko/__init__.py" ]; then
+              echo "::error::Could not find python/eiko/__init__.py"
+              exit 1
+            fi
+            
+            local v
+            # Uses sed to capture the version string between single or double quotes
+            v=$(sed -n "s/^__version__[[:space:]]*=[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" python/eiko/__init__.py)
+            
+            if [ -z "$v" ]; then
+              echo "::error::Failed to parse version from __init__.py"
+              exit 1
+            fi
+            echo "$v"
+          }
 
           if [ "${{ github.event.inputs.is_test }}" == "true" ]; then
             echo "======================================================="
             echo "🚀 RUNNING A TEST RELEASE (TestPyPI Sandbox)"
             echo "======================================================="
             
-            # 1. Read current version from __init__.py without bumping
-            VERSION=$(python3 -c "
-import re, os, sys
-path = 'python/eiko/__init__.py'
-if not os.path.exists(path):
-    print(f'::error::Could not find {path}', file=sys.stderr)
-    sys.exit(1)
-with open(path, 'r') as f:
-    match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
-    if match:
-        print(match.group(1))
-    else:
-        print('::error::Could not find __version__ string', file=sys.stderr)
-        sys.exit(1)
-")
-
-            if [ -z "$VERSION" ]; then
-              echo "::error::Failed to parse version for test run."
-              exit 1
-            fi
-
-            # 2. Append the run number to ensure tag uniqueness
+            # Extract current version
+            VERSION=$(extract_version)
+            
             TAG="v${VERSION}-test-${{ github.run_number }}"
             echo "Test Tag Created: $TAG"
             
-            # 3. Tag and push locally to the test branch environment
             git tag "$TAG"
             git push origin "$TAG"
             
@@ -97,34 +85,15 @@ with open(path, 'r') as f:
             echo "📦 RUNNING A PRODUCTION RELEASE (PyPI)"
             echo "======================================================="
             
-            # 1. Execute the tool to bump code
+            # Bump the code
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
-            # 2. Read the newly bumped version
-            VERSION=$(python3 -c "
-import re, os, sys
-path = 'python/eiko/__init__.py'
-if not os.path.exists(path):
-    print(f'::error::Could not find {path}', file=sys.stderr)
-    sys.exit(1)
-with open(path, 'r') as f:
-    match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
-    if match:
-        print(match.group(1))
-    else:
-        print('::error::Could not find newly bumped __version__', file=sys.stderr)
-        sys.exit(1)
-")
-
-            if [ -z "$VERSION" ]; then
-              echo "::error::Failed to parse version after production bump."
-              exit 1
-            fi
-
+            # Extract the newly bumped version
+            VERSION=$(extract_version)
+            
             TAG="v${VERSION}"
             echo "Production Tag Created: $TAG"
             
-            # 3. Create the production tag and push
             git tag "$TAG"
             git push origin HEAD:${{ github.ref_name }}
             git push origin "$TAG"
