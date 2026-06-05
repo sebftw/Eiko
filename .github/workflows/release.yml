@@ -621,15 +621,22 @@ jobs:
           PIP_NO_CACHE_DIR: "1"
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
-          python${{ matrix.python-version }} -m pip install --upgrade pip
-          python${{ matrix.python-version }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel pybind11
+          # 1. Create a virtual environment using your specific Python version
+          python${{ matrix.python-version }} -m venv venv
+          
+          # 2. Activate the virtual environment
+          source venv/bin/activate
 
-          # Build the wheel
-          python${{ matrix.python-version }} -m build --wheel --no-isolation
+          # 3. Upgrade pip and install build tools safely inside the venv
+          python -m pip install --upgrade pip
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel auditwheel
 
-          # Repair the wheel targeting manylinux_2_31 (Ubuntu 20.04+)
+          # 4. Build the wheel (using standard 'python' now that venv is active)
+          python -m build --wheel --no-isolation
+
+          # 5. Repair the wheel targeting manylinux_2_31
           echo "Repairing wheel for manylinux_2_31 compatibility..."
-          python${{ matrix.python-version }} -m auditwheel repair dist/*.whl \
+          python -m auditwheel repair dist/*.whl \
             --plat manylinux_2_31_x86_64 \
             -w repaired_dist/
 
