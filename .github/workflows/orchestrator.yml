@@ -25,7 +25,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      new_tag: ${{ steps.get_tag.outputs.tag }}
+      new_tag: ${{ steps.version_logic.outputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -63,26 +63,26 @@ jobs:
             
             # 1. Read current version from __init__.py without bumping
             VERSION=$(python3 -c "
-            import re, os, sys
-            path = 'python/eiko/__init__.py'
-            if not os.path.exists(path):
-                print(f'::error::Could not find {path}', file=sys.stderr)
-                sys.exit(1)
-            with open(path, 'r') as f:
-                match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
-                if match:
-                    print(match.group(1))
-                else:
-                    print('::error::Could not find __version__ string', file=sys.stderr)
-                    sys.exit(1)
-            ")
+import re, os, sys
+path = 'python/eiko/__init__.py'
+if not os.path.exists(path):
+    print(f'::error::Could not find {path}', file=sys.stderr)
+    sys.exit(1)
+with open(path, 'r') as f:
+    match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
+    if match:
+        print(match.group(1))
+    else:
+        print('::error::Could not find __version__ string', file=sys.stderr)
+        sys.exit(1)
+")
 
             if [ -z "$VERSION" ]; then
               echo "::error::Failed to parse version for test run."
               exit 1
             fi
 
-            # 2. Append the run number to ensure tag uniqueness (e.g., v0.8.5-test-14)
+            # 2. Append the run number to ensure tag uniqueness
             TAG="v${VERSION}-test-${{ github.run_number }}"
             echo "Test Tag Created: $TAG"
             
@@ -97,24 +97,24 @@ jobs:
             echo "📦 RUNNING A PRODUCTION RELEASE (PyPI)"
             echo "======================================================="
             
-            # 1. Execute the tool to bump code and auto-commit changes to python/eiko/__init__.py
+            # 1. Execute the tool to bump code
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
-            # 2. Read the newly bumped version from __init__.py
+            # 2. Read the newly bumped version
             VERSION=$(python3 -c "
-            import re, os, sys
-            path = 'python/eiko/__init__.py'
-            if not os.path.exists(path):
-                print(f'::error::Could not find {path}', file=sys.stderr)
-                sys.exit(1)
-            with open(path, 'r') as f:
-                match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
-                if match:
-                    print(match.group(1))
-                else:
-                    print('::error::Could not find newly bumped __version__', file=sys.stderr)
-                    sys.exit(1)
-            ")
+import re, os, sys
+path = 'python/eiko/__init__.py'
+if not os.path.exists(path):
+    print(f'::error::Could not find {path}', file=sys.stderr)
+    sys.exit(1)
+with open(path, 'r') as f:
+    match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
+    if match:
+        print(match.group(1))
+    else:
+        print('::error::Could not find newly bumped __version__', file=sys.stderr)
+        sys.exit(1)
+")
 
             if [ -z "$VERSION" ]; then
               echo "::error::Failed to parse version after production bump."
@@ -124,7 +124,7 @@ jobs:
             TAG="v${VERSION}"
             echo "Production Tag Created: $TAG"
             
-            # 3. Create the production tag, push the bump commit to the working branch, and push the tag
+            # 3. Create the production tag and push
             git tag "$TAG"
             git push origin HEAD:${{ github.ref_name }}
             git push origin "$TAG"
