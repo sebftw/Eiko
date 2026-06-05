@@ -104,4 +104,9 @@ jobs:
     name: 3. Inject Registry & Publish
     needs: [bump_and_tag, run_build]
     uses: ./.github/workflows/publish.yml
+    # EXPLICITLY GRANT PERMISSIONS TO THE CHILD WORKFLOW
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
     secrets: inherit # Automatically passes PyPI credentials/tokens downstream
