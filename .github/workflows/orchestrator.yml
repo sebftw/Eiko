@@ -110,17 +110,3 @@ jobs:
       # CRITICAL: Force the build runner to execute on the new tag,
       # ensuring the wheels pick up the newly bumped __version__
       ref: ${{ needs.bump_and_tag.outputs.new_tag }}
-
-  run_publish:
-    name: 3. Inject Registry & Publish
-    needs: [bump_and_tag, run_build]
-    uses: ./.github/workflows/publish.yml
-    with:
-      # Explicitly pass the tag generated in job 1
-      tag: ${{ needs.bump_and_tag.outputs.new_tag }}
-    # EXPLICITLY GRANT PERMISSIONS TO THE CHILD WORKFLOW
-    permissions:
-      contents: write
-      actions: read
-      id-token: write
-    secrets: inherit # Automatically passes PyPI credentials/tokens downstream
