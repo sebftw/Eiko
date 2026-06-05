@@ -54,7 +54,7 @@ jobs:
             echo "Executing Test Run: Skipping code bump."
             
             # Read current version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('python/eiko/__init__.py').read()).group(1))")
             
             # Create a unique test tag (e.g., v1.0.0-test-15)
             TAG="v${VERSION}-test-${{ github.run_number }}"
@@ -72,7 +72,7 @@ jobs:
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
             # Read the newly bumped version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('python/eiko/__init__.py').read()).group(1))")
             TAG="v${VERSION}"
             
             # Tag and push the commit and tag to main
