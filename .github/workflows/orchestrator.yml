@@ -104,7 +104,4 @@ jobs:
     name: 3. Inject Registry & Publish
     needs: [bump_and_tag, run_build]
     uses: ./.github/workflows/publish.yml
-    with:
-      # Pass the run_id of the build job that JUST completed above
-      run_id: ${{ github.run_id }}
     secrets: inherit # Automatically passes PyPI credentials/tokens downstream
