@@ -543,27 +543,42 @@ jobs:
       - name: Install System Utilities
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential binutils
+          sudo apt-get install -y build-essential binutils unzip
 
       - name: Compile Standard Wheel
         env:
           EIKO_RELEASE_BUILD: "1"
           PIP_NO_CACHE_DIR: "1"
         run: |
+          python -m pip install --upgrade pip
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel auditwheel "patchelf>=0.14"
+          
           # Build the wheel
           python -m build --wheel --no-isolation
 
+          # Repair the wheel using auditwheel
+          python -m auditwheel repair dist/*.whl \
+            --plat manylinux_2_31_x86_64 \
+            -w repaired_dist/
+
+          # Clean up and stage repaired wheel
+          rm dist/*.whl
+          mv repaired_dist/*.whl dist/
+
       - name: Verify Wheel Contents
         run: |
-          WHEEL_FILES=$(unzip -l dist/*.whl)
-          echo "$WHEEL_FILES"
-          
-          # Quick verification check to ensure no accidental binary bloat leaked in
-          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib" > /dev/null; then
-            echo "Warning: External shared libraries were bundled into the CPU wheel."
-          else
-            echo "Success: Clean, dependency-free standard wheel generated."
-          fi
+          # Loop through wheels to prevent unzip from choking on multiple files
+          for wheel in dist/*.whl; do
+            echo "Checking $wheel..."
+            WHEEL_FILES=$(unzip -l "$wheel")
+            echo "$WHEEL_FILES"
+            
+            if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib" > /dev/null; then
+              echo "Warning: External shared libraries were bundled into the CPU wheel."
+            else
+              echo "Success: Clean, dependency-free standard wheel generated."
+            fi
+          done
 
       - name: Upload Standard Wheel Artifacts
         uses: actions/upload-artifact@v4
@@ -591,7 +606,7 @@ jobs:
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
           apt-get update
-          apt-get install -y software-properties-common build-essential binutils git wget curl ca-certificates unzip patchelf
+          apt-get install -y software-properties-common build-essential binutils git wget curl ca-certificates unzip
           
           # Add deadsnakes PPA to get modern Python
           add-apt-repository ppa:deadsnakes/ppa -y
@@ -621,20 +636,14 @@ jobs:
           PIP_NO_CACHE_DIR: "1"
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
-          # 1. Create a virtual environment using your specific Python version
-          python${{ matrix.python-version }} -m venv venv
-          
-          # 2. Activate the virtual environment
-          source venv/bin/activate
+          # 1. Upgrade pip and install build tools
+          python${{ matrix.python-version }} -m pip install --upgrade pip
+          python${{ matrix.python-version }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel auditwheel  "patchelf>=0.14"
 
-          # 3. Upgrade pip and install build tools safely inside the venv
-          python -m pip install --upgrade pip
-          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel auditwheel
+          # 2. Build the wheel
+          python${{ matrix.python-version }} -m build --wheel --no-isolation
 
-          # 4. Build the wheel (using standard 'python' now that venv is active)
-          python -m build --wheel --no-isolation
-
-          # 5. Repair the wheel targeting manylinux_2_31
+          # 3. Repair the wheel targeting manylinux_2_31
           echo "Repairing wheel for manylinux_2_31 compatibility..."
           python -m auditwheel repair dist/*.whl \
             --plat manylinux_2_31_x86_64 \
