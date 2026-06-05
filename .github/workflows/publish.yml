@@ -12,6 +12,10 @@ on:
         description: 'The GitHub Actions Run ID of the build to fetch artifacts from'
         required: true
         type: string
+      tag:
+        description: 'Explicit tag passed from the orchestrator'
+        required: false
+        type: string
 
 jobs:
   build_and_release:
@@ -34,9 +38,9 @@ jobs:
 
       - name: Verify Tag, __init__.py, and CITATION.cff Versions Match
         run: |
-          TAG_VERSION="${{ github.ref_name }}"
+          RAW_TAG="${{ inputs.tag || github.ref_name }}"
           # Strip leading 'v'
-          TAG_VERSION="${TAG_VERSION#v}"
+          TAG_VERSION="${RAW_TAG#v}"
           
           # Strip '-test' AND the run number attached to it
           TAG_VERSION="${TAG_VERSION%-test*}"
@@ -154,12 +158,12 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           # Mark as a pre-release if the tag contains '-test'
           prerelease: ${{ contains(github.ref_name, '-test') }}
 
       - name: Publish to TestPyPI
-        if: contains(github.ref, 'test')
+        if: contains(inputs.tag || github.ref_name, 'test')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
@@ -167,7 +171,7 @@ jobs:
           # Ensure you have a Trusted Publisher configured for TestPyPI as well
 
       - name: Publish to PyPI
-        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'test')
+        if: "!contains(inputs.tag || github.ref_name, '-test')"
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
