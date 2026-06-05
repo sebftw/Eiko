@@ -27,6 +27,14 @@ jobs:
     outputs:
       new_tag: ${{ steps.version_logic.outputs.tag }}
     steps:
+      - name: Enforce Branch Context for Production Pushes
+        if: github.event.inputs.is_test == 'false'
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "::error::Strict Mode: Production version bumps can only be initiated from the 'main' branch."
+            exit 1
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
