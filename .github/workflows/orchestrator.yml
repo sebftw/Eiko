@@ -49,39 +49,6 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-      - name: Extract New Version Tag
-        id: get_tag
-        run: |
-          # Extract the version with strict error checking
-          VERSION=$(python -c "
-          import re, sys
-          try:
-              content = open('python/eiko/__init__.py').read()
-              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
-              if match:
-                  print(match.group(1))
-              else:
-                  print('::error::Regex failed to match in __init__.py', file=sys.stderr)
-                  sys.exit(1)
-          except Exception as e:
-              print(f'::error::Failed to read file: {e}', file=sys.stderr)
-              sys.exit(1)
-          ")
-          
-          # Failsafe: Abort if VERSION is somehow still empty
-          if [ -z "$VERSION" ]; then
-            echo "::error::Extracted version string is empty! Aborting."
-            exit 1
-          fi
-          
-          echo "Successfully extracted version: $VERSION"
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          
-          # Create and push the local tag
-          git tag "v$VERSION"
-          git push origin HEAD:${{ github.ref_name }}
-          git push origin "v$VERSION"
-
       - name: Bump Version and Generate Tag
         id: version_logic
         run: |
@@ -164,13 +131,6 @@ jobs:
             
             echo "tag=$TAG" >> $GITHUB_OUTPUT
           fi
-
-      - name: Push Changes and Tag
-        run: |
-          # Push the version bump commit back to your default branch
-          git push origin HEAD:${{ github.ref_name }}
-          # Push the newly minted release tag
-          git push origin "v${{ steps.get_tag.outputs.tag }}"
 
   run_build:
     name: 2. Compile Binaries
