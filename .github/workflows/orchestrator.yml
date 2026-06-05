@@ -22,6 +22,8 @@ jobs:
   bump_and_tag:
     name: 1. Bump Version and Push Tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       new_tag: ${{ steps.get_tag.outputs.tag }}
     steps:
