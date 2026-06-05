@@ -1,13 +1,10 @@
 name: Package Eiko Multi-Language Release
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      ref:
-        description: 'The Git branch or tag to checkout'
-        required: false
-        type: string
 
 jobs:
   build_ubuntu_wheels:
