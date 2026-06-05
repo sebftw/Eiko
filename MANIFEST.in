@@ -1,1 +1,2 @@
 recursive-include src *.cuh *.cu
+include python/eiko/registry.json
