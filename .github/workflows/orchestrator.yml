@@ -12,6 +12,11 @@ on:
           - patch
           - minor
           - major
+      is_test:
+        description: 'Test Run (Creates a temporary tag and uploads to TestPyPI)'
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   bump_and_tag:
@@ -42,20 +47,41 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-      - name: Bump Version Files
+      - name: Bump Version and Generate Tag
+        id: version_logic
         run: |
-          # This executes the bump, modifies files, and creates a local git commit
-          bump-my-version bump ${{ github.event.inputs.bump_type }}
-
-      - name: Extract New Version Tag
-        id: get_tag
-        run: |
-          # Read the new version from the code to determine our tag name
-          VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
-          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          
-          # Create the local tag matching the version bump commit
-          git tag "v$VERSION"
+          if [ "${{ github.event.inputs.is_test }}" == "true" ]; then
+            echo "Executing Test Run: Skipping code bump."
+            
+            # Read current version
+            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            
+            # Create a unique test tag (e.g., v1.0.0-test-15)
+            TAG="v${VERSION}-test-${{ github.run_number }}"
+            
+            # Tag the current commit
+            git tag "$TAG"
+            git push origin "$TAG"
+            
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            
+          else
+            echo "Executing Production Release: Bumping code."
+            
+            # Bump the code and create a commit
+            bump-my-version bump ${{ github.event.inputs.bump_type }}
+            
+            # Read the newly bumped version
+            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            TAG="v${VERSION}"
+            
+            # Tag and push the commit and tag to main
+            git tag "$TAG"
+            git push origin HEAD:${{ github.ref_name }}
+            git push origin "$TAG"
+            
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
 
       - name: Push Changes and Tag
         run: |
