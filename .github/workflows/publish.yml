@@ -1,8 +1,7 @@
-name: Publish HTML
+name: Publish Base Wheel and Release Binaries
 on:
-  workflow_call: # Keeps it working with release.yml
-  
-  workflow_dispatch: # Makes it manually runnable via the GitHub UI
+  workflow_call:
+  workflow_dispatch:
     inputs:
       run_id:
         description: 'The GitHub Actions Run ID of the build to fetch wheels from'
@@ -10,23 +9,16 @@ on:
         type: string
 
 jobs:
-  publish_gh_pages:
-    name: Generate Siloed HTML Indexes and Publish
+  build_and_release:
+    name: Build Base Wheel, Generate Registry, and Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: read # Required to download artifacts from other runs
+      actions: read
     
     steps:
-      - name: Checkout gh-pages branch
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: public
-        continue-on-error: true
-
-      - name: Create fallback directory
-        run: mkdir -p public
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
@@ -34,54 +26,57 @@ jobs:
           path: wheelhouse
           pattern: wheels-*
           merge-multiple: true
-          # If triggered manually, use the provided run_id.
-          # If triggered by the orchestrator, default to the current run context.
           run-id: ${{ inputs.run_id || github.run_id }}
-          # A token is strictly required when downloading artifacts from a different run ID
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate PEP-503 compliant Siloed Indexes
+      - name: Generate Registry and Checksums
         run: |
-          shopt -s nullglob
-          mkdir -p public/whl
+          # Ensure target directory exists
+          mkdir -p python/eiko
           
-          # 1. Sort NEW wheels
+          echo "{" > python/eiko/registry.json
+          echo '  "version": "${{ github.ref_name }}",' >> python/eiko/registry.json
+          echo '  "wheels": {' >> python/eiko/registry.json
+          
+          FIRST=true
+          shopt -s nullglob
           for wheel in wheelhouse/*.whl; do
             filename=$(basename "$wheel")
-            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+) ]]; then
-              cuda_tag="${BASH_REMATCH[1]}"
-              cuda_tag=$(echo "$cuda_tag" | sed 's/da//; s/[-_\.]//g')
+            
+            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+|cpu) ]]; then
+              tag="${BASH_REMATCH[1]}"
+              tag=$(echo "$tag" | sed 's/da//; s/[-_\.]//g')
               
-              mkdir -p "public/whl/$cuda_tag/eiko"
-              cp "$wheel" "public/whl/$cuda_tag/eiko/"
+              hash=$(sha256sum "$wheel" | awk '{print $1}')
+              url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$filename"
+              
+              if [ "$FIRST" = true ]; then
+                FIRST=false
+              else
+                echo "," >> python/eiko/registry.json
+              fi
+              
+              echo "    \"$tag\": {\"url\": \"$url\", \"sha256\": \"$hash\"}" >> python/eiko/registry.json
             fi
           done
+          
+          echo "  }" >> python/eiko/registry.json
+          echo "}" >> python/eiko/registry.json
 
-          # 2. Regenerate index files
-          cd public/whl
-          for dir in cu* cpu; do
-            if [ -d "$dir" ]; then
-              echo "<!DOCTYPE html><html><body><a href=\"eiko/\">eiko</a></body></html>" > "$dir/index.html"
-              
-              cd "$dir/eiko"
-              echo "<!DOCTYPE html><html><head><title>Links for eiko ($dir)</title></head><body>" > index.html
-              echo "<h1>Links for eiko</h1>" >> index.html
-              
-              for w in *.whl; do
-                if [ "$w" != "index.html" ]; then
-                  echo "<a href=\"$w\">$w</a><br>" >> index.html
-                fi
-              done
-              
-              echo "</body></html>" >> index.html
-              cd ../..
-            fi
-          done
+      - name: Build Pure-Python Base Wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --sdist --wheel .
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Binaries to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          keep_files: true
-          publish_branch: gh-pages-test
+          files: wheelhouse/*.whl
+          tag_name: ${{ github.ref_name }}
+          # Uncomment below if you want the action to create the release automatically
+          # name: Release ${{ github.ref_name }}
+          # draft: false
+          # prerelease: false
+          
+      # Add your PyPI upload step here using the built files in dist/
+      # e.g., pypa/gh-action-pypi-publish@release/v1
