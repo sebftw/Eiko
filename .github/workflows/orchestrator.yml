@@ -100,13 +100,3 @@ jobs:
             
             echo "tag=$TAG" >> $GITHUB_OUTPUT
           fi
-
-  run_build:
-    name: 2. Compile Binaries
-    needs: bump_and_tag
-    # Points directly to your existing build workflow file
-    uses: ./.github/workflows/release.yml
-    with:
-      # CRITICAL: Force the build runner to execute on the new tag,
-      # ensuring the wheels pick up the newly bumped __version__
-      ref: ${{ needs.bump_and_tag.outputs.new_tag }}
