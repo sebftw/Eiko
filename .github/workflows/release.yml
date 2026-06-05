@@ -543,7 +543,7 @@ jobs:
       - name: Install System Utilities
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential binutils unzip
+          sudo apt-get install -y build-essential binutils
 
       - name: Compile Standard Wheel
         env:
@@ -551,34 +551,10 @@ jobs:
           PIP_NO_CACHE_DIR: "1"
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel auditwheel "patchelf>=0.14"
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel
           
           # Build the wheel
           python -m build --wheel --no-isolation
-
-          # Repair the wheel using auditwheel
-          python -m auditwheel repair dist/*.whl \
-            --plat manylinux_2_31_x86_64 \
-            -w repaired_dist/
-
-          # Clean up and stage repaired wheel
-          rm dist/*.whl
-          mv repaired_dist/*.whl dist/
-
-      - name: Verify Wheel Contents
-        run: |
-          # Loop through wheels to prevent unzip from choking on multiple files
-          for wheel in dist/*.whl; do
-            echo "Checking $wheel..."
-            WHEEL_FILES=$(unzip -l "$wheel")
-            echo "$WHEEL_FILES"
-            
-            if echo "$WHEEL_FILES" | grep -E "eiko\.libs/lib" > /dev/null; then
-              echo "Warning: External shared libraries were bundled into the CPU wheel."
-            else
-              echo "Success: Clean, dependency-free standard wheel generated."
-            fi
-          done
 
       - name: Upload Standard Wheel Artifacts
         uses: actions/upload-artifact@v4
@@ -645,7 +621,7 @@ jobs:
 
           # 3. Repair the wheel targeting manylinux_2_31
           echo "Repairing wheel for manylinux_2_31 compatibility..."
-          python -m auditwheel repair dist/*.whl \
+          python${{ matrix.python-version }} -m auditwheel repair dist/*.whl \
             --plat manylinux_2_31_x86_64 \
             -w repaired_dist/
 
