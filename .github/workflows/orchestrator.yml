@@ -63,6 +63,8 @@ jobs:
             fi
             echo "$v"
           }
+          
+          git push origin HEAD:${{ github.ref_name }}
 
           if [ "${{ github.event.inputs.is_test }}" == "true" ]; then
             echo "======================================================="
