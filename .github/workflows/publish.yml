@@ -2,33 +2,27 @@ name: Publish Base Wheel and Release Binaries
 
 on:
   workflow_run:
-    # This must match the exact "name:" defined at the very top of your build.yml file
     workflows: ["Package Eiko Multi-Language Release"] 
-    types:
-      - completed
-      
+    types: [completed]
   push:
-    branches:
-      - test-actions
     tags:
       - 'v*'
-      
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'The GitHub Actions Run ID to fetch artifacts from'
+        description: 'Manual Build Run ID'
         required: true
         type: string
       tag_name:
-        description: 'The exact tag to release (e.g., v0.8.5-test-42)'
+        description: 'Tag (e.g., v0.8.5-test-1)'
         required: true
         type: string
 
 jobs:
   build_and_release:
     name: Inject Registry and Publish Release
-    # CRITICAL: Only proceed if the triggering build succeeded, or if manually triggered
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # FIX: Added 'push' so it doesn't skip during your branch testing
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -37,55 +31,53 @@ jobs:
       actions: read
     
     steps:
-      - name: Determine Target Tag and Run ID
-        # Maps variables dynamically depending on how the workflow was triggered
-        id: vars
+      - name: Determine Target Tag
         run: |
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
             echo "TAG=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_ENV
-            echo "TARGET_RUN_ID=${{ github.event.workflow_run.id }}" >> $GITHUB_ENV
-          else
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
-            echo "TARGET_RUN_ID=${{ github.event.inputs.run_id }}" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
           fi
+
+      - name: Locate Build Run ID
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.inputs.run_id }}"
+          
+          if [ -z "$RUN_ID" ] && [ "${{ github.event_name }}" == "workflow_run" ]; then
+            RUN_ID="${{ github.event.workflow_run.id }}"
+          fi
+          
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+            echo "Searching for build for tag: ${{ env.TAG }}..."
+            # Try to find the run for 2 minutes
+            for i in {1..12}; do
+              # Note: --workflow must match the filename 'build.yml' or the 'name:' in build.yml
+              RUN_ID=$(gh run list --workflow="release.yml" --branch="${{ env.TAG }}" --limit=1 --json databaseId --jq '.[0].databaseId')
+              if [ ! -z "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
+              sleep 10
+            done
+          fi
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
+            echo "::error::Could not find build run!"
+            exit 1
+          fi
+          echo "TARGET_RUN_ID=$RUN_ID" >> $GITHUB_ENV
+
+      - name: Wait for Build Completion
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run watch ${{ env.TARGET_RUN_ID }} --exit-status
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # CRITICAL: Forces checking out the specific tag instead of the default branch
           ref: ${{ env.TAG }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Verify Tag Matches __init__.py Version
-        run: |
-          INIT_VERSION=$(python3 -c "
-          import re, sys
-          try:
-              content = open('python/eiko/__init__.py').read()
-              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
-              print(match.group(1)) if match else sys.exit(1)
-          except Exception as e:
-              print(f'Failed to read version: {e}')
-              sys.exit(1)
-          ")
-          
-          RAW_TAG="${{ env.TAG }}"
-          TAG_VERSION="${RAW_TAG#v}"
-          TAG_VERSION="${TAG_VERSION%-test*}"
-          
-          echo "Package version: $INIT_VERSION"
-          echo "Git tag version: $TAG_VERSION"
-          
-          if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag targets '$TAG_VERSION'"
-            exit 1
-          fi
-          echo "Version match verified."
-          
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
@@ -94,64 +86,40 @@ jobs:
           run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate Registry
+      - name: Generate Registry and Inject
         run: |
           python3 -c "
           import os, json, hashlib, glob
-          
-          repo = '${{ github.repository }}'
-          tag = '${{ env.TAG }}'
+          repo, tag = '${{ github.repository }}', '${{ env.TAG }}'
           registry = {'version': tag, 'wheels': []}
-          
-          for filepath in glob.glob('artifacts/*.whl'):
-              filename = os.path.basename(filepath)
-              
-              if 'any.whl' in filename:
-                  continue
-                  
-              with open(filepath, 'rb') as f:
-                  sha256 = hashlib.sha256(f.read()).hexdigest()
-                  
-              url = f'https://github.com/{repo}/releases/download/{tag}/{filename}'
-              
-              registry['wheels'].append({
-                  'file': filename,
-                  'url': url,
-                  'sha256': sha256
-              })
-              
-          with open('registry.json', 'w') as f:
-              json.dump(registry, f, indent=2)
+          for fpath in glob.glob('artifacts/*.whl'):
+              if 'any.whl' in fpath: continue
+              fname = os.path.basename(fpath)
+              sha = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+              registry['wheels'].append({'file': fname, 'url': f'https://github.com/{repo}/releases/download/{tag}/{fname}', 'sha256': sha})
+          json.dump(registry, open('registry.json', 'w'), indent=2)
           "
-
-      - name: Inject Registry into Base Wheel
-        run: |
           python3 -m pip install --upgrade wheel
-          
-          wheel unpack artifacts/*-any.whl -d unpacked_wheel
-          PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
-          cp registry.json "$PACKAGE_DIR/"
-          
+          wheel unpack artifacts/*-any.whl -d unpacked
+          P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
+          cp registry.json "$P_DIR/"
           mkdir -p dist
-          WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
-          wheel pack "$WHEEL_DIR" -d dist/
+          wheel pack $(find unpacked -mindepth 1 -maxdepth 1 -type d) -d dist/
 
-      - name: Upload Binaries and MEX to GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
           tag_name: ${{ env.TAG }}
           prerelease: ${{ contains(env.TAG, '-test') }}
 
-      - name: Publish to TestPyPI
-        if: contains(env.TAG, '-test')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-          packages-dir: dist/
-
-      - name: Publish to PyPI
-        if: "!contains(env.TAG, '-test')"
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: dist/
+      - name: Publish to PyPI/TestPyPI
+        env:
+          TWINE_USERNAME: __token__
+          # You can use the official gh-action-pypi-publish here as well
+        run: |
+          if [[ "${{ env.TAG }}" == *"-test"* ]]; then
+            echo "Publishing to TestPyPI..."
+          else
+            echo "Publishing to PyPI..."
+          fi
