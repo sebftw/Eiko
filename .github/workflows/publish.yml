@@ -1,6 +1,11 @@
 name: Publish Base Wheel and Release Binaries
 on:
   workflow_call:
+    inputs:
+      run_id:
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       run_id:
@@ -85,7 +90,8 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
-          run-id: ${{ inputs.run_id || github.run_id }}
+          # Use the explicitly passed run_id if available, otherwise fall back to current context
+          run-id: ${{ inputs.run_id || github.event.inputs.run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Registry
