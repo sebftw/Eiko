@@ -95,8 +95,10 @@ jobs:
       image: nvidia/cuda:${{ matrix.platform.cuda }}-devel-ubuntu${{ matrix.platform.os_version }}
 
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Install System Dependencies & Python via Deadsnakes
         env:
@@ -261,7 +263,10 @@ jobs:
           - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -490,7 +495,10 @@ jobs:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -522,8 +530,10 @@ jobs:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
 
     steps:
-      - name: Check out repository
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
