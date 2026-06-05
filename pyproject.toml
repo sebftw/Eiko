@@ -48,7 +48,7 @@ jax = [
     "pybind11"
 ]
 jax-local = [
-    "jax[cuda12_local]",  # This is only for HPC users ("modules load cuda/12.0").
+    "jax[cuda12-local]",  # This is only for HPC users ("modules load cuda/12.0").
     "pybind11"
 ]
 # Dependencies require to run examples.
