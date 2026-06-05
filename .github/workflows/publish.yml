@@ -6,6 +6,13 @@ on:
     workflows: ["Package Eiko Multi-Language Release"] 
     types:
       - completed
+      
+  push:
+    branches:
+      - test-actions
+    tags:
+      - 'v*'
+      
   workflow_dispatch:
     inputs:
       run_id:
