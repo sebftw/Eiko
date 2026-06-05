@@ -32,9 +32,8 @@ jobs:
         with:
           fetch-depth: 0
           # Standard GITHUB_TOKEN won't trigger subsequent workflows when pushing commits.
-          # Use a Personal Access Token (PAT) if your repository settings require it to trigger actions,
-          # or ensure your branch protections allow the default token to push.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # We therefore use a Personal Access Token below
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
       
       - name: Install Bump Tool
         run: pip install bump-my-version
