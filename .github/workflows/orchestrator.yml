@@ -1,0 +1,84 @@
+name: "🚀 Trigger Production Release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Semantic Version Bump Type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  bump_and_tag:
+    name: 1. Bump Version and Push Tag
+    runs-on: ubuntu-latest
+    outputs:
+      new_tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Standard GITHUB_TOKEN won't trigger subsequent workflows when pushing commits.
+          # Use a Personal Access Token (PAT) if your repository settings require it to trigger actions,
+          # or ensure your branch protections allow the default token to push.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Bump Tool
+        run: pip install bump-my-version
+
+      - name: Configure Git Author
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Bump Version Files
+        run: |
+          # This executes the bump, modifies files, and creates a local git commit
+          bump-my-version bump ${{ github.event.inputs.bump_type }}
+
+      - name: Extract New Version Tag
+        id: get_tag
+        run: |
+          # Read the new version from the code to determine our tag name
+          VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          
+          # Create the local tag matching the version bump commit
+          git tag "v$VERSION"
+
+      - name: Push Changes and Tag
+        run: |
+          # Push the version bump commit back to your default branch
+          git push origin HEAD:${{ github.ref_name }}
+          # Push the newly minted release tag
+          git push origin "v${{ steps.get_tag.outputs.tag }}"
+
+  run_build:
+    name: 2. Compile Binaries
+    needs: bump_and_tag
+    # Points directly to your existing build workflow file
+    uses: ./.github/workflows/release.yml
+    with:
+      # CRITICAL: Force the build runner to execute on the new tag,
+      # ensuring the wheels pick up the newly bumped __version__
+      ref: ${{ needs.bump_and_tag.outputs.new_tag }}
+
+  run_publish:
+    name: 3. Inject Registry & Publish
+    needs: [bump_and_tag, run_build]
+    uses: ./.github/workflows/publish.yml
+    with:
+      # Pass the run_id of the build job that JUST completed above
+      run_id: ${{ github.run_id }}
+    secrets: inherit # Automatically passes PyPI credentials/tokens downstream
