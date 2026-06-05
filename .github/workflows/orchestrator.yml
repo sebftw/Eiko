@@ -76,8 +76,10 @@ jobs:
             echo "Test Tag Created: $TAG"
             
             git tag "$TAG"
-            git push origin "$TAG"
-            
+            # 1. Push the branch code first so GitHub updates its workflow registry
+            git push origin HEAD:${{ github.ref_name }}
+            # 2. Push the tag second so the trigger finds the updated file
+            git push origin "$TAG"            
             echo "tag=$TAG" >> $GITHUB_OUTPUT
 
           else
@@ -95,8 +97,10 @@ jobs:
             echo "Production Tag Created: $TAG"
             
             git tag "$TAG"
+            # 1. Push the branch code first so GitHub updates its workflow registry
             git push origin HEAD:${{ github.ref_name }}
-            git push origin "$TAG"
-            
+            # 2. Push the tag second so the trigger finds the updated file
+            git push origin "$TAG"            
             echo "tag=$TAG" >> $GITHUB_OUTPUT
+            
           fi
