@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'The GitHub Actions Run ID of the build to fetch wheels from'
+        description: 'The GitHub Actions Run ID of the build to fetch artifacts from'
         required: true
         type: string
 
 jobs:
   build_and_release:
-    name: Build Base Wheel, Generate Registry, and Release
+    name: Inject Registry and Publish Release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,63 +20,79 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download all wheel artifacts
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Required for the inline scripts and wheel CLI
+
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: wheelhouse
-          pattern: wheels-*
+          path: artifacts
           merge-multiple: true
           run-id: ${{ inputs.run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate Registry and Checksums
+      - name: Generate Registry
         run: |
-          # Ensure target directory exists
-          mkdir -p python/eiko
+          python -c "
+          import os, json, hashlib, glob
           
-          echo "{" > python/eiko/registry.json
-          echo '  "version": "${{ github.ref_name }}",' >> python/eiko/registry.json
-          echo '  "wheels": {' >> python/eiko/registry.json
+          repo = '${{ github.repository }}'
+          tag = '${{ github.ref_name }}'
+          registry = {'version': tag, 'wheels': []}
           
-          FIRST=true
-          shopt -s nullglob
-          for wheel in wheelhouse/*.whl; do
-            filename=$(basename "$wheel")
-            
-            if [[ "$filename" =~ (cu(da)?[-_]?[0-9.]+|cpu) ]]; then
-              tag="${BASH_REMATCH[1]}"
-              tag=$(echo "$tag" | sed 's/da//; s/[-_\.]//g')
+          # Iterate over all downloaded wheels
+          for filepath in glob.glob('artifacts/*.whl'):
+              filename = os.path.basename(filepath)
               
-              hash=$(sha256sum "$wheel" | awk '{print $1}')
-              url="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$filename"
+              # Skip the pure-Python base wheel (we don't want it downloading itself)
+              if 'any.whl' in filename:
+                  continue
+                  
+              with open(filepath, 'rb') as f:
+                  sha256 = hashlib.sha256(f.read()).hexdigest()
+                  
+              url = f'https://github.com/{repo}/releases/download/{tag}/{filename}'
               
-              if [ "$FIRST" = true ]; then
-                FIRST=false
-              else
-                echo "," >> python/eiko/registry.json
-              fi
+              # Add to registry (Your runtime script will parse the filename to find the right OS/Python match)
+              registry['wheels'].append({
+                  'file': filename,
+                  'url': url,
+                  'sha256': sha256
+              })
               
-              echo "    \"$tag\": {\"url\": \"$url\", \"sha256\": \"$hash\"}" >> python/eiko/registry.json
-            fi
-          done
-          
-          echo "  }" >> python/eiko/registry.json
-          echo "}" >> python/eiko/registry.json
+          with open('registry.json', 'w') as f:
+              json.dump(registry, f, indent=2)
+          "
 
-      - name: Build Pure-Python Base Wheel
+      - name: Inject Registry into Base Wheel
         run: |
-          python -m pip install --upgrade build
-          python -m build --sdist --wheel .
+          python -m pip install --upgrade wheel
+          
+          # 1. Unpack the pure-Python base wheel
+          # Adjust the wildcard if your base wheel naming differs
+          wheel unpack artifacts/*-any.whl -d unpacked_wheel
+          
+          # 2. Find the inner package directory (e.g., unpacked_wheel/eiko-1.0.0/eiko/)
+          PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
+          
+          # 3. Copy the registry into the package code
+          cp registry.json "$PACKAGE_DIR/"
+          
+          # 4. Repack the wheel (this recalculates the RECORD hashes automatically)
+          mkdir -p dist
+          WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
+          wheel pack "$WHEEL_DIR" -d dist/
 
-      - name: Upload Binaries to GitHub Release
+      - name: Upload Binaries and MEX to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: wheelhouse/*.whl
+          # Upload everything: the compiled wheels, the MEX files, and even the unmodified base wheel if desired
+          files: artifacts/*
           tag_name: ${{ github.ref_name }}
-          # Uncomment below if you want the action to create the release automatically
-          # name: Release ${{ github.ref_name }}
-          # draft: false
-          # prerelease: false
           
-      # Add your PyPI upload step here using the built files in dist/
+      # Add your PyPI upload step here using the newly repacked wheel in dist/
       # e.g., pypa/gh-action-pypi-publish@release/v1
+      # with:
+      #   packages-dir: dist/
