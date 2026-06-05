@@ -1,19 +1,13 @@
 name: Publish Base Wheel and Release Binaries
+
 on:
-  workflow_call:
-    inputs:
-      run_id:
-        required: false
-        type: string
-        default: ''
-      tag:
-        description: 'Explicit tag passed from the orchestrator'
-        required: false
-        type: string
+  push:
+    tags:
+      - 'v*' # Wakes up automatically for v0.8.5, v1.0.0-test-1, etc.
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'The GitHub Actions Run ID of the build to fetch artifacts from'
+        description: 'The GitHub Actions Run ID to fetch artifacts from'
         required: true
         type: string
 
@@ -34,76 +28,138 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Required for the inline scripts and wheel CLI
+          python-version: '3.10'
 
-      - name: Verify Tag, __init__.py, and CITATION.cff Versions Match
+      - name: Verify Tag Matches __init__.py Version
         run: |
-          RAW_TAG="${{ inputs.tag || github.ref_name }}"
-          # Strip leading 'v'
+          # Extract the version securely without importing the package
+          INIT_VERSION=$(python3 -c "
+          import re, sys
+          try:
+              content = open('python/eiko/__init__.py').read()
+              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+              print(match.group(1)) if match else sys.exit(1)
+          except Exception as e:
+              print(f'Failed to read version: {e}')
+              sys.exit(1)
+          ")
+          
+          RAW_TAG="${{ github.ref_name }}"
           TAG_VERSION="${RAW_TAG#v}"
           
-          # Strip '-test' AND the run number attached to it
+          # Strip '-test' AND the run number attached to it (e.g., 0.8.5-test-42 -> 0.8.5)
           TAG_VERSION="${TAG_VERSION%-test*}"
           
-          python -c "
-          import re, sys
+          echo "Package version: $INIT_VERSION"
+          echo "Git tag version: $TAG_VERSION"
           
-          tag_version = '$TAG_VERSION'
+          if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag targets '$TAG_VERSION'"
+            exit 1
+          fi
+          echo "Version match verified."
           
-          # 1. Read __init__.py
-          try:
-              init_content = open('python/eiko/__init__.py').read()
-              init_match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', init_content, re.MULTILINE)
-              init_version = init_match.group(1) if init_match else None
-          except FileNotFoundError:
-              print('::error::python/eiko/__init__.py not found!')
-              sys.exit(1)
-              
-          # 2. Read CITATION.cff
-          try:
-              cff_content = open('CITATION.cff').read()
-              # Matches 'version: 1.0.0' or 'version: \"1.0.0\"'
-              cff_match = re.search(r'^version:\s*([^\s]+)', cff_content, re.MULTILINE)
-              cff_version = cff_match.group(1).strip('\'\"') if cff_match else None
-          except FileNotFoundError:
-              print('::error::CITATION.cff not found!')
-              sys.exit(1)
+      - name: Locate and Download Artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.inputs.run_id }}"
           
-          print(f'Git tag version:     {tag_version}')
-          print(f'__init__.py version: {init_version}')
-          print(f'CITATION.cff version:{cff_version}')
+          if [ -z "$RUN_ID" ]; then
+            echo "Searching for build workflow run for tag ${{ github.ref_name }}..."
+            
+            RUN_ID=$(gh run list \
+              --workflow="build.yml" \
+              --branch="${{ github.ref_name }}" \
+              --status="success" \
+              --limit=1 \
+              --json databaseId \
+              --jq '.[0].databaseId')
+          fi
           
-          # 3. Validate
-          if not init_version:
-              print('::error::Could not parse __version__ from __init__.py')
-              sys.exit(1)
-          if not cff_version:
-              print('::error::Could not parse version from CITATION.cff')
-              sys.exit(1)
-              
-          if init_version != tag_version:
-              print(f'::error::__init__.py ({init_version}) does not match tag ({tag_version})')
-              sys.exit(1)
-          if cff_version != tag_version:
-              print(f'::error::CITATION.cff ({cff_version}) does not match tag ({tag_version})')
-              sys.exit(1)
-              
-          print('All versions match perfectly.')
-          "
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::Could not find a successful build run for this tag!"
+            exit 1
+          fi
+          
+          echo "Fetching artifacts from Run ID: $RUN_ID"
+          echo "TARGET_RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-      - name: Download all artifacts
+      - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-          # Use the explicitly passed run_id if available, otherwise fall back to current context
-          run-id: ${{ inputs.run_id || github.event.inputs.run_id || github.run_id }}
+          run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Registry
         run: |
-          python -c "
+          python3 -c "
           import os, json, hashlib, glob
+          
+          repo = '${{ github.repository }}'
+          tag = '${{ github.ref_name }}'
+          registry = {'version': tag, 'wheels': []}
+          
+          for filepath in glob.glob('artifacts/*.whl'):
+              filename = os.path.basename(filepath)
+              
+              if 'any.whl' in filename:
+                  continue
+                  
+              with open(filepath, 'rb') as f:
+                  sha256 = hashlib.sha256(f.read()).hexdigest()
+                  
+              url = f'https://github.com/{repo}/releases/download/{tag}/{filename}'
+              
+              registry['wheels'].append({
+                  'file': filename,
+                  'url': url,
+                  'sha256': sha256
+              })
+              
+          with open('registry.json', 'w') as f:
+              json.dump(registry, f, indent=2)
+          "
+
+      - name: Inject Registry into Base Wheel
+        run: |
+          python3 -m pip install --upgrade wheel
+          
+          # 1. Unpack the pure-Python base wheel
+          wheel unpack artifacts/*-any.whl -d unpacked_wheel
+          
+          # 2. Find inner package folder (tracks python/eiko structure inside wheel)
+          PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
+          
+          # 3. Inject registry.json
+          cp registry.json "$PACKAGE_DIR/"
+          
+          # 4. Repack the wheel 
+          mkdir -p dist
+          WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
+          wheel pack "$WHEEL_DIR" -d dist/
+
+      - name: Upload Binaries and MEX to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-test') }}
+
+      - name: Publish to TestPyPI
+        if: contains(github.ref_name, '-test')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+
+      - name: Publish to PyPI
+        if: "!contains(github.ref_name, '-test')"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/          import os, json, hashlib, glob
           
           repo = '${{ github.repository }}'
           tag = '${{ github.ref_name }}'
