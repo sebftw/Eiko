@@ -35,9 +35,11 @@ jobs:
       - name: Verify Tag, __init__.py, and CITATION.cff Versions Match
         run: |
           TAG_VERSION="${{ github.ref_name }}"
-          # Strip leading 'v' and '-test' suffix for matching
+          # Strip leading 'v'
           TAG_VERSION="${TAG_VERSION#v}"
-          TAG_VERSION="${TAG_VERSION%-test}"
+          
+          # Strip '-test' AND the run number attached to it
+          TAG_VERSION="${TAG_VERSION%-test*}"
           
           python -c "
           import re, sys
@@ -149,9 +151,10 @@ jobs:
       - name: Upload Binaries and MEX to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # Upload everything: the compiled wheels, the MEX files, and even the unmodified base wheel if desired
           files: artifacts/*
           tag_name: ${{ github.ref_name }}
+          # Mark as a pre-release if the tag contains '-test'
+          prerelease: ${{ contains(github.ref_name, '-test') }}
 
       - name: Publish to TestPyPI
         if: contains(github.ref, 'test')
