@@ -3,15 +3,40 @@ name: Python Tests
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'src/**'       # Triggers on any changes to C++ code
+      - 'python/**'    # Triggers on any changes to Python code
+      
+      # CRITICAL: You must also whitelist your configuration files!
+      # If you don't, changing your test setup won't trigger the tests to run.
+      - 'tox.ini'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'MANIFEST.in'
+      - '.github/workflows/tests.yml' # The filename of this exact workflow
+      
   pull_request:
     branches: [ "main" ]
+    paths:
+      - 'src/**'
+      - 'python/**'
+      - 'tox.ini'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'MANIFEST.in'
+      - '.github/workflows/test.yml'
+
   workflow_dispatch:
+
+# Automatically cancel in-progress runs if a new commit is pushed to the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
-      # Prevents the workflow from cancelling other versions if one fails
       fail-fast: false 
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
