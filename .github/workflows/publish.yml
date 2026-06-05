@@ -1,6 +1,8 @@
 name: Publish Base Wheel and Release Binaries
 on:
-  workflow_call:
+  push:
+    tags:
+      - 'v*' # Wakes up automatically for v0.8.5, v1.0.0-test-1, etc.
   workflow_dispatch:
     inputs:
       run_id:
