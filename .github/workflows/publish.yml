@@ -1,4 +1,5 @@
 name: Publish Base Wheel and Release Binaries
+
 on:
   push:
     tags:
@@ -6,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'The GitHub Actions Run ID of the build to fetch artifacts from'
+        description: 'The GitHub Actions Run ID to fetch artifacts from'
         required: true
         type: string
 
@@ -27,12 +28,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # Required for the inline scripts and wheel CLI
+          python-version: '3.10'
 
       - name: Verify Tag Matches __init__.py Version
         run: |
           # Extract the version securely without importing the package
-          INIT_VERSION=$(python -c "
+          INIT_VERSION=$(python3 -c "
           import re, sys
           try:
               content = open('python/eiko/__init__.py').read()
@@ -43,46 +44,67 @@ jobs:
               sys.exit(1)
           ")
           
-          # Get the Git tag that triggered the run
-          TAG_VERSION="${{ github.ref_name }}"
+          RAW_TAG="${{ github.ref_name }}"
+          TAG_VERSION="${RAW_TAG#v}"
           
-          # Optional: Strip a leading 'v' from the tag if you use them (e.g., v1.0.0 -> 1.0.0)
-          TAG_VERSION="${TAG_VERSION#v}"
-          
-          # Optional: Strip '-test' suffix for your sandbox testing
-          TAG_VERSION="${TAG_VERSION%-test}"
+          # Strip '-test' AND the run number attached to it (e.g., 0.8.5-test-42 -> 0.8.5)
+          TAG_VERSION="${TAG_VERSION%-test*}"
           
           echo "Package version: $INIT_VERSION"
           echo "Git tag version: $TAG_VERSION"
           
           if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag is '$TAG_VERSION'"
+            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag targets '$TAG_VERSION'"
             exit 1
           fi
           echo "Version match verified."
+          
+      - name: Locate and Download Artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.inputs.run_id }}"
+          
+          if [ -z "$RUN_ID" ]; then
+            echo "Searching for build workflow run for tag ${{ github.ref_name }}..."
+            
+            RUN_ID=$(gh run list \
+              --workflow="build.yml" \
+              --branch="${{ github.ref_name }}" \
+              --status="success" \
+              --limit=1 \
+              --json databaseId \
+              --jq '.[0].databaseId')
+          fi
+          
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "::error::Could not find a successful build run for this tag!"
+            exit 1
+          fi
+          
+          echo "Fetching artifacts from Run ID: $RUN_ID"
+          echo "TARGET_RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-      - name: Download all artifacts
+      - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-          run-id: ${{ inputs.run_id || github.run_id }}
+          run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Registry
         run: |
-          python -c "
+          python3 -c "
           import os, json, hashlib, glob
           
           repo = '${{ github.repository }}'
           tag = '${{ github.ref_name }}'
           registry = {'version': tag, 'wheels': []}
           
-          # Iterate over all downloaded wheels
           for filepath in glob.glob('artifacts/*.whl'):
               filename = os.path.basename(filepath)
               
-              # Skip the pure-Python base wheel (we don't want it downloading itself)
               if 'any.whl' in filename:
                   continue
                   
@@ -91,7 +113,6 @@ jobs:
                   
               url = f'https://github.com/{repo}/releases/download/{tag}/{filename}'
               
-              # Add to registry (Your runtime script will parse the filename to find the right OS/Python match)
               registry['wheels'].append({
                   'file': filename,
                   'url': url,
@@ -104,19 +125,18 @@ jobs:
 
       - name: Inject Registry into Base Wheel
         run: |
-          python -m pip install --upgrade wheel
+          python3 -m pip install --upgrade wheel
           
           # 1. Unpack the pure-Python base wheel
-          # Adjust the wildcard if your base wheel naming differs
           wheel unpack artifacts/*-any.whl -d unpacked_wheel
           
-          # 2. Find the inner package directory (e.g., unpacked_wheel/eiko-1.0.0/eiko/)
+          # 2. Find inner package folder (tracks python/eiko structure inside wheel)
           PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
           
-          # 3. Copy the registry into the package code
+          # 3. Inject registry.json
           cp registry.json "$PACKAGE_DIR/"
           
-          # 4. Repack the wheel (this recalculates the RECORD hashes automatically)
+          # 4. Repack the wheel 
           mkdir -p dist
           WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
           wheel pack "$WHEEL_DIR" -d dist/
@@ -124,25 +144,19 @@ jobs:
       - name: Upload Binaries and MEX to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          # Upload everything: the compiled wheels, the MEX files, and even the unmodified base wheel if desired
           files: artifacts/*
           tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-test') }}
 
       - name: Publish to TestPyPI
-        if: contains(github.ref, 'test')
+        if: contains(github.ref_name, '-test')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/
-          # Ensure you have a Trusted Publisher configured for TestPyPI as well
 
       - name: Publish to PyPI
-        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'test')
+        if: "!contains(github.ref_name, '-test')"
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
-          
-      # Add your PyPI upload step here using the newly repacked wheel in dist/
-      # e.g., pypa/gh-action-pypi-publish@release/v1
-      # with:
-      #   packages-dir: dist/
