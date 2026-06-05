@@ -85,71 +85,79 @@ jobs:
       - name: Bump Version and Generate Tag
         id: version_logic
         run: |
+          # Configure Git Author immediately so commits/tags work
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
           if [ "${{ github.event.inputs.is_test }}" == "true" ]; then
-            echo "Executing Test Run: Skipping code bump."
+            echo "======================================================="
+            echo "🚀 RUNNING A TEST RELEASE (TestPyPI Sandbox)"
+            echo "======================================================="
             
-            # Read current version
-            VERSION=$(python -c "
-            import re, sys
-            try:
-                content = open('python/eiko/__init__.py').read()
-                match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+            # 1. Read current version from __init__.py without bumping
+            VERSION=$(python3 -c "
+            import re, os, sys
+            path = 'python/eiko/__init__.py'
+            if not os.path.exists(path):
+                print(f'::error::Could not find {path}', file=sys.stderr)
+                sys.exit(1)
+            with open(path, 'r') as f:
+                match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
                 if match:
                     print(match.group(1))
                 else:
-                    print('::error::Regex failed to match in __init__.py', file=sys.stderr)
+                    print('::error::Could not find __version__ string', file=sys.stderr)
                     sys.exit(1)
-            except Exception as e:
-                print(f'::error::Failed to read file: {e}', file=sys.stderr)
-                sys.exit(1)
             ")
-         
-            # Failsafe: Abort if VERSION is somehow still empty
+
             if [ -z "$VERSION" ]; then
-              echo "::error::Extracted version string is empty! Aborting."
+              echo "::error::Failed to parse version for test run."
               exit 1
             fi
-            
-            # Create a unique test tag (e.g., v1.0.0-test-15)
+
+            # 2. Append the run number to ensure tag uniqueness (e.g., v0.8.5-test-14)
             TAG="v${VERSION}-test-${{ github.run_number }}"
+            echo "Test Tag Created: $TAG"
             
-            # Tag the current commit
+            # 3. Tag and push locally to the test branch environment
             git tag "$TAG"
             git push origin "$TAG"
             
             echo "tag=$TAG" >> $GITHUB_OUTPUT
-            
+
           else
-            echo "Executing Production Release: Bumping code."
+            echo "======================================================="
+            echo "📦 RUNNING A PRODUCTION RELEASE (PyPI)"
+            echo "======================================================="
             
-            # Bump the code and create a commit
+            # 1. Execute the tool to bump code and auto-commit changes to python/eiko/__init__.py
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
-            # Read the newly bumped version
-            VERSION=$(python -c "
-            import re, sys
-            try:
-                content = open('python/eiko/__init__.py').read()
-                match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+            # 2. Read the newly bumped version from __init__.py
+            VERSION=$(python3 -c "
+            import re, os, sys
+            path = 'python/eiko/__init__.py'
+            if not os.path.exists(path):
+                print(f'::error::Could not find {path}', file=sys.stderr)
+                sys.exit(1)
+            with open(path, 'r') as f:
+                match = re.search(r'^__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', f.read(), re.M)
                 if match:
                     print(match.group(1))
                 else:
-                    print('::error::Regex failed to match in __init__.py', file=sys.stderr)
+                    print('::error::Could not find newly bumped __version__', file=sys.stderr)
                     sys.exit(1)
-            except Exception as e:
-                print(f'::error::Failed to read file: {e}', file=sys.stderr)
-                sys.exit(1)
             ")
-         
-            # Failsafe: Abort if VERSION is somehow still empty
+
             if [ -z "$VERSION" ]; then
-              echo "::error::Extracted version string is empty! Aborting."
+              echo "::error::Failed to parse version after production bump."
               exit 1
             fi
-            
+
             TAG="v${VERSION}"
+            echo "Production Tag Created: $TAG"
             
-            # Tag and push the commit and tag to main
+            # 3. Create the production tag, push the bump commit to the working branch, and push the tag
             git tag "$TAG"
             git push origin HEAD:${{ github.ref_name }}
             git push origin "$TAG"
