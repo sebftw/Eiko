@@ -49,6 +49,39 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
+      - name: Extract New Version Tag
+        id: get_tag
+        run: |
+          # Extract the version with strict error checking
+          VERSION=$(python -c "
+          import re, sys
+          try:
+              content = open('python/eiko/__init__.py').read()
+              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+              if match:
+                  print(match.group(1))
+              else:
+                  print('::error::Regex failed to match in __init__.py', file=sys.stderr)
+                  sys.exit(1)
+          except Exception as e:
+              print(f'::error::Failed to read file: {e}', file=sys.stderr)
+              sys.exit(1)
+          ")
+          
+          # Failsafe: Abort if VERSION is somehow still empty
+          if [ -z "$VERSION" ]; then
+            echo "::error::Extracted version string is empty! Aborting."
+            exit 1
+          fi
+          
+          echo "Successfully extracted version: $VERSION"
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          
+          # Create and push the local tag
+          git tag "v$VERSION"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v$VERSION"
+
       - name: Bump Version and Generate Tag
         id: version_logic
         run: |
@@ -56,7 +89,26 @@ jobs:
             echo "Executing Test Run: Skipping code bump."
             
             # Read current version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('python/eiko/__init__.py').read()).group(1))")
+            VERSION=$(python -c "
+            import re, sys
+            try:
+                content = open('python/eiko/__init__.py').read()
+                match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+                if match:
+                    print(match.group(1))
+                else:
+                    print('::error::Regex failed to match in __init__.py', file=sys.stderr)
+                    sys.exit(1)
+            except Exception as e:
+                print(f'::error::Failed to read file: {e}', file=sys.stderr)
+                sys.exit(1)
+            ")
+         
+            # Failsafe: Abort if VERSION is somehow still empty
+            if [ -z "$VERSION" ]; then
+              echo "::error::Extracted version string is empty! Aborting."
+              exit 1
+            fi
             
             # Create a unique test tag (e.g., v1.0.0-test-15)
             TAG="v${VERSION}-test-${{ github.run_number }}"
@@ -74,7 +126,27 @@ jobs:
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
             # Read the newly bumped version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('python/eiko/__init__.py').read()).group(1))")
+            VERSION=$(python -c "
+            import re, sys
+            try:
+                content = open('python/eiko/__init__.py').read()
+                match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+                if match:
+                    print(match.group(1))
+                else:
+                    print('::error::Regex failed to match in __init__.py', file=sys.stderr)
+                    sys.exit(1)
+            except Exception as e:
+                print(f'::error::Failed to read file: {e}', file=sys.stderr)
+                sys.exit(1)
+            ")
+         
+            # Failsafe: Abort if VERSION is somehow still empty
+            if [ -z "$VERSION" ]; then
+              echo "::error::Extracted version string is empty! Aborting."
+              exit 1
+            fi
+            
             TAG="v${VERSION}"
             
             # Tag and push the commit and tag to main
