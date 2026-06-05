@@ -2,118 +2,523 @@ name: Package Eiko Multi-Language Release
 
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
-  # Build wheels independently (cibuildwheel handles the matrix of python versions internally)
-  build-wheels-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
-      - uses: pypa/cibuildwheel@v2.16
-        env:
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          # Use single quotes for the main string to safely include double quotes for the install command
-          CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
-          CIBW_ENVIRONMENT: >
-            PATH=$PATH:"C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1\\bin"
-            CUDA_HOME="C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.1"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows
-          path: ./wheelhouse/*.whl
-
-  build-wheels-linux:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      # cibuildwheel handles the container isolation, so we don't need a wrapper container.
-      - uses: pypa/cibuildwheel@v2.16
-        env:
-          CIBW_BUILD: "cp38-* cp39-* cp310-* cp311-*"
-          CIBW_BEFORE_BUILD: 'pip install -e ".[jax]" && python -c "import eiko.eiko_torch; import eiko.eiko_jax"'
-          CIBW_ENVIRONMENT: 'LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64 CUDA_HOME=/usr/local/cuda'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux
-          path: ./wheelhouse/*.whl
-
-# Build MATLAB Toolbox on Windows (Generates .mexw64)
-  build-matlab-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install CUDA Toolkit
-        uses: Jimver/cuda-toolkit@v0.2.18
-        with: {cuda: '12.1.1', method: 'network'}
-      - name: Setup MATLAB
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: 'R2021b'
-      - name: Build MATLAB Toolbox and MEX
-        uses: matlab-actions/run-command@v2
-        env:
-        # Match the path to the version installed by Jimver/cuda-toolkit
-        CUDA_HOME: 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.1'
-        with:
-          # Assumes build_release() calls 'mex' which utilizes the system's VS compiler
-          command: addpath(genpath(pwd)); build_release(); 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: matlab-toolbox-windows
-          path: releases/*.mltbx
-
-  # Build MATLAB Toolbox on Linux (Generates .mexa64)
-  build-matlab-linux:
-    runs-on: ubuntu-22.04
-    container: 
-      image: nvidia/cuda:12.1.1-devel-ubuntu20.04
-    steps:
-      - name: Install Prerequisites
-        run: apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y git curl zip unzip software-properties-common python3-pip
-      - uses: actions/checkout@v4
-      - name: Setup MATLAB
-        uses: matlab-actions/setup-matlab@v2
-        with:
-          release: 'R2021b'
-      - name: Build MATLAB Toolbox
-        uses: matlab-actions/run-command@v2
-        env:
-        CUDA_HOME: '/usr/local/cuda'
-        with:
-          command: addpath(genpath(pwd)); build_release();
-      - uses: actions/upload-artifact@v4
-        with:
-          name: matlab-toolbox-linux
-          path: releases/*.mltbx
-
-  merge-and-release:
-    needs: [build-wheels-windows, build-wheels-linux, build-matlab-linux, build-matlab-windows]
+  build_ubuntu_wheels:
+    name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # --- Legacy Baseline ---
+          # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
+          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          #- { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
+          #- { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          #- { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+  
+          # --- Transition & Modern Tier (All 22.04 base) ---
+          #- { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+          #- { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
+          #- { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+  
+          # --- Bleeding Edge ---
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+  
+        # Target active Python versions
+        python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+  
+        exclude:
+          # ==========================================
+          # 1. OS vs PYTHON REALITY CHECKS
+          # ==========================================
+          # Ubuntu 20.04 lacks OpenSSL 3.0; exclude modern Python
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+            python_version: '3.10'
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+            python_version: '3.11'
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+            python_version: '3.12'
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+            python_version: '3.13'
+
+          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+            python_version: '3.10'
+          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+            python_version: '3.11'
+          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+            python_version: '3.12'
+          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+            python_version: '3.13'
+
+          # Ubuntu 22.04 ships with 3.10 natively; avoid building legacy 3.9 here
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
+            python_version: '3.9'
+          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+            python_version: '3.9'
+          - platform: { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+            python_version: '3.9'
+          - platform: { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
+            python_version: '3.9'
+          - platform: { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+            python_version: '3.9'
+
+          # Ubuntu 24.04 ships with 3.12 natively; exclude older versions
+          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+            python_version: '3.9'
+          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+            python_version: '3.10'
+          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+            python_version: '3.11'
+
+          # ==========================================
+          # 2. PYTORCH vs PYTHON COMPATIBILITY
+          # ==========================================
+          # PyTorch 2.4 predates Python 3.13
+          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
+            python_version: '3.13'
+            
+          # PyTorch 2.12 drops Python 3.10
+          - platform: { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+            python_version: '3.10'
+        
+        
+    container:
+      # Use a NVIDIA CUDA container for compilation
+      image: nvidia/cuda:${{ matrix.platform.cuda }}-devel-ubuntu${{ matrix.platform.os_version }}
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Download All
-        uses: actions/download-artifact@v4
-        with: {path: raw-downloads}
-      - name: Merge and Repackage
-        run: |
-          mkdir -p unified-toolbox/extracted_win unified-toolbox/extracted_lin unified-toolbox/merged/+eiko_lib
-          WIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "windows" | head -n 1)
-          unzip -q "$WIN_MLTBX" -d unified-toolbox/extracted_win
-          LIN_MLTBX=$(find raw-downloads -name "*.mltbx" | grep "linux" | head -n 1)
-          unzip -q "$LIN_MLTBX" -d unified-toolbox/extracted_lin
-          cp -r unified-toolbox/extracted_win/* unified-toolbox/merged/
-          cp unified-toolbox/extracted_lin/fs/matlab/eiko/+eiko_lib/*.mexa64 unified-toolbox/merged/fs/matlab/eiko/+eiko_lib/ 2>/dev/null || true
-          mkdir -p final-release
-          cd unified-toolbox/merged && zip -q -r ../../final-release/Eiko-Universal.mltbx * && cd ../..
-          find raw-downloads -name "*.whl" -exec cp {} final-release/ \;
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          files: final-release/*
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Install System Dependencies & Python via Deadsnakes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBIAN_FRONTEND: noninteractive
+          PIP_BREAK_SYSTEM_PACKAGES: 1
+        run: |
+          apt-get update
+          apt-get install -y software-properties-common build-essential git wget curl ca-certificates unzip
+          
+          # Add deadsnakes PPA to get modern Python on older Ubuntu versions
+          add-apt-repository ppa:deadsnakes/ppa -y
+          apt-get update
+          
+          # Install the specific Python version dictated by the matrix
+          apt-get install -y python${{ matrix.python_version }} python${{ matrix.python_version }}-dev python${{ matrix.python_version }}-venv
+          
+          # Conditionally install distutils (Required for <3.12 to run get-pip.py)
+          if apt-cache show python${{ matrix.python_version }}-distutils > /dev/null 2>&1; then
+            apt-get install -y python${{ matrix.python_version }}-distutils
+          fi
+          
+          # Dynamically choose the correct get-pip URL based on Python version
+          if [ "${{ matrix.python_version }}" = "3.8" ] || [ "${{ matrix.python_version }}" = "3.9" ]; then
+            PIP_URL="https://bootstrap.pypa.io/pip/${{ matrix.python_version }}/get-pip.py"
+          else
+            PIP_URL="https://bootstrap.pypa.io/get-pip.py"
+          fi
+          
+          # Bootstrap pip directly into this Python version
+          curl -sS $PIP_URL -o get-pip.py
+          python${{ matrix.python_version }} get-pip.py
+
+      - name: Format CUDA version for PyTorch
+        id: format-cuda
+        run: |
+          CUDA_SHORT=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1,2 | tr -d '.')
+          echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+
+      - name: Determine Target manylinux Platform
+        id: set-plat
+        run: |
+          if [ "${{ matrix.platform.os_version }}" = "20.04" ]; then
+            echo "PLAT=manylinux_2_31_x86_64" >> $GITHUB_ENV
+          elif [ "${{ matrix.platform.os_version }}" = "22.04" ]; then
+            echo "PLAT=manylinux_2_35_x86_64" >> $GITHUB_ENV
+          elif [ "${{ matrix.platform.os_version }}" = "24.04" ]; then
+            echo "PLAT=manylinux_2_39_x86_64" >> $GITHUB_ENV
+          else
+            echo "PLAT=linux_x86_64" >> $GITHUB_ENV # Fallback
+          fi
+      
+      # Straightforward compilation step (No bash loops, no mid-job cleanup required)
+      - name: Compile Wheel
+        env:
+          FORCE_CUDA: "1"
+          TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
+          PIP_ROOT_USER_ACTION: "ignore"
+          EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
+          PIP_BREAK_SYSTEM_PACKAGES: 1
+        run: |
+          echo "Building for Python ${{ matrix.python_version }}..."
+          
+          python${{ matrix.python_version }} -m pip install --upgrade pip
+          python${{ matrix.python_version }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14"
+          
+          # Install PyTorch from the explicit wheel index, along with JAX
+          python${{ matrix.python_version }} -m pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          python${{ matrix.python_version }} -m pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          # Build the wheel 
+          python${{ matrix.python_version }} -m build --wheel --no-isolation
+
+          # Repair the wheel for cross-distro compatibility (excluding PyTorch binaries)
+          echo "Repairing wheel with auditwheel..."
+          python${{ matrix.python_version }} -m auditwheel repair dist/*.whl \
+            --plat $PLAT \
+            --exclude libtorch.so \
+            --exclude libtorch_cpu.so \
+            --exclude libtorch_cuda.so \
+            --exclude libtorch_python.so \
+            --exclude libc10.so \
+            --exclude libc10_cuda.so \
+            --exclude libbackend_with_compiler.so \
+            --exclude libjitbackend_test.so \
+            --exclude libcudart.so \
+            --exclude libcudart.so.11.0 \
+            --exclude libcudart.so.12 \
+            --exclude libcudart.so.12.0 \
+            --exclude libcudart.so.13 \
+            --exclude libcudart.so.13.2 \
+            --exclude _xla.so \
+            --exclude xla_extension.so \
+            --exclude libjax_cuda_plugin.so \
+            --exclude libjax_cuda_pjrt.so \
+            --exclude libnvrtc.so \
+            --exclude libnvidia-ml.so \
+            --exclude libnccl.so \
+            --exclude libgomp.so.1 \
+            --exclude libcublas.so \
+            --exclude libcublasLt.so \
+            -w repaired_dist/
+
+          # Safely rewrite the tags to ONLY use the requested $PLAT
+          echo "Stripping redundant platform tags..."
+          cd repaired_dist
+          python${{ matrix.python_version }} -m wheel tags --platform-tag $PLAT *.whl --remove
+          cd ..
+          
+          # Replace original wheel with the repaired many-linux wheel
+          rm dist/*.whl
+          mv repaired_dist/*.whl dist/
+
+          # --- VERIFICATION STEP ---
+          echo "Verifying Wheel Contents..."          
+          
+          # List files and look for the vendored .libs directory auditwheel creates
+          WHEEL_FILES=$(unzip -l dist/*.whl)
+          echo "$WHEEL_FILES"
+          
+          # Check if any forbidden libraries leaked into the wheel
+          if echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)" > /dev/null; then
+            echo "ERROR: Auditwheel accidentally bundled PyTorch/JAX or CUDA libraries!"
+            echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)"
+            exit 1
+          else
+            echo "Success: No heavy external runtimes were bundled inside the wheel."
+          fi          
+      
+      # 5. Upload artifacts (Ensure names are unique per Python version)
+      - name: Upload Wheel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-ubuntu${{ matrix.platform.os_version }}-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py${{ matrix.python_version }}
+          path: dist/*.whl
+
+  build_windows_wheels:
+    name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # --- Legacy Baseline ---
+          # Matches the 2.4.0 baseline and the 2.7.0 legacy tier
+          #- { torch: '2.4.0', cuda: '12.1.1' }
+          #- { torch: '2.7.0', cuda: '12.6.3' }
+  
+          # --- Transition Tier ---
+          # Matches the PyTorch 2.10.0 platform
+          #- { torch: '2.10.0', cuda: '12.8.1' }
+  
+          # --- Modern Standard ---
+          # Matches the PyTorch 2.11.0 CUDA 13 transition
+          #- { torch: '2.11.0', cuda: '13.0.2' }
+  
+          # --- Bleeding Edge ---
+          # Matches both the 12.6 legacy-architecture backup and the experimental 13.2 build
+          #- { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install CUDA Toolkit
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit
+        with:
+          cuda: ${{ matrix.platform.cuda }}
+          method: 'network'
+          use-github-cache: 'true'
+          sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "visual_studio_integration"]'
+          
+      - name: Format CUDA version and PATHs for PyTorch
+        shell: bash
+        id: format-cuda
+        run: |
+          # Format CUDA version string
+          CUDA_SHORT=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1,2 | tr -d '.')
+          echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+
+          # Set CUDA PATHs
+          echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
+          echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
+          echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin" >> $GITHUB_PATH
+          
+
+      - name: Verify CUDA_HOME
+        run: |
+          echo "The CUDA_HOME variable is currently set to: $env:CUDA_HOME"
+          echo "Testing if nvcc is accessible:"
+          nvcc --version
+
+      # ==========================================
+      # PYTHON 3.9 BUILD
+      # Excluded for PyTorch 2.12+ (Requires 3.11+)
+      # ==========================================
+      - name: Set up Python 3.9
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      # --- PYTHON 3.9 BUILD ---
+      # Excluded for PyTorch 2.12+ (Requires 3.11+)
+      - name: Build 3.9 Wheel
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        env: &build_env
+          DISTUTILS_USE_SDK: "1" 
+          FORCE_CUDA: "1"        
+          TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX"
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
+          PIP_NO_CACHE_DIR: "1"
+          CUDA_HOME: ${{ env.CUDA_PATH }} 
+          EIKO_RELEASE_BUILD: "1"
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.9 Wheel
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.9
+          path: dist/*.whl
+          
+      - name: Clean 3.9 Workspace
+        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        shell: pwsh
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+
+      # --- PYTHON 3.10 BUILD ---
+      # Excluded for PyTorch 2.12+ 
+      - name: Set up Python 3.10
+        # if: matrix.platform.torch != '2.12.0'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Build 3.10 Wheel
+        # if: matrix.platform.torch != '2.12.0'
+        env: *build_env
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.10 Wheel
+        # if: matrix.platform.torch != '2.12.0'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.10
+          path: dist/*.whl
+          
+      - name: Clean 3.10 Workspace
+        if: matrix.platform.torch != '2.12.0'
+        shell: pwsh
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+      
+      # --- PYTHON 3.11 BUILD ---
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Build 3.11 Wheel
+        env: *build_env
+        run: |
+          # Install PyTorch and JAX (+pybind11)
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          # Build Wheel
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.11 Wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.11
+          path: dist/*.whl
+          
+      - name: Clean Build Workspace
+        shell: pwsh
+        run: |
+          # Clear intermediate C++ / CUDA binaries
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          
+          # Clear metadata cache
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          
+          # Clear the 3.11 output wheel so it doesn't get bundled with 3.12 later
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+
+      # --- PYTHON 3.12 BUILD ---
+      # Runs on all matrices
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          
+      - name: Build 3.12 Wheel
+        env: *build_env
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.12 Wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.12
+          path: dist/*.whl
+          
+      - name: Clean 3.12 Workspace
+        shell: pwsh
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+
+      # --- PYTHON 3.13 BUILD ---
+      # Excluded for PyTorch 2.4.0
+      # Excluded for PyTorch 2.10 + CUDA 12.8 (missing binaries)
+      - name: Set up Python 3.13
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          
+      - name: Build 3.13 Wheel
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        env: *build_env
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.13 Wheel
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.13
+          path: dist/*.whl
+          
+      - name: Clean 3.13 Workspace
+        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        shell: pwsh
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+
+  build_standard_wheels:
+    name: Standard Wheel - Python ${{ matrix.python-version }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12']
+
+    steps:
+      # We only need to create a single standard wheel since it only contains Python code (no compiled binaries), meaning it is compatible with any Python 3 version and Operating System.
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install System Utilities
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils
+
+      - name: Compile Standard Wheel
+        env:
+          EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel
+          
+          # Build the wheel
+          python -m build --wheel --no-isolation
+
+      - name: Upload Standard Wheel Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-ubuntu-standard-py${{ matrix.python-version }}
+          path: dist/*.whl
