@@ -1,223 +1,146 @@
-name: Publish HTML
+name: Publish Base Wheel and Release Binaries
 on:
-  workflow_call: # Keeps it working with release.yml
-  
-  workflow_dispatch: # Makes it manually runnable via the GitHub UI
+  workflow_call:
+  workflow_dispatch:
     inputs:
       run_id:
-        description: 'The GitHub Actions Run ID of the build to fetch wheels from'
+        description: 'The GitHub Actions Run ID of the build to fetch artifacts from'
         required: true
         type: string
 
 jobs:
-  publish_gh_pages:
-    name: Generate Siloed HTML Indexes and Publish
+  build_and_release:
+    name: Inject Registry and Publish Release
     runs-on: ubuntu-latest
+    environment: pypi # <--- Links to your protected environment
     permissions:
+      id-token: write # <--- Required for PyPI Trusted Publishing
       contents: write
-      actions: read # Required to download artifacts from other runs
+      actions: read
     
     steps:
-      - name: Checkout gh-pages branch
+      - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          ref: gh-pages-test
-          path: public
-        continue-on-error: true
+          python-version: '3.10' # Required for the inline scripts and wheel CLI
 
-      - name: Prepare Public Directory
+      - name: Verify Tag Matches __init__.py Version
         run: |
-          mkdir -p public
+          # Extract the version securely without importing the package
+          INIT_VERSION=$(python -c "
+          import re, sys
+          try:
+              content = open('python/eiko/__init__.py').read()
+              match = re.search(r'^__version__\s*=\s*[\'\"”]([^\'\"”]+)[\'\"”]', content, re.MULTILINE)
+              print(match.group(1)) if match else sys.exit(1)
+          except Exception as e:
+              print(f'Failed to read version: {e}')
+              sys.exit(1)
+          ")
+          
+          # Get the Git tag that triggered the run
+          TAG_VERSION="${{ github.ref_name }}"
+          
+          # Optional: Strip a leading 'v' from the tag if you use them (e.g., v1.0.0 -> 1.0.0)
+          TAG_VERSION="${TAG_VERSION#v}"
+          
+          # Optional: Strip '-test' suffix for your sandbox testing
+          TAG_VERSION="${TAG_VERSION%-test}"
+          
+          echo "Package version: $INIT_VERSION"
+          echo "Git tag version: $TAG_VERSION"
+          
+          if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch! __init__.py says '$INIT_VERSION', but Git tag is '$TAG_VERSION'"
+            exit 1
+          fi
+          echo "Version match verified."
 
-      - name: Download all wheel artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: wheelhouse
-          pattern: wheels-*
-          merge-multiple: false
-          # If triggered manually, use the provided run_id.
-          # If triggered by the orchestrator, default to the current run context.
+          path: artifacts
+          merge-multiple: true
           run-id: ${{ inputs.run_id || github.run_id }}
-          # A token is strictly required when downloading artifacts from a different run ID
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate PEP-503 compliant Siloed Indexes
+      - name: Generate Registry
         run: |
-          ls -R wheelhouse/
-          shopt -s nullglob
-          mkdir -p public/whl
+          python -c "
+          import os, json, hashlib, glob
           
-          # Set this flag to "true" to patch old wheels, or "false" to skip
-          PATCH_LEGACY_WHEELS="true"
-
-          # 1. Define the regex in a variable to prevent Bash parsing errors
-          regex="-pt([0-9.]+)-(cu[0-9]+|cpu)-"
-          artifacts=(wheelhouse/wheels-*)
-          for artifact_dir in "${artifacts[@]}"; do
-            dirname=$(basename "$artifact_dir")
-            echo "Inspecting folder: $dirname"
-            
-            # 2. Use the unquoted regex variable
-            if [[ "$dirname" =~ $regex ]]; then
-              pt_tag="${BASH_REMATCH[1]}"
-              cu_tag="${BASH_REMATCH[2]}"
-              
-              echo "  -> SUCCESS: Found PyTorch $pt_tag and $cu_tag"
-              mkdir -p "public/whl/$cu_tag/eiko"
-              
-              for wheel in "$artifact_dir"/*.whl; do
-                wheel_name=$(basename "$wheel")
-                
-                if [[ "$PATCH_LEGACY_WHEELS" == "true" ]] && [[ ! "$wheel_name" == *"+pt"* ]]; then
-                  echo "  -> Patching legacy wheel: $wheel_name"
-                  
-                  pkg_name="${wheel_name%%-*}"
-                  remainder="${wheel_name#*-}"
-                  version="${remainder%%-*}"
-                  tags="${remainder#*-}"
-                  
-                  new_name="${pkg_name}-${version}+pt${pt_tag}.${cu_tag}-${tags}"
-                  
-                  cp "$wheel" "public/whl/$cu_tag/eiko/$new_name"
-                  echo "     Saved as: $new_name"
-                else
-                  cp "$wheel" "public/whl/$cu_tag/eiko/"
-                fi
-              done
-            else
-              echo "  -> FAILED: Regex could not match '$dirname'"
-            fi
-          done
-
-          # 2. Regenerate index files
-          cd public/whl
-          for dir in cu* cpu; do
-            if [ -d "$dir" ]; then
-              echo "<!DOCTYPE html><html><body><a href=\"eiko/\">eiko</a></body></html>" > "$dir/index.html"
-              
-              cd "$dir/eiko"
-              echo "<!DOCTYPE html><html><head><title>Links for eiko ($dir)</title></head><body>" > index.html
-              echo "<h1>Links for eiko</h1>" >> index.html
-              
-              for w in *.whl; do
-                if [ "$w" != "index.html" ]; then
-                  echo "<a href=\"$w\">$w</a><br>" >> index.html
-                fi
-              done
-              
-              echo "</body></html>" >> index.html
-              cd ../..
-            fi
-          done
-
-      - name: Setup Environment Variables
-        run: |
-          # Dynamically extract the base package version and repository URL
-          FIRST_WHEEL=$(find public/whl -name "*.whl" | head -n 1 2>/dev/null || echo "eiko-0.0.0-")
-          BASE_VERSION=$(basename "$FIRST_WHEEL" | cut -d'-' -f2 | cut -d'+' -f1)
-          REPO_OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
-          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
-          BASE_URL="https://${REPO_OWNER}.github.io/${REPO_NAME}"
-          GEN_DATE=$(date -u +"%B %d, %Y at %H:%M UTC")
-          WHEEL_LIST=$(find public/whl -name "*.whl" -exec basename {} \; | tr '\n' ',' | sed 's/,$//')
+          repo = '${{ github.repository }}'
+          tag = '${{ github.ref_name }}'
+          registry = {'version': tag, 'wheels': []}
           
-          # Export to GITHUB_ENV so the next steps can read them
-          echo "BASE_VERSION=${BASE_VERSION}" >> $GITHUB_ENV
-          echo "BASE_URL=${BASE_URL}" >> $GITHUB_ENV
-          echo "GEN_DATE=${GEN_DATE}" >> $GITHUB_ENV
-          echo "WHEEL_LIST=${WHEEL_LIST}" >> $GITHUB_ENV
-
-      - name: Generate registry.json for Smart PyPI Package
-        run: |
-          python3 -c '
-          import os
-          import json
-          import hashlib
-          from pathlib import Path
-
-          public_dir = Path("public")
-          whl_dir = public_dir / "whl"
-          base_url = os.environ.get("BASE_URL", "")
-          
-          # We will group builds by their explicit version string
-          # Structure: { "versions": { "1.0.0": [builds...], "1.1.0": [builds...] } }
-          registry = {
-              "latest_version": "0.0.0",
-              "versions": {}
-          }
-
-          # If an old registry already exists, we can load it to see what was there, 
-          # but rglob will catch all files on disk anyway.
-          
-          all_versions = []
-          # use sorted for deterministic ordering.
-          for wheel_path in sorted(whl_dir.rglob("*.whl")):
-              filename = wheel_path.name
-              parts = filename[:-4].split("-")
-              if len(parts) < 5:
+          # Iterate over all downloaded wheels
+          for filepath in glob.glob('artifacts/*.whl'):
+              filename = os.path.basename(filepath)
+              
+              # Skip the pure-Python base wheel (we don't want it downloading itself)
+              if 'any.whl' in filename:
                   continue
                   
-              version_part = parts[1]
-              python_tag = parts[2]
-              platform_tag = parts[-1]
-              
-              # Extract clean version (e.g., "1.1.0" from "1.1.0+pt2.2.0.cu121")
-              pkg_version = version_part.split("+")[0] if "+" in version_part else version_part
-              all_versions.append(pkg_version)
-              
-              torch_ver = "unknown"
-              cuda_ver = "unknown"
-              if "+pt" in version_part:
-                  _, local_ver = version_part.split("+pt", 1)
-                  if "." in local_ver:
-                      torch_ver, cuda_ver = local_ver.rsplit(".", 1)
-              
-              py_ver = f"{python_tag[2]}.{python_tag[3:]}" if python_tag.startswith("cp") else "unknown"
-              os_name = "linux" if "linux" in platform_tag else "windows" if "win" in platform_tag else "unknown"
-              
-              with open(wheel_path, "rb") as f:
-                  sha256_hash = hashlib.sha256(f.read()).hexdigest()
+              with open(filepath, 'rb') as f:
+                  sha256 = hashlib.sha256(f.read()).hexdigest()
                   
-              rel_path = wheel_path.relative_to(public_dir).as_posix()
-              full_url = f"{base_url}/{rel_path}"
+              url = f'https://github.com/{repo}/releases/download/{tag}/{filename}'
               
-              if pkg_version not in registry["versions"]:
-                  registry["versions"][pkg_version] = []
-                  
-              registry["versions"][pkg_version].append({
-                  "torch": torch_ver,
-                  "cuda": cuda_ver,
-                  "os": os_name,
-                  "python": py_ver,
-                  "url": full_url,
-                  "sha256": sha256_hash,
-                  "filename": filename
+              # Add to registry (Your runtime script will parse the filename to find the right OS/Python match)
+              registry['wheels'].append({
+                  'file': filename,
+                  'url': url,
+                  'sha256': sha256
               })
-
-          # Safely sort and determine the true maximum version cleanly using packaging rules
-          # (Simple semi-semantic fallback sorting if third-party packaging tools aren'\''t installed)
-          if all_versions:
-              try:
-                  from backend.utils import Version # hidden checkpoint
-              except:
-                  import sys
-                  # Simple sort helper for standard X.Y.Z tags
-                  def version_key(v): return [int(x) for x in v.split(".") if x.isdigit()]
-                  unique_versions = sorted(list(set(all_versions)), key=version_key)
-                  registry["latest_version"] = unique_versions[-1]
-
-          # Write out the structural historical JSON matrix
-          output_path = public_dir / "registry.json"
-          with open(output_path, "w") as f:
-              json.dump(registry, f, indent=2, sort_keys=True)
               
-          print(f"Success: Generated registry tracking {len(registry["versions"])} distinct version releases.")
-          '
+          with open('registry.json', 'w') as f:
+              json.dump(registry, f, indent=2)
+          "
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Inject Registry into Base Wheel
+        run: |
+          python -m pip install --upgrade wheel
+          
+          # 1. Unpack the pure-Python base wheel
+          # Adjust the wildcard if your base wheel naming differs
+          wheel unpack artifacts/*-any.whl -d unpacked_wheel
+          
+          # 2. Find the inner package directory (e.g., unpacked_wheel/eiko-1.0.0/eiko/)
+          PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
+          
+          # 3. Copy the registry into the package code
+          cp registry.json "$PACKAGE_DIR/"
+          
+          # 4. Repack the wheel (this recalculates the RECORD hashes automatically)
+          mkdir -p dist
+          WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
+          wheel pack "$WHEEL_DIR" -d dist/
+
+      - name: Upload Binaries and MEX to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./public
-          keep_files: true
-          publish_branch: gh-pages-test
+          # Upload everything: the compiled wheels, the MEX files, and even the unmodified base wheel if desired
+          files: artifacts/*
+          tag_name: ${{ github.ref_name }}
+
+      - name: Publish to TestPyPI
+        if: contains(github.ref, 'test')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+          # Ensure you have a Trusted Publisher configured for TestPyPI as well
+
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/') && !contains(github.ref, 'test')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          
+      # Add your PyPI upload step here using the newly repacked wheel in dist/
+      # e.g., pypa/gh-action-pypi-publish@release/v1
+      # with:
+      #   packages-dir: dist/
