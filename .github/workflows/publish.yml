@@ -1,29 +1,59 @@
 name: Publish Base Wheel and Release Binaries
 
 on:
+  workflow_run:
+    # This must match the exact "name:" defined at the very top of your build.yml file
+    workflows: ["Package Eiko Multi-Language Release"] 
+    types:
+      - completed
+      
   push:
+    branches:
+      - test-actions
     tags:
-      - 'v*' # Wakes up automatically for v0.8.5, v1.0.0-test-1, etc.
+      - 'v*'
+      
   workflow_dispatch:
     inputs:
       run_id:
         description: 'The GitHub Actions Run ID to fetch artifacts from'
         required: true
         type: string
+      tag_name:
+        description: 'The exact tag to release (e.g., v0.8.5-test-42)'
+        required: true
+        type: string
 
 jobs:
   build_and_release:
     name: Inject Registry and Publish Release
+    # CRITICAL: Only proceed if the triggering build succeeded, or if manually triggered
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    environment: pypi # <--- Links to your protected environment
+    environment: pypi
     permissions:
-      id-token: write # <--- Required for PyPI Trusted Publishing
+      id-token: write
       contents: write
       actions: read
     
     steps:
+      - name: Determine Target Tag and Run ID
+        # Maps variables dynamically depending on how the workflow was triggered
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "TAG=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_ENV
+            echo "TARGET_RUN_ID=${{ github.event.workflow_run.id }}" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+            echo "TARGET_RUN_ID=${{ github.event.inputs.run_id }}" >> $GITHUB_ENV
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          # CRITICAL: Forces checking out the specific tag instead of the default branch
+          ref: ${{ env.TAG }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,7 +62,6 @@ jobs:
 
       - name: Verify Tag Matches __init__.py Version
         run: |
-          # Extract the version securely without importing the package
           INIT_VERSION=$(python3 -c "
           import re, sys
           try:
@@ -44,10 +73,8 @@ jobs:
               sys.exit(1)
           ")
           
-          RAW_TAG="${{ github.ref_name }}"
+          RAW_TAG="${{ env.TAG }}"
           TAG_VERSION="${RAW_TAG#v}"
-          
-          # Strip '-test' AND the run number attached to it (e.g., 0.8.5-test-42 -> 0.8.5)
           TAG_VERSION="${TAG_VERSION%-test*}"
           
           echo "Package version: $INIT_VERSION"
@@ -59,32 +86,6 @@ jobs:
           fi
           echo "Version match verified."
           
-      - name: Locate and Download Artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          RUN_ID="${{ github.event.inputs.run_id }}"
-          
-          if [ -z "$RUN_ID" ]; then
-            echo "Searching for build workflow run for tag ${{ github.ref_name }}..."
-            
-            RUN_ID=$(gh run list \
-              --workflow="build.yml" \
-              --branch="${{ github.ref_name }}" \
-              --status="success" \
-              --limit=1 \
-              --json databaseId \
-              --jq '.[0].databaseId')
-          fi
-          
-          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "::error::Could not find a successful build run for this tag!"
-            exit 1
-          fi
-          
-          echo "Fetching artifacts from Run ID: $RUN_ID"
-          echo "TARGET_RUN_ID=$RUN_ID" >> $GITHUB_ENV
-
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
@@ -99,7 +100,7 @@ jobs:
           import os, json, hashlib, glob
           
           repo = '${{ github.repository }}'
-          tag = '${{ github.ref_name }}'
+          tag = '${{ env.TAG }}'
           registry = {'version': tag, 'wheels': []}
           
           for filepath in glob.glob('artifacts/*.whl'):
@@ -127,16 +128,10 @@ jobs:
         run: |
           python3 -m pip install --upgrade wheel
           
-          # 1. Unpack the pure-Python base wheel
           wheel unpack artifacts/*-any.whl -d unpacked_wheel
-          
-          # 2. Find inner package folder (tracks python/eiko structure inside wheel)
           PACKAGE_DIR=$(find unpacked_wheel -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
-          
-          # 3. Inject registry.json
           cp registry.json "$PACKAGE_DIR/"
           
-          # 4. Repack the wheel 
           mkdir -p dist
           WHEEL_DIR=$(find unpacked_wheel -mindepth 1 -maxdepth 1 -type d)
           wheel pack "$WHEEL_DIR" -d dist/
@@ -145,18 +140,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
-          tag_name: ${{ github.ref_name }}
-          prerelease: ${{ contains(github.ref_name, '-test') }}
+          tag_name: ${{ env.TAG }}
+          prerelease: ${{ contains(env.TAG, '-test') }}
 
       - name: Publish to TestPyPI
-        if: contains(github.ref_name, '-test')
+        if: contains(env.TAG, '-test')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
           packages-dir: dist/
 
       - name: Publish to PyPI
-        if: "!contains(github.ref_name, '-test')"
+        if: "!contains(env.TAG, '-test')"
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
