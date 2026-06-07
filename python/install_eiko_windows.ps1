@@ -133,7 +133,7 @@ Write-Host "`n[3/5] Checking Python installation..." -ForegroundColor Cyan
 $installPython = $true
 $pyCheck = Get-Command python -ErrorAction SilentlyContinue
 
-if ($pyCheck -and (Get-Item $pyCheck.Source).Length -gt 0) {
+if ($pyCheck -and $pyCheck.Source -notmatch "WindowsApps") {
     $pyOutput = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>$null
     if ($pyOutput) {
     if ($pyOutput -match "(\d+\.\d+\.\d+)") {
