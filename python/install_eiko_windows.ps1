@@ -5,7 +5,8 @@
 param (
     [string]$InheritedVenv = $env:VIRTUAL_ENV,
     [string]$InvokerProfile = $env:USERPROFILE,
-    [string]$InvokerName = $env:USERNAME # Add this
+    [string]$InvokerName = $env:USERNAME,
+    [string]$InvokerDomain = $env:USERDOMAIN
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +17,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     Write-Host "[*] Requesting Administrator privileges for system checks..." -ForegroundColor Cyan
     # Pass the current VIRTUAL_ENV to the elevated process so it isn't forgotten
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`" -InvokerName `"$InvokerName`"" -Verb RunAs
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`" -InvokerName `"$InvokerName`" -InvokerDomain `"$InvokerDomain`"" -Verb RunAs
     Exit
 }
 
@@ -25,12 +26,19 @@ Write-Host " Starting Eiko Smart Environment Setup " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
 function Refresh-EnvPath {
-    # Pull the fresh Path variables from the Registry
     $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
     $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
-    $env:Path = "$machinePath;$userPath"
+    
+    # Rebuild the path, but ensure the current process paths (like venv) are kept
+    $newPath = "$machinePath;$userPath"
+    if ($env:VIRTUAL_ENV) {
+        $venvScripts = "$env:VIRTUAL_ENV\Scripts"
+        if ($newPath -notmatch [regex]::Escape($venvScripts)) {
+            $newPath = "$venvScripts;$newPath"
+        }
+    }
+    $env:Path = $newPath
 
-    # Refresh CUDA specific variables just in case
     $systemCudaPath = [System.Environment]::GetEnvironmentVariable("CUDA_PATH", "Machine")
     if (-not [string]::IsNullOrWhiteSpace($systemCudaPath)) {
         $env:CUDA_PATH = $systemCudaPath
@@ -49,7 +57,7 @@ $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 
 if ($nvidiaSmi) {
     # Extract the major version number (e.g., "551.23" becomes 551)
-    $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader | Out-String
+    $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader | Select-Object -First 1 | Out-String
     if ($smiOutput -match "(?m)^(\d+)") {
         $driverVer = [int]$matches[1]
         Write-Host "-> Found active NVIDIA driver: v$driverVer" -ForegroundColor DarkGray
@@ -125,7 +133,7 @@ Write-Host "`n[3/5] Checking Python installation..." -ForegroundColor Cyan
 $installPython = $true
 $pyCheck = Get-Command python -ErrorAction SilentlyContinue
 
-if ($pyCheck) {
+if ($pyCheck -and (Get-Item $pyCheck.Source).Length -gt 0) {
     $pyOutput = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>$null
     if ($pyOutput) {
     if ($pyOutput -match "(\d+\.\d+\.\d+)") {
@@ -172,7 +180,7 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
 
         # Grant the standard user full control over the new venv
         $acl = Get-Acl $venvPath
-        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($InvokerName, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule("$InvokerDomain\$InvokerName", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
         $acl.AddAccessRule($rule)
         Set-Acl -Path $venvPath -AclObject $acl
     }
@@ -208,7 +216,7 @@ except ImportError:
 sys.exit(1)
 "@
 
-& "$venvPath\Scripts\python.exe" -c $pythonCheck
+$pythonCheck | & "$venvPath\Scripts\python.exe"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping wheel downloads." -ForegroundColor Green
