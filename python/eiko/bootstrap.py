@@ -1,17 +1,15 @@
 import os
 import sys
 import json
-import re
-import hashlib
+import uuid
+import platform
 import urllib.request
 import urllib.error
-import platform
+import hashlib
 import zipfile
-import tempfile
 import shutil
-import uuid
-
-REGISTRY_URL = "https://sebftw.github.io/Eiko/registry.json"
+import tempfile
+import re
 
 def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target_dir, target_impl="eiko_torch_impl"):
     os.makedirs(target_dir, exist_ok=True)
@@ -19,22 +17,21 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     # Early Exit
     existing_binaries = [f for f in os.listdir(target_dir) if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
     if existing_binaries:
-        # print(f"[Eiko] Binary already exists in {target_dir}. Skipping download.")
         return True
 
-    # print(f"[Eiko] Looking for precompiled binaries for {target_impl}...")
     print(f"[Eiko] Downloading precompiled CUDA kernels for you... (This may take a minute)")
     
-    # 1. Fetch Registry
+    # 1. Load Local Registry
     try:
-        req = urllib.request.Request(REGISTRY_URL, headers={'User-Agent': 'eiko-bootstrap'})
-        with urllib.request.urlopen(req, timeout=5.0) as response:
-            registry = json.loads(response.read().decode('utf-8'))
-    except urllib.error.URLError as e:
-        print(f"[Eiko] Network error reaching registry ({e.reason}). Falling back to JIT.")
+        # Resolves the path to the registry.json sitting next to this script
+        registry_path = os.path.join(os.path.dirname(__file__), "registry.json")
+        with open(registry_path, "r", encoding="utf-8") as f:
+            registry = json.load(f)
+    except FileNotFoundError:
+        print("[Eiko] Local registry.json not found. Falling back to JIT.")
         return False
-    except Exception:
-        print(f"[Eiko] Failed to parse registry. Falling back to JIT.")
+    except Exception as e:
+        print(f"[Eiko] Failed to parse local registry ({e}). Falling back to JIT.")
         return False
 
     # 2. Match Environment
@@ -66,8 +63,6 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     if not matched_build:
         matched_build = max(valid_builds, key=get_cuda_score)
 
-    # print(f"[Eiko] Selected wheel: {matched_build['filename']} (CUDA target: {matched_build['cuda']})")
-
     # 4. Multiprocessing-Safe Download & Extract
     wheel_url = matched_build["url"]
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
@@ -81,14 +76,13 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
 
     expected_hash = matched_build.get("sha256")
     max_allowed_size = 50 * 1024 * 1024  # 50 MB safety limit
-    chunk_size = 256 * 1024  # 256 KB chunks (large chunks reduce loop overhead and system calls)
+    chunk_size = 256 * 1024  # 256 KB chunks 
     
     try:
         if not os.path.exists(wheel_path):
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
             
             with urllib.request.urlopen(req, timeout=5.0) as response:
-                # Fast-fail: Check headers before downloading anything (assuming an honest server)
                 content_length = response.getheader('Content-Length')
                 if content_length and int(content_length) > max_allowed_size:
                     raise ValueError(f"Reported size ({content_length} bytes) exceeds maximum allowed size.")
@@ -100,14 +94,12 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
                     while chunk := response.read(chunk_size):
                         downloaded_size += len(chunk)
                         
-                        # Defend against infinite streams / DoS
                         if downloaded_size > max_allowed_size:
                             raise ValueError(f"Download exceeded the maximum allowed size of {max_allowed_size} bytes.")
                         
                         out_file.write(chunk)
                         sha256_hash.update(chunk)
             
-            # Verify the hash before moving it to the active path
             if expected_hash:
                 calculated_hash = sha256_hash.hexdigest()
                 if calculated_hash != expected_hash:
@@ -116,10 +108,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
                         "The file may be corrupted or compromised."
                     )
             
-            # Atomically rename the verified tmp file to the final wheel path.
             os.replace(tmp_wheel_path, wheel_path)
-        # else:
-        #    print(f"[Eiko] Using cached wheel from {wheel_path}")
         
         # Atomic Extraction Phase
         with zipfile.ZipFile(wheel_path, 'r') as z:
@@ -132,20 +121,15 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
                 final_target_path = os.path.join(target_dir, filename)
                 tmp_target_path = final_target_path + tmp_suffix
                 
-                # Extract to a temporary unique file first
                 with z.open(bf) as source, open(tmp_target_path, "wb") as target:
                     shutil.copyfileobj(source, target)
                 
-                # Atomically swap the temporary binary into its final location
                 os.replace(tmp_target_path, final_target_path)
                     
-        # print("[Eiko] Successfully extracted cached precompiled binaries.")
         return True
         
     except Exception as e:
         print(f"[Eiko] Download or extraction failed: {e}. Falling back to JIT.")
-        # Cleanup unique temp files if something went wrong
         if os.path.exists(tmp_wheel_path):
             os.remove(tmp_wheel_path)
-        # Avoid deleting the shared wheel_path on error, as another process might be reading it!
         return False
