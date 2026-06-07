@@ -1,5 +1,5 @@
-:<<'BATCH'
-@echo off
+:<<- 'BATCH'
+@ECHO OFF
 GOTO WINDOWS_START
 BATCH
 #!/bin/bash
@@ -8,21 +8,17 @@ BATCH
 # ==============================================================================
 REMOTE_INSTALLER_URL="https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_ubuntu.sh"
 
-# 1. Check if eiko is already available in the current environment
-if command -v python3 >/dev/null 2>&1 && python3 -c "import eiko" >/dev/null 2>&1; then
-    if [ $# -gt 0 ]; then
-        exec python3 "$@"
-    else
-        # Launch Python and force it to read from the terminal, not the pipe
-        exec python3 < /dev/tty
-    fi
+# 1. Check if eiko is already available globally
+if command -v python3 >/dev/null 2>&1 && python3 -c "import eiko.eiko_torch" >/dev/null 2>&1; then
+    echo -e "\033[1;32m-> Eiko is available globally. No virtual environment needed.\033[0m"
+    exit 0
 fi
 
 # 2. Fallback to dedicated Eiko sandbox
 VENV_PATH="$HOME/eiko"
 
 # Check if venv exists and eiko module is installed inside it
-if [ ! -f "$VENV_PATH/bin/activate" ] || ! "$VENV_PATH/bin/python" -c "import eiko" >/dev/null 2>&1; then
+if [ ! -f "$VENV_PATH/bin/activate" ] || ! "$VENV_PATH/bin/python" -c "import eiko.eiko_torch" >/dev/null 2>&1; then
     echo -e "\033[1;33m-> Eiko not found. Downloading and launching installer...\033[0m"
     
     TEMP_SH=$(mktemp)
@@ -41,41 +37,37 @@ if [ ! -f "$VENV_PATH/bin/activate" ] || ! "$VENV_PATH/bin/python" -c "import ei
     fi
 fi
 
-# Execute the user's script using the venv Python
-if [ $# -gt 0 ]; then
-    exec "$VENV_PATH/bin/python" "$@"
-else
-    # Launch Python and force it to read from the terminal, not the pipe
-    "$VENV_PATH/bin/python" < /dev/tty
-    exit 0
-fi
+# 3. Activate the environment
+echo -e "\033[1;32m-> Activating Eiko virtual environment...\033[0m"
+source "$VENV_PATH/bin/activate"
+exec bash
+
 
 :WINDOWS_START
-@ECHO OFF
 REM ==============================================================================
 REM WINDOWS RUNNER (Batch)
 REM ==============================================================================
 SET "REMOTE_INSTALLER_URL=https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_windows.ps1"
 
-REM 1. Check if eiko is already available in the current environment
+REM 1. Check if python exists at all
 WHERE python >nul 2>&1
-IF %ERRORLEVEL% EQU 0 (
-    python -c "import eiko" >nul 2>&1
-    IF %ERRORLEVEL% EQU 0 (
-        python %*
-        EXIT /B %ERRORLEVEL%
-    )
-)
+IF %ERRORLEVEL% NEQ 0 GOTO CHECK_VENV
 
-REM 2. Fallback to dedicated Eiko sandbox
-SET "VENV_PATH=%USERPROFILE%\eiko"
+REM 2. It exists, now test if eiko can be imported
+python -c "import eiko.eiko_torch" >nul 2>&1
+IF %ERRORLEVEL% EQU 0 GOTO RUN_GLOBAL_PYTHON
 
-IF NOT EXIST "%VENV_PATH%\Scripts\python.exe" GOTO RUN_INSTALLER
+:CHECK_VENV
+REM 3. Fallback to dedicated Eiko sandbox...
 
-"%VENV_PATH%\Scripts\python.exe" -c "import eiko" >nul 2>&1
+:: If the virtual environment activation script doesn't exist, install.
+IF NOT EXIST "%VENV_PATH%\Scripts\activate.bat" GOTO RUN_INSTALLER
+
+:: If the environment exists, test if eiko can actually be imported inside it
+"%VENV_PATH%\Scripts\python.exe" -c "import eiko.eiko_torch" >nul 2>&1
 IF %ERRORLEVEL% NEQ 0 GOTO RUN_INSTALLER
 
-GOTO RUN_EIKO
+GOTO ACTIVATE_VENV
 
 :RUN_INSTALLER
 ECHO -^> Eiko not found. Downloading and launching installer...
@@ -87,12 +79,13 @@ IF %ERRORLEVEL% NEQ 0 (
     EXIT /B %ERRORLEVEL%
 )
 
-:: Re-verify after install to ensure it actually exists now
-IF NOT EXIST "%VENV_PATH%\Scripts\python.exe" (
-    ECHO -^> Installation script completed, but Python executable was not found.
+:: Re-verify after install
+IF NOT EXIST "%VENV_PATH%\Scripts\activate.bat" (
+    ECHO -^> Installation script completed, but activate.bat was not found.
     EXIT /B 1
 )
 
-:RUN_EIKO
-"%VENV_PATH%\Scripts\python.exe" %*
-EXIT /B %ERRORLEVEL%
+:ACTIVATE_VENV
+ECHO -^> Activating Eiko virtual environment...
+CALL "%VENV_PATH%\Scripts\activate.bat"
+EXIT /B 0
