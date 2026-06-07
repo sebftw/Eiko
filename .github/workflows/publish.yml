@@ -98,11 +98,23 @@ jobs:
           json.dump(registry, open('registry.json', 'w'), indent=2)
           "
           python3 -m pip install --upgrade wheel
+          
+          # Unpack the pure-python wheel
           wheel unpack artifacts/*-any.whl -d unpacked
+          
+          # Find internal package directory and copy registry inside
           P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
           cp registry.json "$P_DIR/"
+          
+          # Find top-level unpacked directory and pack it to dist/
           mkdir -p dist
-          wheel pack $(find unpacked -mindepth 1 -maxdepth 1 -type d) -d dist/
+          W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
+          wheel pack "$W_DIR" -d dist/
+
+          # Replace the old pure wheel in artifacts with the newly injected one
+          # This ensures your GitHub Release step uploads the correct asset.
+          rm artifacts/*-any.whl
+          cp dist/*-any.whl artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
