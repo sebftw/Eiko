@@ -280,7 +280,7 @@ jobs:
           cuda: ${{ matrix.platform.cuda }}
           method: 'network'
           use-github-cache: 'true'
-          sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "cublas", "cublas_dev", "cusparse", "cusparse_dev", "cusolver", "cusolver_dev", "visual_studio_integration"]'
+          # sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "cublas", "cublas_dev", "cusparse", "cusparse_dev", "cusolver", "cusolver_dev", "visual_studio_integration"]'
           
       - name: Format CUDA version and PATHs for PyTorch
         shell: bash
