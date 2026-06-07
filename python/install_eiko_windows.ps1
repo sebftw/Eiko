@@ -23,7 +23,55 @@ Write-Host " Starting Eiko Smart Environment Setup " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
 function Refresh-EnvPath {
+    # 1. Refresh standard PATH
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+    
+    # 2. Pull the newly installed CUDA paths from the registry into the live session
+    $systemCudaPath = [System.Environment]::GetEnvironmentVariable("CUDA_PATH", "Machine")
+    if (-not [string]::IsNullOrWhiteSpace($systemCudaPath)) {
+        $env:CUDA_PATH = $systemCudaPath
+        $env:CUDA_HOME = $systemCudaPath # PyTorch specifically looks for CUDA_HOME
+    }
+}
+
+# ---------------------------------------------------------
+# Step 0: Check NVIDIA Display Drivers
+# ---------------------------------------------------------
+Write-Host "`n[0/5] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
+
+$minDriver = 550
+$driverValid = $true
+$nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+
+if ($nvidiaSmi) {
+    # Extract the major version number (e.g., "551.23" becomes 551)
+    $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader
+    if ($smiOutput -match "^(\d+)") {
+        $driverVer = [int]$matches[1]
+        Write-Host "-> Found active NVIDIA driver: v$driverVer" -ForegroundColor DarkGray
+
+        if ($driverVer -lt $minDriver) {
+            Write-Host "-> Driver is too old for CUDA 12.6 (Requires v$minDriver+)." -ForegroundColor Yellow
+            $driverValid = $false
+        }
+    }
+} else {
+    Write-Host "-> No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
+    $driverValid = $false
+}
+
+if (-not $driverValid) {
+    Write-Host "`n====================================================" -ForegroundColor Red
+    Write-Host " CRITICAL: NVIDIA DRIVER UPDATE REQUIRED" -ForegroundColor Red
+    Write-Host "====================================================" -ForegroundColor Red
+    Write-Host "Your system requires NVIDIA display driver version $minDriver or higher to run." -ForegroundColor Yellow
+    Write-Host "Because Windows hardware matching is highly specific, this cannot be safely automated." -ForegroundColor Magenta
+    Write-Host "`nPlease update your drivers manually:" -ForegroundColor White
+    Write-Host "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your PC." -ForegroundColor White
+    Write-Host "  2. Navigate to the 'Drivers' tab and install the latest update." -ForegroundColor White
+    Write-Host "  3. Reboot your computer and run this script again." -ForegroundColor White
+    Read-Host "`nPress Enter to exit"
+    Exit
 }
 
 # ---------------------------------------------------------
@@ -91,45 +139,56 @@ if ($installPython) {
 # ---------------------------------------------------------
 # Step 4: Virtual Environment Setup & Detection
 # ---------------------------------------------------------
-$venvPath = "$env:USERPROFILE\eiko"
+Write-Host "`n[4/5] Preparing Virtual Environment..." -ForegroundColor Cyan
+$venvPath = ""
 
-if (Test-Path "$venvPath\Scripts\activate") {
-    Write-Host "-> Found existing 'eiko' environment at $venvPath." -ForegroundColor Yellow
+if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
+    # Scenario A: User already activated a venv before running the script
+    $venvPath = $InheritedVenv
+    Write-Host "-> Detected active virtual environment at: $venvPath" -ForegroundColor Green
+    Write-Host "-> Skipping environment creation. Integrating directly." -ForegroundColor Yellow
 } else {
-    Write-Host "-> Creating new virtual environment at $venvPath..." -ForegroundColor Magenta
+    # Scenario B & C: No active venv, check for existing or create new
+    $venvPath = "$env:USERPROFILE\eiko"
     
-    # Dynamically find Python rather than hardcoding the C:\Program Files path
-    $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
-    if (-not $pythonExe) { 
-        Write-Host "[!] Python executable not found in PATH." -ForegroundColor Red
-        Exit 
+    if (Test-Path "$venvPath\Scripts\activate") {
+        Write-Host "-> Found existing 'eiko' environment at $venvPath." -ForegroundColor Yellow
+    } else {
+        Write-Host "-> Creating new virtual environment at $venvPath..." -ForegroundColor Magenta
+        
+        # Ensure we only grab the first result if multiple python exes exist
+        $pythonExe = (Get-Command python -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+        if (-not $pythonExe) { 
+            Write-Host "[!] Python executable not found in PATH." -ForegroundColor Red
+            Exit 
+        }
+        
+        & $pythonExe -m venv $venvPath
     }
-    
-    # Fixed: Passing the absolute path instead of the relative "eiko" string
-    & $pythonExe -m venv $venvPath
 }
+
 # ---------------------------------------------------------
 # Step 5: Install Python Libraries (with Network Resilience)
 # ---------------------------------------------------------
 Write-Host "`n[5/5] Checking and Installing Eiko..." -ForegroundColor Cyan
 
-# Helper function to run pip and catch actual exit codes
-function Run-PipCommand ([string]$Args) {
-    # Invoke pip with the arguments
-    Invoke-Expression "& `"$venvPath\Scripts\pip.exe`" $Args"
+function Run-PipCommand ([string[]]$PipArgs) {
+    # Direct execution operator (&) natively handles arguments securely without IEX
+    & "$venvPath\Scripts\pip.exe" $PipArgs
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
-        Write-Host "Command failed: pip $Args" -ForegroundColor DarkGray
+        Write-Host "Command failed: pip $($PipArgs -join ' ')" -ForegroundColor DarkGray
         Write-Host "Please check your internet connection or package versions and try again." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         Exit
     }
 }
 
-Run-PipCommand "install --upgrade pip"
-Run-PipCommand "install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
-Run-PipCommand "install eiko"
+# Standard array passing for secure argument execution
+Run-PipCommand "install", "--upgrade", "pip"
+Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu126"
+Run-PipCommand "install", "eiko"
 
 # ---------------------------------------------------------
 # Verification
