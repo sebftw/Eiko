@@ -46,7 +46,8 @@ $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 if ($nvidiaSmi) {
     # Extract the major version number (e.g., "551.23" becomes 551)
     $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader
-    if ($smiOutput -match "^(\d+)") {
+    $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader | Out-String
+    if ($smiOutput -match "(?m)^(\d+)") {
         $driverVer = [int]$matches[1]
         Write-Host "-> Found active NVIDIA driver: v$driverVer" -ForegroundColor DarkGray
 
@@ -120,7 +121,7 @@ $installPython = $true
 $pyCheck = Get-Command python -ErrorAction SilentlyContinue
 
 if ($pyCheck) {
-    $pyOutput = python -c "import platform; print(platform.python_version())" 2>$null
+    $pyOutput = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>$null
     if ($pyOutput) {
         $pyVer = [version]$pyOutput
         if ($pyVer -ge [version]"3.9") {
@@ -182,7 +183,7 @@ function Run-PipCommand ([string[]]$PipArgs) {
     }
 }
 
-Run-PipCommand "install", "--upgrade", "pip", "quiet"
+Run-PipCommand "install", "--upgrade", "pip", "--quiet"
 
 # Inline Python check for existing, valid PyTorch
 $pythonCheck = @"
