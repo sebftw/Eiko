@@ -23,14 +23,15 @@ Write-Host " Starting Eiko Smart Environment Setup " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
 function Refresh-EnvPath {
-    # 1. Refresh standard PATH
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-    
-    # 2. Pull the newly installed CUDA paths from the registry into the live session
     $systemCudaPath = [System.Environment]::GetEnvironmentVariable("CUDA_PATH", "Machine")
     if (-not [string]::IsNullOrWhiteSpace($systemCudaPath)) {
         $env:CUDA_PATH = $systemCudaPath
-        $env:CUDA_HOME = $systemCudaPath # PyTorch specifically looks for CUDA_HOME
+        $env:CUDA_HOME = $systemCudaPath
+        
+        # Only append to Path if it's not already there
+        if ($env:Path -notmatch [regex]::Escape($systemCudaPath)) {
+            $env:Path += ";$systemCudaPath\bin;$systemCudaPath\libnvvp"
+        }
     }
 }
 
@@ -40,12 +41,11 @@ function Refresh-EnvPath {
 Write-Host "`n[0/5] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
 
 $minDriver = 550
-$driverValid = $true
+$driverValid = $false
 $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 
 if ($nvidiaSmi) {
     # Extract the major version number (e.g., "551.23" becomes 551)
-    $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader
     $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader | Out-String
     if ($smiOutput -match "(?m)^(\d+)") {
         $driverVer = [int]$matches[1]
@@ -109,7 +109,7 @@ if ($msvcCheck -match "Microsoft.VisualStudio.2022.BuildTools") {
     Write-Host "-> MSVC Build Tools already installed. Skipping." -ForegroundColor Yellow
 } else {
     Write-Host "-> Installing MSVC Build Tools..." -ForegroundColor Magenta
-    winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" --accept-package-agreements
+    winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" --accept-source-agreements --accept-package-agreements
     Refresh-EnvPath
 }
 
@@ -123,17 +123,19 @@ $pyCheck = Get-Command python -ErrorAction SilentlyContinue
 if ($pyCheck) {
     $pyOutput = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')" 2>$null
     if ($pyOutput) {
-        $pyVer = [version]$pyOutput
+    if ($pyOutput -match "(\d+\.\d+\.\d+)") {
+        $pyVer = [version]$matches[1]
         if ($pyVer -ge [version]"3.9") {
             Write-Host "-> Found Python $pyVer. Skipping installation." -ForegroundColor Yellow
             $installPython = $false
         }
     }
 }
+}
 
 if ($installPython) {
     Write-Host "-> Installing Python 3.12..." -ForegroundColor Magenta
-    winget install -e --id Python.Python.3.12 --scope machine --override "/passive Precompile=1 Include_debug=1 Include_symbols=1" --accept-package-agreements
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --scope machine --override "/passive Precompile=1 Include_debug=1 Include_symbols=1" --accept-package-agreements
     Refresh-EnvPath
 }
 
