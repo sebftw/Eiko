@@ -168,26 +168,46 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
 }
 
 # ---------------------------------------------------------
-# Step 5: Install Python Libraries (with Network Resilience)
+# Step 5: Install Python Libraries (with Smart Bypass)
 # ---------------------------------------------------------
-Write-Host "`n[5/5] Checking and Installing Eiko..." -ForegroundColor Cyan
+Write-Host "`n[5/5] Checking existing Eiko ML Stack..." -ForegroundColor Cyan
 
 function Run-PipCommand ([string[]]$PipArgs) {
-    # Direct execution operator (&) natively handles arguments securely without IEX
     & "$venvPath\Scripts\pip.exe" $PipArgs
-    
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
         Write-Host "Command failed: pip $($PipArgs -join ' ')" -ForegroundColor DarkGray
-        Write-Host "Please check your internet connection or package versions and try again." -ForegroundColor Yellow
         Read-Host "Press Enter to exit"
         Exit
     }
 }
 
-# Standard array passing for secure argument execution
-Run-PipCommand "install", "--upgrade", "pip"
-Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu126"
+Run-PipCommand "install", "--upgrade", "pip", "quiet"
+
+# Inline Python check for existing, valid PyTorch
+$pythonCheck = @"
+import sys
+try:
+    import torch
+    v = torch.__version__.split('+')[0].split('.')
+    if torch.version.cuda and (int(v[0]) > 2 or (int(v[0]) == 2 and int(v[1]) >= 4)):
+        sys.exit(0)
+except ImportError:
+    pass
+sys.exit(1)
+"@
+
+& "$venvPath\Scripts\python.exe" -c $pythonCheck
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping wheel downloads." -ForegroundColor Green
+} else {
+    Write-Host "-> Installing default ML target stack..." -ForegroundColor Magenta
+    Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu126"
+}
+
+# Install Eiko
+Write-Host "-> Installing Eiko..." -ForegroundColor Magenta
 Run-PipCommand "install", "eiko"
 
 # ---------------------------------------------------------
