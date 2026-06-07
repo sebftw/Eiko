@@ -1,6 +1,7 @@
 #!/bin/bash
 :<<'BATCH'
-@GOTO WINDOWS_START
+@echo off
+GOTO WINDOWS_START
 BATCH
 
 # ==============================================================================
@@ -40,8 +41,8 @@ fi
 if [ $# -gt 0 ]; then
     exec "$VENV_PATH/bin/python" "$@"
 else
-    # Launch Python in a subshell, then exit the wrapper immediately
-    ("$VENV_PATH/bin/python"; exit)
+    # Launch Python in the foreground, then exit cleanly
+    "$VENV_PATH/bin/python"
     exit 0
 fi
 
