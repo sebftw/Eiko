@@ -1,7 +1,9 @@
-:<<- 'BATCH'
+:<<- 'BATCH_BOOTSTRAP'
 @ECHO OFF
+CLS
 GOTO WINDOWS_START
-BATCH
+BATCH_BOOTSTRAP
+
 #!/bin/bash
 # ==============================================================================
 # LINUX RUNNER (Bash)
@@ -40,13 +42,20 @@ fi
 # 3. Activate the environment
 echo -e "\033[1;32m-> Activating Eiko virtual environment...\033[0m"
 source "$VENV_PATH/bin/activate"
-exec bash &
+
+# Drop the user cleanly into a terminal with the active venv
+exec bash 
+
+# This final statement tricks Bash into ignoring EVERYTHING below it!
+exit 0
 
 
 :WINDOWS_START
+
 REM ==============================================================================
 REM WINDOWS RUNNER (Batch)
 REM ==============================================================================
+SET "VENV_PATH=%USERPROFILE%\eiko"
 SET "REMOTE_INSTALLER_URL=https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_windows.ps1"
 
 REM 1. Check if python exists at all
@@ -55,7 +64,11 @@ IF %ERRORLEVEL% NEQ 0 GOTO CHECK_VENV
 
 REM 2. It exists, now test if eiko can be imported
 python -c "import eiko.eiko_torch" >nul 2>&1
-IF %ERRORLEVEL% EQU 0 GOTO RUN_GLOBAL_PYTHON
+IF %ERRORLEVEL% EQU 0 (
+    ECHO -^> Eiko is available globally.
+    CMD /K
+    GOTO :EOF
+)
 
 :CHECK_VENV
 REM 3. Fallback to dedicated Eiko sandbox...
@@ -76,16 +89,19 @@ PowerShell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 
 IF %ERRORLEVEL% NEQ 0 (
     ECHO -^> Installation failed. Exiting.
+    PAUSE
     EXIT /B %ERRORLEVEL%
 )
 
 :: Re-verify after install
 IF NOT EXIST "%VENV_PATH%\Scripts\activate.bat" (
     ECHO -^> Installation script completed, but activate.bat was not found.
+    PAUSE
     EXIT /B 1
 )
 
 :ACTIVATE_VENV
 ECHO -^> Activating Eiko virtual environment...
-CALL "%VENV_PATH%\Scripts\activate.bat"
-EXIT /B 0
+REM Call activate and keep the command prompt open for the user
+CMD /K "%VENV_PATH%\Scripts\activate.bat"
+GOTO :EOF
