@@ -41,10 +41,11 @@ fi
 
 # 3. Activate the environment
 echo -e "\033[1;32m-> Activating Eiko virtual environment...\033[0m"
-source "$VENV_PATH/bin/activate"
 
-# Drop the user cleanly into a terminal with the active venv
-exec bash 
+# The magic trick: We source it first, then use 'exec bash --rcfile' 
+# to keep the modifications alive in a fresh interactive shell.
+source "$VENV_PATH/bin/activate"
+exec bash --rcfile <(echo "source ~/.bashrc; source $VENV_PATH/bin/activate")
 
 # This final statement tricks Bash into ignoring EVERYTHING below it!
 exit 0
