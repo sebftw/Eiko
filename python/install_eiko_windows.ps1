@@ -1,9 +1,10 @@
 # ==============================================================================
 # Eiko Smart Windows Environment Installer
 # ==============================================================================
+# Capture the active virtual environment before elevation context is lost
 param (
-    # Capture the active virtual environment before elevation context is lost
-    [string]$InheritedVenv = $env:VIRTUAL_ENV 
+    [string]$InheritedVenv = $env:VIRTUAL_ENV,
+    [string]$InvokerProfile = $env:USERPROFILE
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,7 +15,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     Write-Host "[*] Requesting Administrator privileges for system checks..." -ForegroundColor Cyan
     # Pass the current VIRTUAL_ENV to the elevated process so it isn't forgotten
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`"" -Verb RunAs
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`"" -Verb RunAs
     Exit
 }
 
@@ -23,15 +24,16 @@ Write-Host " Starting Eiko Smart Environment Setup " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
 function Refresh-EnvPath {
+    # Pull the fresh Path variables from the Registry
+    $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machinePath;$userPath"
+
+    # Refresh CUDA specific variables just in case
     $systemCudaPath = [System.Environment]::GetEnvironmentVariable("CUDA_PATH", "Machine")
     if (-not [string]::IsNullOrWhiteSpace($systemCudaPath)) {
         $env:CUDA_PATH = $systemCudaPath
         $env:CUDA_HOME = $systemCudaPath
-        
-        # Only append to Path if it's not already there
-        if ($env:Path -notmatch [regex]::Escape($systemCudaPath)) {
-            $env:Path += ";$systemCudaPath\bin;$systemCudaPath\libnvvp"
-        }
     }
 }
 
@@ -54,7 +56,9 @@ if ($nvidiaSmi) {
         if ($driverVer -lt $minDriver) {
             Write-Host "-> Driver is too old for CUDA 12.6 (Requires v$minDriver+)." -ForegroundColor Yellow
             $driverValid = $false
-        }
+        } else {
+            $driverValid = $true
+        )
     }
 } else {
     Write-Host "-> No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
@@ -143,7 +147,7 @@ if ($installPython) {
 # Step 4: Virtual Environment Setup & Detection
 # ---------------------------------------------------------
 Write-Host "`n[4/5] Preparing Virtual Environment..." -ForegroundColor Cyan
-$venvPath = ""
+$venvPath = "$InvokerProfile\eiko"
 
 if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
     # Scenario A: User already activated a venv before running the script
@@ -176,7 +180,7 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
 Write-Host "`n[5/5] Checking existing Eiko ML Stack..." -ForegroundColor Cyan
 
 function Run-PipCommand ([string[]]$PipArgs) {
-    & "$venvPath\Scripts\pip.exe" $PipArgs
+    & "$venvPath\Scripts\pip.exe" @PipArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
         Write-Host "Command failed: pip $($PipArgs -join ' ')" -ForegroundColor DarkGray
