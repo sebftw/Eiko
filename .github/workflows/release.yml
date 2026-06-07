@@ -243,7 +243,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: true
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -260,7 +260,6 @@ jobs:
           # - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           - { torch: '2.12.0', cuda: '13.2.0' }
-          # - { torch: 'skip', cuda: 'skip' } # Dummy row keeps YAML valid
 
     steps:
       - name: Checkout code
