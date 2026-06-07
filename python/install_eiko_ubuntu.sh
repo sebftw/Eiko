@@ -128,6 +128,7 @@ if [ "$VERSION_ID" == "20.04" ]; then
     TARGET_CUDA_VER="12.1" # Lowest version that we support
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu121"
     TARGET_TORCH_VER="torch==2.4.0 torchvision"
+	TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
     MIN_PYTHON_VER=3.8
 else
     echo -e "${CYAN}-> Detected Modern Ubuntu. Engaging Next-Gen Mode...${NC}"
@@ -135,6 +136,7 @@ else
     TARGET_CUDA_VER="12.6"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu126"
     TARGET_TORCH_VER="torch torchvision"
+    TARGET_JAX_VER="jax[cuda12]>=0.4.30"
     MIN_PYTHON_VER=3.9
 fi
 
@@ -280,7 +282,7 @@ fi
 
 # Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install jax jaxlib -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 run_pip_command install "eiko[jax]"
 
 # ---------------------------------------------------------
