@@ -24,7 +24,7 @@ jobs:
           # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
 
           # --- Next-Gen Tier (CUDA 13+) ---
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -243,7 +243,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: false 
+    if: true 
     strategy:
       fail-fast: false
       matrix:
@@ -257,10 +257,10 @@ jobs:
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
-          # - { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           # - { torch: '2.12.0', cuda: '13.2.0' }
-          - { torch: 'skip', cuda: 'skip' } # Dummy row keeps YAML valid
+          # - { torch: 'skip', cuda: 'skip' } # Dummy row keeps YAML valid
 
     steps:
       - name: Checkout code
@@ -482,83 +482,6 @@ jobs:
           Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
           if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
           
-          
-      - name: Clean Build Workspace
-        shell: pwsh
-        run: |
-          # Clear intermediate C++ / CUDA binaries
-          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
-          
-          # Clear metadata cache
-          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
-          
-          # Clear the 3.11 output wheel so it doesn't get bundled with 3.12 later
-          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
-
-      # --- PYTHON 3.12 BUILD ---
-      # Runs on all matrices
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          
-      - name: Build 3.12 Wheel
-        env: *build_env
-        run: |
-          pip install --upgrade pip
-          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-          python -m build --wheel --no-isolation
-          pip uninstall torch jax -y
-
-      - name: Upload 3.12 Wheel
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.12
-          path: dist/*.whl
-          
-      - name: Clean 3.12 Workspace
-        shell: pwsh
-        run: |
-          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
-          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
-          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
-
-      # --- PYTHON 3.13 BUILD ---
-      # Excluded for PyTorch 2.4.0
-      # Excluded for PyTorch 2.10 + CUDA 12.8 (missing binaries)
-      - name: Set up Python 3.13
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          
-      - name: Build 3.13 Wheel
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
-        env: *build_env
-        run: |
-          pip install --upgrade pip
-          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-          python -m build --wheel --no-isolation
-          pip uninstall torch jax -y
-
-      - name: Upload 3.13 Wheel
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.13
-          path: dist/*.whl
-          
-      - name: Clean 3.13 Workspace
-        if: matrix.platform.torch != '2.4.0' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
-        shell: pwsh
-        run: |
-          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
-          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
-          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
 
   build_standard_wheels:
     name: Standard Wheel - Python ${{ matrix.python-version }}
