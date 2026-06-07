@@ -27,6 +27,51 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 sudo apt-get update -qq
 
 # ---------------------------------------------------------
+# Step 0: Check and Update NVIDIA Display Drivers
+# ---------------------------------------------------------
+echo -e "\n${CYAN}[0/6] Checking NVIDIA Display Drivers...${NC}"
+
+# CUDA 12.6 requires driver version 550 or higher
+MIN_DRIVER=550 
+UPDATE_DRIVER=false
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+    # Extract just the major version number (e.g., "535.183" becomes "535")
+    DRIVER_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | cut -d'.' -f1)
+    echo -e "${DARK_GRAY}-> Found active NVIDIA driver: v${DRIVER_VER}${NC}"
+
+    if [ "$DRIVER_VER" -lt "$MIN_DRIVER" ]; then
+        echo -e "${YELLOW}-> Driver is too old for CUDA 12.6 (Requires v${MIN_DRIVER}+).${NC}"
+        UPDATE_DRIVER=true
+    fi
+else
+    echo -e "${YELLOW}-> No active NVIDIA display driver detected.${NC}"
+    UPDATE_DRIVER=true
+fi
+
+if [ "$UPDATE_DRIVER" = true ]; then
+    echo -e "${MAGENTA}WARNING: Updating Linux display drivers may cause a temporary screen flicker and requires a reboot.${NC}"
+    read -p "Would you like to automatically install the recommended NVIDIA driver now? (y/N): " confirm
+    
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${MAGENTA}-> Fetching and installing the recommended proprietary driver...${NC}"
+        # ubuntu-drivers autoinstall is the safest native way to assign the correct metapackage
+        sudo ubuntu-drivers autoinstall
+        
+        echo -e "\n${RED}====================================================${NC}"
+        echo -e "${RED} CRITICAL: SYSTEM REBOOT REQUIRED                   ${NC}"
+        echo -e "${RED}====================================================${NC}"
+        echo -e "${YELLOW}The NVIDIA display driver has been updated. The CUDA toolkit cannot map to the GPU until the kernel reloads.${NC}"
+        echo -e "Please reboot your computer, then run this script again to finish the Eiko installation."
+        exit 0
+    else
+        echo -e "\n${RED}[!] Cannot proceed without a compatible NVIDIA driver.${NC}"
+        echo -e "Update your drivers manually via the 'Software & Updates' GUI (Additional Drivers tab), reboot, and rerun this script."
+        exit 1
+    fi
+fi
+
+# ---------------------------------------------------------
 # Step 1: Check and Install C++ Build Tools
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[1/5] Checking MSVC/GCC Build Tools...${NC}"
@@ -66,6 +111,10 @@ if [ "$INSTALL_CUDA" = true ]; then
     # Export paths to current session
     export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
     export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+    # Explicitly set compiler environment variables for PyTorch / Eiko builds
+    export CUDA_HOME=/usr/local/cuda
+    export CUDA_PATH=/usr/local/cuda
 fi
 
 # ---------------------------------------------------------
