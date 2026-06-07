@@ -19,7 +19,6 @@ on:
 jobs:
   build_and_release:
     name: Inject Registry and Publish Release
-    # FIX: Added 'push' so it doesn't skip during your branch testing
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment: pypi
@@ -29,32 +28,43 @@ jobs:
       actions: read
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
       - name: Determine Target Tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WF_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          INPUT_TAG: ${{ github.event.inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "TAG=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+          if [ "$EVENT_NAME" == "workflow_run" ]; then
+            echo "TAG=$WF_BRANCH" >> $GITHUB_ENV
+          elif [ "$EVENT_NAME" == "workflow_dispatch" ]; then
+            echo "TAG=$INPUT_TAG" >> $GITHUB_ENV
           else
-            echo "TAG=${{ github.ref_name }}" >> $GITHUB_ENV
+            echo "TAG=$REF_NAME" >> $GITHUB_ENV
           fi
 
       - name: Locate Build Run ID
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_RUN_ID: ${{ github.event.inputs.run_id }}
+          WF_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
-          RUN_ID="${{ github.event.inputs.run_id }}"
+          RUN_ID="$INPUT_RUN_ID"
           
           if [ -z "$RUN_ID" ] && [ "${{ github.event_name }}" == "workflow_run" ]; then
-            RUN_ID="${{ github.event.workflow_run.id }}"
+            RUN_ID="$WF_RUN_ID"
           fi
           
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" == "null" ]; then
             echo "Searching for build for tag: ${{ env.TAG }}..."
-            # Try to find the run for 2 minutes
             for i in {1..12}; do
-              # Note: --workflow must match the filename 'build.yml' or the 'name:' in build.yml
-              RUN_ID=$(gh run list --workflow="release.yml" --branch="${{ env.TAG }}" --limit=1 --json databaseId --jq '.[0].databaseId')
+              # Optional: Added --repo just to be extra safe
+              RUN_ID=$(gh run list --repo ${{ github.repository }} --workflow="release.yml" --branch="${{ env.TAG }}" --limit=1 --json databaseId --jq '.[0].databaseId')
               if [ ! -z "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
               sleep 10
             done
@@ -64,17 +74,14 @@ jobs:
             echo "::error::Could not find build run!"
             exit 1
           fi
+          
           echo "TARGET_RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
       - name: Wait for Build Completion
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh run watch ${{ env.TARGET_RUN_ID }} --exit-status
-
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
+        # Optional: Added --repo just to be extra safe
+        run: gh run watch ${{ env.TARGET_RUN_ID }} --repo ${{ github.repository }} --exit-status
 
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
