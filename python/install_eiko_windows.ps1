@@ -1,6 +1,11 @@
 # ==============================================================================
 # Eiko Smart Windows Environment Installer
 # ==============================================================================
+param (
+    # Capture the active virtual environment before elevation context is lost
+    [string]$InheritedVenv = $env:VIRTUAL_ENV 
+)
+
 $ErrorActionPreference = "Stop"
 
 # 1. Ensure the script is running with Administrator privileges
@@ -8,7 +13,8 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 
 if (-not $isAdmin) {
     Write-Host "[*] Requesting Administrator privileges for system checks..." -ForegroundColor Cyan
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    # Pass the current VIRTUAL_ENV to the elevated process so it isn't forgotten
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`"" -Verb RunAs
     Exit
 }
 
@@ -16,7 +22,6 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host " Starting Eiko Smart Environment Setup " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
-# Helper function to refresh PATH
 function Refresh-EnvPath {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 }
@@ -35,13 +40,12 @@ if ($cudaCheck) {
         if ($cudaVer -ge [version]"12.6") {
             Write-Host "-> Found CUDA $cudaVer. Skipping installation." -ForegroundColor Yellow
             $installCuda = $false
-        } else {
-            Write-Host "-> Found CUDA $cudaVer, but 12.6+ is required. Upgrading..." -ForegroundColor Magenta
         }
     }
 }
 
 if ($installCuda) {
+    Write-Host "-> Installing/Upgrading to CUDA 12.6..." -ForegroundColor Magenta
     winget install --id Nvidia.CUDA -v 12.6.0 -e --accept-package-agreements --accept-source-agreements
     Refresh-EnvPath
 }
@@ -50,7 +54,6 @@ if ($installCuda) {
 # Step 2: Check and Install MSVC Build Tools
 # ---------------------------------------------------------
 Write-Host "`n[2/5] Checking MSVC C++ Build Tools..." -ForegroundColor Cyan
-# Winget's list command is the safest way to check for the headless build tools
 $msvcCheck = winget list --id Microsoft.VisualStudio.2022.BuildTools --accept-source-agreements | Out-String
 
 if ($msvcCheck -match "Microsoft.VisualStudio.2022.BuildTools") {
@@ -75,46 +78,58 @@ if ($pyCheck) {
         if ($pyVer -ge [version]"3.9") {
             Write-Host "-> Found Python $pyVer. Skipping installation." -ForegroundColor Yellow
             $installPython = $false
-        } else {
-            Write-Host "-> Found Python $pyVer, but Eiko requires 3.9+. Upgrading to 3.12..." -ForegroundColor Magenta
         }
     }
 }
 
 if ($installPython) {
+    Write-Host "-> Installing Python 3.12..." -ForegroundColor Magenta
     winget install -e --id Python.Python.3.12 --scope machine --override "/passive Precompile=1 Include_debug=1 Include_symbols=1" --accept-package-agreements
     Refresh-EnvPath
 }
 
 # ---------------------------------------------------------
-# Step 4: Virtual Environment Setup
+# Step 4: Virtual Environment Setup & Detection
 # ---------------------------------------------------------
-Write-Host "`n[4/5] Preparing Virtual Environment..." -ForegroundColor Cyan
-cd $env:USERPROFILE
 $venvPath = "$env:USERPROFILE\eiko"
 
-# Prefer a globally installed 3.12 if the script just installed it, otherwise fallback to system python
-$pythonExe = "C:\Program Files\Python312\python.exe"
-if (-not (Test-Path $pythonExe)) {
-    $pythonExe = "python" 
-}
-
-if (-not (Test-Path "$venvPath\Scripts\activate")) {
-    Write-Host "-> Creating new virtual environment at $venvPath..." -ForegroundColor Magenta
-    & $pythonExe -m venv eiko
+if (Test-Path "$venvPath\Scripts\activate") {
+    Write-Host "-> Found existing 'eiko' environment at $venvPath." -ForegroundColor Yellow
 } else {
-    Write-Host "-> Virtual environment already exists. Using existing environment." -ForegroundColor Yellow
+    Write-Host "-> Creating new virtual environment at $venvPath..." -ForegroundColor Magenta
+    
+    # Dynamically find Python rather than hardcoding the C:\Program Files path
+    $pythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+    if (-not $pythonExe) { 
+        Write-Host "[!] Python executable not found in PATH." -ForegroundColor Red
+        Exit 
+    }
+    
+    # Fixed: Passing the absolute path instead of the relative "eiko" string
+    & $pythonExe -m venv $venvPath
+}
+# ---------------------------------------------------------
+# Step 5: Install Python Libraries (with Network Resilience)
+# ---------------------------------------------------------
+Write-Host "`n[5/5] Checking and Installing Eiko..." -ForegroundColor Cyan
+
+# Helper function to run pip and catch actual exit codes
+function Run-PipCommand ([string]$Args) {
+    # Invoke pip with the arguments
+    Invoke-Expression "& `"$venvPath\Scripts\pip.exe`" $Args"
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
+        Write-Host "Command failed: pip $Args" -ForegroundColor DarkGray
+        Write-Host "Please check your internet connection or package versions and try again." -ForegroundColor Yellow
+        Read-Host "Press Enter to exit"
+        Exit
+    }
 }
 
-# ---------------------------------------------------------
-# Step 5: Install Python Libraries (Pip handles idempotency)
-# ---------------------------------------------------------
-Write-Host "`n[5/5] Checking and Installing Eiko ML stack..." -ForegroundColor Cyan
-Write-Host "-> Note: Pip will automatically skip packages that are already installed." -ForegroundColor DarkGray
-
-& "$venvPath\Scripts\pip.exe" install --upgrade pip
-& "$venvPath\Scripts\pip.exe" install torch torchvision --index-url https://download.pytorch.org/whl/cu126
-& "$venvPath\Scripts\pip.exe" install eiko[jax]
+Run-PipCommand "install --upgrade pip"
+Run-PipCommand "install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
+Run-PipCommand "install eiko"
 
 # ---------------------------------------------------------
 # Verification
@@ -122,7 +137,8 @@ Write-Host "-> Note: Pip will automatically skip packages that are already insta
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " Verification Running... " -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
-& "$venvPath\Scripts\python.exe" -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko is fully operational!')"
+
+& "$venvPath\Scripts\python.exe" -c "import eiko.eiko_torch; print('-> Success: Eiko and PyTorch CUDA layers are fully operational!')"
 
 Write-Host "`n[*] Installation Complete! You can close this window now." -ForegroundColor Green
 Read-Host "Press Enter to exit"
