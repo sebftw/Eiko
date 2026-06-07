@@ -27,27 +27,63 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 sudo apt-get update -qq
 
 # ---------------------------------------------------------
-# Step 0: Check and Update NVIDIA Display Drivers
+# Step 0: Check NVIDIA Driver Version
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[0/5] Checking NVIDIA Display Drivers...${NC}"
+echo -e "\n${CYAN}[0/5] Checking NVIDIA Driver Compatibility...${NC}"
 
-# CUDA 12.6 requires driver version 550 or higher
 MIN_DRIVER=550 
 UPDATE_DRIVER=false
+IS_WSL=false
+
+# Detect WSL
+if grep -qi microsoft /proc/version || [ -n "$WSL_DISTRO_NAME" ]; then
+    IS_WSL=true
+fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
+    # This command works in both Linux and WSL
     DRIVER_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | cut -d'.' -f1)
     echo -e "${DARK_GRAY}-> Found active NVIDIA driver: v${DRIVER_VER}${NC}"
 
     if [ "$DRIVER_VER" -lt "$MIN_DRIVER" ]; then
-        echo -e "${YELLOW}-> Driver is too old for CUDA 12.6 (Requires v${MIN_DRIVER}+).${NC}"
-        UPDATE_DRIVER=true
+        echo -e "${YELLOW}-> Driver is too old (Requires v${MIN_DRIVER}+).${NC}"
+        
+        if [ "$IS_WSL" = true ]; then
+            echo -e "\n${RED}====================================================${NC}"
+            echo -e "${RED} CRITICAL: NVIDIA DRIVER UPDATE REQUIRED             ${NC}"
+            echo -e "${RED}====================================================${NC}"
+            echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
+            echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
+            echo -e "\nPlease update your drivers manually:"
+            echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
+            echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
+            echo -e "  3. Reboot your computer and run this script again."
+            read -p "`nPress Enter to exit"
+            exit 1
+        else
+            UPDATE_DRIVER=true
+        fi
     fi
 else
     echo -e "${YELLOW}-> No active NVIDIA display driver detected.${NC}"
-    UPDATE_DRIVER=true
+    if [ "$IS_WSL" = true ]; then
+        echo -e "\n${RED}====================================================${NC}"
+        echo -e "${RED} CRITICAL: NVIDIA DRIVER UPDATE REQUIRED             ${NC}"
+        echo -e "${RED}====================================================${NC}"
+        echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
+        echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
+        echo -e "\nPlease update your drivers manually:"
+        echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
+        echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
+        echo -e "  3. Reboot your computer and run this script again."
+        read -p "`nPress Enter to exit"
+        exit 1
+    else
+        UPDATE_DRIVER=true
+    fi
 fi
 
+# Only proceed with the auto-update logic if NOT in WSL
 if [ "$UPDATE_DRIVER" = true ]; then
     echo -e "${MAGENTA}WARNING: Updating Linux display drivers may cause a screen flicker and requires a reboot.${NC}"
     read -p "Would you like to automatically install the recommended NVIDIA driver now? (y/N): " confirm
