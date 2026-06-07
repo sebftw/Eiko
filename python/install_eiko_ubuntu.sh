@@ -236,7 +236,7 @@ fi
 
 # Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install eiko[jax] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+run_pip_command install "eiko[jax]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 # ---------------------------------------------------------
 # Verification
