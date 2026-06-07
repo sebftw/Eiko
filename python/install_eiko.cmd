@@ -40,9 +40,9 @@ fi
 if [ $# -gt 0 ]; then
     exec "$VENV_PATH/bin/python" "$@"
 else
-    # If no arguments, launch an interactive REPL cleanly 
-    # without letting it read the rest of this file.
-    exec "$VENV_PATH/bin/python" < /dev/tty
+    # Launch Python in a subshell, then exit the wrapper immediately
+    ("$VENV_PATH/bin/python"; exit)
+    exit 0
 fi
 
 :WINDOWS_START
