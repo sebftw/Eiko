@@ -15,11 +15,11 @@ jobs:
       matrix:
         platform:
           # --- Legacy Floor (Max Backwards Compatibility) ---
-          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
-          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
-          - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
+          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
           # - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
           # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
 
