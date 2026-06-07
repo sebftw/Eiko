@@ -187,9 +187,9 @@ else
 fi
 
 # ---------------------------------------------------------
-# Step 5: Install Python Libraries
+# Step 5: Install Python Libraries (with Smart Bypass)
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[5/5] Checking and Installing Eiko ML stack...${NC}"
+echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 
 run_pip_command() {
     local pip_exe="$VENV_PATH/bin/pip"
@@ -204,9 +204,27 @@ run_pip_command() {
 }
 
 run_pip_command install --upgrade pip quiet
-# Uses the dynamically targeted PyTorch version and CUDA Wheel URL
-run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL
-run_pip_command install eiko[jax] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Inline Python check for existing, valid PyTorch
+TORCH_VALID=false
+if "$VENV_PATH/bin/python" -c "
+import sys
+try:
+    import torch
+    v = torch.__version__.split('+')[0].split('.')
+    if torch.version.cuda and (int(v[0]) > 2 or (int(v[0]) == 2 and int(v[1]) >= 4)):
+        sys.exit(0)
+except ImportError:
+    pass
+sys.exit(1)
+" 2>/dev/null; then
+    echo -e "${GREEN}-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping wheel downloads.${NC}"
+    TORCH_VALID=true
+fi
+
+# Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
+echo -e "${MAGENTA}-> Installing Eiko...${NC}"
+run_pip_command install eiko[jax]
 
 # ---------------------------------------------------------
 # Verification
