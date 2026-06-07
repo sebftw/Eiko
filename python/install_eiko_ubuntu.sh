@@ -85,16 +85,17 @@ source /etc/os-release
 # ---------------------------------------------------------
 # Determine Target Matrix based on OS Version
 # ---------------------------------------------------------
+
 if [ "$VERSION_ID" == "20.04" ]; then
     echo -e "${YELLOW}-> Detected Ubuntu 20.04. Engaging Legacy Compatibility Mode...${NC}"
-    TARGET_CUDA_PKG="cuda-toolkit-12-1"
-    TARGET_CUDA_VER="12.1"
+    TARGET_CUDA_PKG="cuda-toolkit-12-4" # Highest version for Ubuntu 20.04
+    TARGET_CUDA_VER="12.1" # Lowest version that we support
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu121"
     TARGET_TORCH_VER="torch==2.4.0 torchvision"
     MIN_PYTHON_VER=3.8
 else
     echo -e "${CYAN}-> Detected Modern Ubuntu. Engaging Next-Gen Mode...${NC}"
-    TARGET_CUDA_PKG="cuda-toolkit-12-6"
+    TARGET_CUDA_PKG="cuda-toolkit-12-8" # Highest version for Ubuntu 22.04
     TARGET_CUDA_VER="12.6"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu126"
     TARGET_TORCH_VER="torch torchvision"
