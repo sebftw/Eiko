@@ -41,8 +41,8 @@ fi
 if [ $# -gt 0 ]; then
     exec "$VENV_PATH/bin/python" "$@"
 else
-    # Launch Python in the foreground, then exit cleanly
-    "$VENV_PATH/bin/python"
+    # Launch Python and force it to read from the terminal, not the pipe
+    "$VENV_PATH/bin/python" < /dev/tty
     exit 0
 fi
 
