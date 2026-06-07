@@ -31,3 +31,8 @@
 *.pdf binary
 *.png binary
 *.xlsx binary
+
+# Specifically ensure shell scripts and python scripts use LF
+*.sh text eol=lf
+*.cmd text eol=lf
+*.py text eol=lf

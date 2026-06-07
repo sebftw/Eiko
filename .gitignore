@@ -40,10 +40,6 @@ codegen/
 #####################################
 ##              PYTHON             ##
 #####################################
-
-# Custom ignores
-python/install_eiko.cmd text eol=lf
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

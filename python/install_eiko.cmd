@@ -1,3 +1,4 @@
+#!/bin/bash
 :<<'cls'
 @GOTO WINDOWS_START
 cls

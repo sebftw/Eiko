@@ -58,7 +58,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then
             echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
             echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
             echo -e "  3. Reboot your computer and run this script again."
-            read -p "`nPress Enter to exit"
+            read -p $'\nPress Enter to exit'
             exit 1
         else
             UPDATE_DRIVER=true
@@ -76,7 +76,7 @@ else
         echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
         echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
         echo -e "  3. Reboot your computer and run this script again."
-        read -p "`nPress Enter to exit"
+        read -p $'\nPress Enter to exit'
         exit 1
     else
         UPDATE_DRIVER=true
@@ -288,3 +288,4 @@ echo -e "\n${GREEN}[*] Installation Complete!${NC}"
 if [ -z "$VIRTUAL_ENV" ]; then
     echo -e "To activate your environment in the future, run: \n${CYAN}source $VENV_PATH/bin/activate${NC}"
 fi
+
