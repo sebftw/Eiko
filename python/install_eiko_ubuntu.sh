@@ -226,9 +226,9 @@ else
         # Inject CUDA paths into the activate script
         echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> "$VENV_PATH/bin/activate"
         echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> "$VENV_PATH/bin/activate"
+		export PATH="$VENV_PATH/bin:$PATH"
     fi
 fi
-
 
 # ---------------------------------------------------------
 # Step 5: Install Python Libraries (with Smart Bypass)
