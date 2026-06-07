@@ -16,95 +16,100 @@ on:
         description: 'Test Run (Creates a temporary tag and uploads to TestPyPI)'
         required: true
         type: boolean
-        default: false
+        default: true
 
 jobs:
   bump_and_tag:
     name: 1. Bump Version and Push Tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      new_tag: ${{ steps.get_tag.outputs.tag }}
+      new_tag: ${{ steps.version_logic.outputs.tag }}
     steps:
+      - name: Enforce Branch Context for Production Pushes
+        if: github.event.inputs.is_test == 'false'
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "::error::Strict Mode: Production version bumps can only be initiated from the 'main' branch."
+            exit 1
+          fi
+      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           # Standard GITHUB_TOKEN won't trigger subsequent workflows when pushing commits.
-          # Use a Personal Access Token (PAT) if your repository settings require it to trigger actions,
-          # or ensure your branch protections allow the default token to push.
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
+          # We therefore use a Personal Access Token below
+          token: ${{ secrets.RELEASE_PAT || secrets.GITHUB_TOKEN }}
+      
       - name: Install Bump Tool
         run: pip install bump-my-version
-
-      - name: Configure Git Author
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
 
       - name: Bump Version and Generate Tag
         id: version_logic
         run: |
+          # Configure Git Author
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Bash function to extract version cleanly without Python indentation issues
+          extract_version() {
+            if [ ! -f "python/eiko/__init__.py" ]; then
+              echo "::error::Could not find python/eiko/__init__.py"
+              exit 1
+            fi
+            
+            local v
+            # Uses sed to capture the version string between single or double quotes
+            v=$(sed -n "s/^__version__[[:space:]]*=[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" python/eiko/__init__.py)
+            
+            if [ -z "$v" ]; then
+              echo "::error::Failed to parse version from __init__.py"
+              exit 1
+            fi
+            echo "$v"
+          }
+          
+          git push origin HEAD:${{ github.ref_name }}
+
           if [ "${{ github.event.inputs.is_test }}" == "true" ]; then
-            echo "Executing Test Run: Skipping code bump."
+            echo "======================================================="
+            echo "🚀 RUNNING A TEST RELEASE (TestPyPI Sandbox)"
+            echo "======================================================="
             
-            # Read current version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            # Extract current version
+            VERSION=$(extract_version)
             
-            # Create a unique test tag (e.g., v1.0.0-test-15)
             TAG="v${VERSION}-test-${{ github.run_number }}"
+            echo "Test Tag Created: $TAG"
             
-            # Tag the current commit
             git tag "$TAG"
-            git push origin "$TAG"
-            
+            # 1. Push the branch code first so GitHub updates its workflow registry
+            git push origin HEAD:${{ github.ref_name }}
+            # 2. Push the tag second so the trigger finds the updated file
+            git push origin "$TAG"            
             echo "tag=$TAG" >> $GITHUB_OUTPUT
-            
+
           else
-            echo "Executing Production Release: Bumping code."
+            echo "======================================================="
+            echo "📦 RUNNING A PRODUCTION RELEASE (PyPI)"
+            echo "======================================================="
             
-            # Bump the code and create a commit
+            # Bump the code
             bump-my-version bump ${{ github.event.inputs.bump_type }}
             
-            # Read the newly bumped version
-            VERSION=$(python -c "import re; print(re.search(r'__version__\s*=\s*[\'\"]([^\'\"]+)[\'\"]', open('src/eiko/__init__.py').read()).group(1))")
+            # Extract the newly bumped version
+            VERSION=$(extract_version)
+            
             TAG="v${VERSION}"
+            echo "Production Tag Created: $TAG"
             
-            # Tag and push the commit and tag to main
             git tag "$TAG"
+            # 1. Push the branch code first so GitHub updates its workflow registry
             git push origin HEAD:${{ github.ref_name }}
-            git push origin "$TAG"
-            
+            # 2. Push the tag second so the trigger finds the updated file
+            git push origin "$TAG"            
             echo "tag=$TAG" >> $GITHUB_OUTPUT
+            
           fi
-
-      - name: Push Changes and Tag
-        run: |
-          # Push the version bump commit back to your default branch
-          git push origin HEAD:${{ github.ref_name }}
-          # Push the newly minted release tag
-          git push origin "v${{ steps.get_tag.outputs.tag }}"
-
-  run_build:
-    name: 2. Compile Binaries
-    needs: bump_and_tag
-    # Points directly to your existing build workflow file
-    uses: ./.github/workflows/release.yml
-    with:
-      # CRITICAL: Force the build runner to execute on the new tag,
-      # ensuring the wheels pick up the newly bumped __version__
-      ref: ${{ needs.bump_and_tag.outputs.new_tag }}
-
-  run_publish:
-    name: 3. Inject Registry & Publish
-    needs: [bump_and_tag, run_build]
-    uses: ./.github/workflows/publish.yml
-    with:
-      # Pass the run_id of the build job that JUST completed above
-      run_id: ${{ github.run_id }}
-    secrets: inherit # Automatically passes PyPI credentials/tokens downstream

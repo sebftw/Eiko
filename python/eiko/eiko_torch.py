@@ -1,40 +1,147 @@
-import os, sys
-import torch
-from torch.utils.cpp_extension import load, _get_build_directory
+import os
+import sys
 
-# Import centralized configuration from __init__.py
-from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+try:
+    import torch
+    # Immediately trap CPU-only installations before doing anything else
+    if torch.version.cuda is None:
+        raise RuntimeError(
+            "\n" + "="*75 + "\n"
+            "[Eiko] ERROR: CPU-only PyTorch installation detected.\n"
+            + "="*75 + "\n"
+            "You have a CPU-only version of PyTorch.\n"
+            "Eiko strictly requires a GPU-enabled (CUDA) version of PyTorch.\n\n"
+            "HOW TO FIX:\n"
+            "1. Uninstall your current version:  pip uninstall torch\n"
+            "2. Get the correct GPU command at:  👉 https://pytorch.org/get-started/\n"
+            + "="*75 + "\n"
+        )
+except ImportError as e:
+    raise ImportError(
+        "\n" + "="*65 + "\n"
+        f"[Eiko] PyTorch bindings require 'torch' to be installed.\n"
+        + "="*65 + "\n"
+        "Eiko requires a GPU-enabled version of PyTorch.\n"
+        "A standard 'pip install torch' installs a CPU-only version. \n\n"
+        "To get the correct GPU (CUDA) installation, visit:\n"
+        "👉 https://pytorch.org/get-started/\n"
+        + "="*65 + "\n"
+    ) from e
 
+from torch.utils.cpp_extension import load
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
+from eiko import SRC_DIR, __version__
 
-# ------------------------------------------------------------------------
-# JIT Compilation & Loading
-# ------------------------------------------------------------------------
+try:
+    # --------------------------------------------------------------------
+    #  The Fastest Path (Cached Import)
+    # --------------------------------------------------------------------
+    import eiko_torch_impl as _fim_cuda_impl
 
-# Check if the extension has already been compiled in a previous session.
+except ImportError:
+    # --------------------------------------------------------------------
+    # Runtime Download Fallback
+    # --------------------------------------------------------------------
+    from eiko.bootstrap import fetch_precompiled_wheel
+    is_loaded = False
 
-# Get the native PyTorch build directory for this specific extension name.
-build_dir = _get_build_directory('eiko_torch_impl', verbose=False)
+    torch_v = torch.__version__
+    cuda_v = torch.version.cuda or "cpu."
+    if cuda_v != "cpu":
+        cuda_v = f"cu{cuda_v.replace('.', '')}"
 
-# If the directory doesn't exist or is empty, this is a first-time compile.
-is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
+    if fetch_precompiled_wheel(__version__, torch_v, cuda_v, BIN_CACHE_DIR, target_impl="eiko_torch_impl"):
+        # Force Python to rescan sys.path directories, so it sees the new file
+        import importlib
+        importlib.invalidate_caches()
+        try:
+            import eiko_torch_impl as _fim_cuda_impl
+            is_loaded = True
+        except ImportError as e:
+            print(f"[Eiko] Downloaded PyTorch binary failed to load ({e}).")
+            
+            # Debugging helper: Print exactly what is inside the directory
+            found_files = os.listdir(BIN_CACHE_DIR) if os.path.exists(BIN_CACHE_DIR) else []
+            # print(f"[Eiko] Debug - Files currently in cache ({BIN_CACHE_DIR}): {found_files}")
+            print(f"[Eiko] Falling back to JIT compilation.")
 
-if not is_cached:
-    print("[Eiko] First-time PyTorch initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
-    sys.stdout.flush()
+    # --------------------------------------------------------------------
+    # Final JIT Compilation Fallback (With User-Friendly Error Catching)
+    # --------------------------------------------------------------------
+    if not is_loaded:
+        print("[Eiko] JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+        sys.stdout.flush()
 
-# JIT compilation.
-torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
-_fim_cuda_impl = load(
-    name="eiko_torch_impl",
-    sources=[torch_source],
-    extra_cflags=CXX_ARGS,
-    extra_cuda_cflags=NVCC_ARGS,
-    extra_include_paths=EXTRA_INCLUDE_PATHS,
-    verbose=False
-)
-
-if not is_cached:
-    print("Congratulations, you are now ready to use Eiko! :)")
+        torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
+        
+        try:
+            _fim_cuda_impl = load(
+                name="eiko_torch_impl",
+                sources=[torch_source],
+                extra_cflags=CXX_ARGS,
+                extra_cuda_cflags=NVCC_ARGS,
+                extra_include_paths=EXTRA_INCLUDE_PATHS,
+                verbose=False,
+                build_directory=BIN_CACHE_DIR
+            )
+            print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko! :)")
+            
+        except Exception as e:
+            error_msg = str(e).lower()
+            
+            print("\n" + "="*75)
+            print("[Eiko] FATAL ERROR: Local C++/CUDA compilation failed.")
+            print("="*75)
+            print("1. We could not find a compatible precompiled wheel for your exact system.")
+            print("2. We attempted to compile the extension from source, but it failed.\n")
+            
+            # --- DIAGNOSIS ROUTINES ---
+            # 1. MSVC Missing (Windows)
+            if sys.platform == "win32" and ("cl.exe" in error_msg or "['where', 'cl']" in error_msg):
+                print("DIAGNOSIS: Microsoft Visual Studio C++ compiler ('cl.exe') was not found.")
+                print("FIX: 1) Install the 'Desktop development with C++' workload via the Visual Studio Installer.")
+                print("     2) Ensure you run Python inside the 'x64 Native Tools Command Prompt for VS'.")
+            
+            # 2. GCC/G++ Missing (Linux)
+            elif sys.platform != "win32" and ("['which', 'c++']" in error_msg or "['which', 'g++']" in error_msg or "gcc" in error_msg):
+                print("DIAGNOSIS: A C++ host compiler (like GCC or G++) was not found.")
+                print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
+                
+            # 3. NVCC Missing (Cross-Platform)
+            elif "nvcc" in error_msg or "cuda" in error_msg:
+                print("DIAGNOSIS: The NVIDIA CUDA Toolkit ('nvcc') was not found or failed to execute.")
+                print("FIX: Ensure the CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
+                print("🔗 Download CUDA here: https://developer.nvidia.com/cuda-downloads")
+                
+            # 4. Generic Compilation Failure
+            else:
+                print("COMPILER OUTPUT:")
+                print(str(e))
+                
+            # --- FASTEST FIX ADVICE ---
+            print("\n" + "-"*75)
+            print("FASTEST FIX: UPDATE PYTORCH")
+            print("Eiko provides precompiled wheels for the newest PyTorch releases.")
+            print(f"You are currently running PyTorch {torch_v}. Updating PyTorch to the latest")
+            print("version will likely bypass this compilation step entirely.")
+            print("👉 https://pytorch.org/get-started/")
+                
+            # --- GITHUB ISSUE TEMPLATE ---
+            import platform
+            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            os_name = platform.system()
+            print("\n" + "-"*75)
+            print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
+            print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
+            print("Please copy and paste the following system information into your issue description:\n")
+            print(f"OS:      {os_name}")
+            print(f"Python:  {py_ver}")
+            print(f"PyTorch: {torch_v}")
+            print(f"CUDA:    {cuda_v}")
+            print("\n" + "="*75 + "\n")
+            
+            # Suppress the massive traceback and raise a clean error
+            raise RuntimeError("Eiko initialization failed due to missing C++ build tools.") from None
 
 #------------------------------------------------------------------------
 # Global Solver Cache

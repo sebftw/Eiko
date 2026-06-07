@@ -1,66 +1,191 @@
 import os
 import sys
-import struct
-from functools import partial
-from torch.utils.cpp_extension import load, _get_build_directory
+import subprocess
 
 try:
     import jax
     import pybind11
     import jaxlib
+
+    # Immediately trap CPU-only installations or missing GPU hardware
+    if jax.default_backend() == "cpu":
+        raise RuntimeError(
+            "\n" + "="*75 + "\n"
+            "[Eiko] ERROR: CPU-only JAX or missing GPU detected.\n"
+            + "="*75 + "\n"
+            "You have JAX installed, but it is currently defaulting to the CPU backend.\n"
+            "Eiko strictly requires a GPU-enabled version of JAX to run.\n\n"
+            "HOW TO FIX:\n"
+            "1. If you have the CPU-only version, uninstall it first:\n"
+            "   👉 pip uninstall jax jaxlib\n"
+            "2. Install the CUDA-enabled version of JAX (e.g., for CUDA 12):\n"
+            "   👉 pip install -U \"jax[cuda12]\"\n"
+            "3. Ensure your NVIDIA drivers are correctly installed and visible to Python.\n\n"
+            "For full installation details, visit:\n"
+            "https://jax.readthedocs.io/en/latest/installation.html\n"
+            + "="*75 + "\n"
+        )
 except ImportError as e:
     raise ImportError(
         f"\n[Eiko] JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
-        f" Please install the required environment via: pip install \"eiko[jax]\"\n"
+        f" Please install via: pip install \"eiko[jax]\"\n"
     ) from e
 
 import jax.numpy as jnp
 from jax import core
-from jax.interpreters import batching
-from jax.interpreters import xla
-from jax.interpreters import mlir
+from jax.interpreters import batching, xla, mlir
 
-# Robust Primitive resolution for modern JAX.
 if not hasattr(core, "Primitive"):
     from jax._src.core import Primitive
     core.Primitive = Primitive
 
-# Version-agnostic xla_client import.
 try:
     from jaxlib import xla_client
 except ImportError:
     from jax.lib import xla_client
 
-# Version-agnostic custom_call import.
-#try:
-#    from jaxlib.hlo_helpers import custom_call
-#except ImportError:
-#    from jax.interpreters.mlir import custom_call
+# 1. Import our centralized configuration
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
+from eiko import SRC_DIR, __version__
 
-from eiko import SRC_DIR, CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+try:
+    # --------------------------------------------------------------------
+    # 2. The Fastest Path (Cached Import)
+    # (sys.path is already handled by __init__.py)
+    # --------------------------------------------------------------------
+    import eiko_jax_impl as _fim_jax_impl
 
-# ---------------------------------------------------------
-# JIT COMPILATION & LOADING
-# ---------------------------------------------------------
-build_dir = _get_build_directory('eiko_jax_impl', verbose=False)
-is_cached = os.path.exists(build_dir) and len(os.listdir(build_dir)) > 0
+except ImportError:
+    ext = ".pyd" if sys.platform == "win32" else ".so"
 
-if not is_cached:
-    print("[Eiko] First-time JAX initialization: JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
-    sys.stdout.flush()
+    # Ensure the shared cache directory exists
+    os.makedirs(BIN_CACHE_DIR, exist_ok=True)
+    
+    # --------------------------------------------------------------------
+    # 3. Runtime Download Fallback
+    # --------------------------------------------------------------------
+    from eiko.bootstrap import fetch_precompiled_wheel
+    is_loaded = False
 
-jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
-jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include()]
+    # Download into BIN_CACHE_DIR so both backends share the same folder
+    if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
+        try:
+            import eiko_jax_impl as _fim_jax_impl
+            is_loaded = True
+        except ImportError as e:
+            print(f"[Eiko] Downloaded JAX binary failed to load natively ({e}).")
+            print(f"[Eiko] Falling back to local compilation.")
 
-_fim_jax_impl = load(
-    name="eiko_jax_impl",
-    sources=[jax_source],
-    extra_cflags=CXX_ARGS,
-    extra_cuda_cflags=NVCC_ARGS,
-    extra_include_paths=jax_includes,
-    verbose=False
-)
+    # --------------------------------------------------------------------
+    # 4. Pure JIT Compilation Fallback via NVCC
+    # --------------------------------------------------------------------
+    if not is_loaded:
+        print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc... (This might take a minute)")
+        sys.stdout.flush()
 
+        import sysconfig
+        import uuid # Added for atomic naming
+        import platform
+        import subprocess
+        
+        jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
+        
+        # FIX: Changed build_dir to BIN_CACHE_DIR
+        final_output_lib = os.path.join(BIN_CACHE_DIR, f"eiko_jax_impl{ext}")
+        tmp_suffix = f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
+        tmp_output_lib = final_output_lib + tmp_suffix
+        
+        includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
+        include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
+        
+        # Point nvcc output directly to the temporary file
+        cmd = ["nvcc", "-shared", "-std=c++17", jax_source, "-o", tmp_output_lib]
+        cmd += NVCC_ARGS
+        cmd += [f"-Xcompiler={arg}" for arg in CXX_ARGS]
+        cmd += include_flags
+
+        try:
+            # 1. Compile atomically to the unique temp file
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # 2. Atomically swap it into the active path
+            os.replace(tmp_output_lib, final_output_lib)
+            
+            import eiko_jax_impl as _fim_jax_impl
+            print("[Eiko] Compilation complete. JAX bindings are ready! :)")
+            
+        except Exception as e:
+            # Clean up the temporary file if compilation crashed
+            if os.path.exists(tmp_output_lib):
+                os.remove(tmp_output_lib)
+                
+            # Extract output depending on whether the process failed to start or failed to compile
+            if isinstance(e, subprocess.CalledProcessError):
+                error_msg = e.stderr.decode('utf-8', errors='replace').lower()
+                raw_error = e.stderr.decode('utf-8', errors='replace')
+            else:
+                error_msg = str(e).lower()
+                raw_error = str(e)
+
+            # System diagnostics for the GitHub template
+            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            os_name = platform.system()
+            try:
+                import jax
+                j_ver = jax.__version__
+            except ImportError:
+                j_ver = "unknown"
+                
+            print("\n" + "="*75)
+            print("[Eiko] FATAL ERROR: Local C++/CUDA compilation for JAX failed.")
+            print("="*75)
+            print("1. We could not find a compatible precompiled wheel for your exact system.")
+            print("2. We attempted to compile the JAX extension via nvcc, but it failed.\n")
+            
+            # --- DIAGNOSIS ROUTINES ---
+            # 1. NVCC Missing (Caught via FileNotFoundError usually)
+            if isinstance(e, FileNotFoundError) or "nvcc" in error_msg:
+                print("DIAGNOSIS: The NVIDIA CUDA Toolkit compiler ('nvcc') was not found.")
+                print("FIX: Ensure the CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
+                print("🔗 Download CUDA: https://developer.nvidia.com/cuda-downloads")
+                
+            # 2. MSVC Missing (Windows)
+            elif sys.platform == "win32" and ("cl.exe" in error_msg or "compiler" in error_msg):
+                print("DIAGNOSIS: Microsoft Visual Studio C++ compiler ('cl.exe') was not found by nvcc.")
+                print("FIX: 1) Install the 'Desktop development with C++' workload via the Visual Studio Installer.")
+                print("     2) Ensure you run Python inside the 'x64 Native Tools Command Prompt for VS'.")
+            
+            # 3. GCC/G++ Missing (Linux)
+            elif sys.platform != "win32" and ("g++" in error_msg or "gcc" in error_msg or "c++" in error_msg):
+                print("DIAGNOSIS: A C++ host compiler (like GCC or G++) was not found by nvcc.")
+                print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
+                
+            # 4. Generic Compilation Failure
+            else:
+                print("COMPILER OUTPUT:")
+                print(raw_error)
+                
+            # --- GITHUB ISSUE TEMPLATE ---
+            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
+            os_name = platform.system()
+            j_ver = jax.__version__
+            print("\n" + "-"*75)
+            print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
+            print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
+            print("Please copy and paste the following system information into your issue description:\n")
+            print("```text")
+            print(f"OS:      {os_name}")
+            print(f"Python:  {py_ver}")
+            print(f"JAX:     {j_ver}")
+            print("```")
+            print("="*75 + "\n")
+            
+            # Suppress the massive traceback and raise a clean error
+            raise RuntimeError("Eiko JAX initialization failed due to missing C++ build tools.") from None
+
+# ------------------------------------------------------------------------
+# 5. XLA Custom Call Registration
+# ------------------------------------------------------------------------
 for name, target in _fim_jax_impl.registrations().items():
     xla_client.register_custom_call_target(name, target, platform="gpu")
 

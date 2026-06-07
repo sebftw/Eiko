@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=61.0.0", "wheel"]
+requires = ["setuptools>=61.0.0", "wheel", "build>=1.2.0", "validate-pyproject>=0.25"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "eiko"
-version = "0.8.0"
+dynamic = ["version", "license"]  # Grab version and license from setup.py
 description = "Eiko: the GPU-accelerated Eikonal equation solver"
 readme = "README.md"
-requires-python = ">=3.8"  # Required for PyTorch 2.0.0
+requires-python = ">=3.8"  # Required for PyTorch 2.4.0
 license = { file = "LICENSE" }
 authors = [
     {name = "Sebastian Kazmarek Præsius", email = "sebastian.devel@gmail.com"},
@@ -22,7 +22,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
@@ -30,6 +29,8 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Environment :: GPU",
     "Environment :: GPU :: NVIDIA CUDA",
     "Topic :: Scientific/Engineering :: Physics",
@@ -44,17 +45,19 @@ dependencies = [
 # Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
 # Dependencies required for JAX.
 jax = [
-    "jax[cuda12]",       # Installs the GPU-enabled JAX backend via pip.
+    "jax[cuda12]>=0.4.30",       # Installs the GPU-enabled JAX backend via pip.
     "pybind11"
 ]
 jax-local = [
-    "jax[cuda12-local]",  # This is only for HPC users ("modules load cuda/12.0").
+    "jax[cuda12-local]>=0.4.30",  # This is only for HPC users ("modules load cuda/12.0").
     "pybind11"
 ]
+torch = ["torch>=2.4.0"]
 # Dependencies require to run examples.
 examples = [
+    "torch>=2.4.0",
     "matplotlib>=3.5.0", 
-    "jax[cuda12_pip]",
+    "jax[cuda12]>=0.4.30",
     "pybind11",
     "optax",
     "scipy>=1.7.0",
@@ -74,15 +77,13 @@ test = [
 [project.urls]
 Homepage = "https://github.com/sebftw/Eiko"
 
+
 [tool.setuptools]
-packages = ["eiko", "eiko.src"]
+packages = ["eiko"]
+include-package-data = true  # <-- Crucial for JIT compilation architectures
 
 [tool.setuptools.package-dir]
 "eiko" = "python/eiko"
-"eiko.src" = "src"
-
-[tool.setuptools.package-data]
-"eiko.src" = ["*.cuh", "bindings/*.cu"]
 
 [tool.pytest.ini_options]
 testpaths = ["python/test"]

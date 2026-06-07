@@ -36,12 +36,12 @@ struct SolveOp {
                     bool broadcast_f, cudaStream_t stream) {
         
         // Fetch the exact configuration mapped to this specific template instance.
-        constexpr auto Config = MakeDefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>();
+        using Config = DefaultConfig<IS_3D, IS_BACKWARD, MSFM, HAS_V, GATED_X>;
 
         // Safely calculate pitches using the actual configuration constants.
-        size_t pitch_u   = width * sizeof(float) * Config.CHANNELS;
-        size_t pitch_f   = width * sizeof(float) * Config.CHANNELS_F;
-        size_t pitch_v   = HAS_V ? (width * sizeof(float) * Config.CHANNELS_V) : 0;
+        size_t pitch_u   = width * sizeof(float) * Config::CHANNELS;
+        size_t pitch_f   = width * sizeof(float) * Config::CHANNELS_F;
+        size_t pitch_v   = HAS_V ? (width * sizeof(float) * Config::CHANNELS_V) : 0;
         size_t pitch_tof = IS_BACKWARD ? pitch_u : 0;
 
         // Execute.

@@ -1,0 +1,14 @@
+[tool.bumpversion]
+current_version = "0.8.5"
+commit = true
+tag = false # Let GitHub Actions handle tagging or do it manually later
+
+[[tool.bumpversion.files]]
+file = "python/eiko/__init__.py"
+search = "__version__ = '{current_version}'"
+replace = "__version__ = '{new_version}'"
+
+[[tool.bumpversion.files]]
+file = "CITATION.cff"
+search = "version: {current_version}"
+replace = "version: {new_version}"

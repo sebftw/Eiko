@@ -117,17 +117,17 @@ struct FIMConfig {
     }
 };
 
-template <FIMConfig Config>
+template <typename Config>
 struct FIMConstants {
     static constexpr int HALO = 1;
-    static constexpr int EFF_W = Config.TILE_W * Config.NX;
-    static constexpr int EFF_H = Config.TILE_H * Config.NY;
-    static constexpr int EFF_D = Config.TILE_D * Config.NZ;
+    // Replace the dot (.) with the scope resolution operator (::)
+    static constexpr int EFF_W = Config::TILE_W * Config::NX;
+    static constexpr int EFF_H = Config::TILE_H * Config::NY;
+    static constexpr int EFF_D = Config::TILE_D * Config::NZ;
     static constexpr int SMEM_W = EFF_W + 2 * HALO;
     static constexpr int SMEM_H = EFF_H + 2 * HALO;
     static constexpr int SMEM_D = EFF_D + 2 * HALO;
-    static constexpr int THREADS_PER_BLOCK = Config.TILE_W * Config.TILE_H * 
-                                            (Config.THREE_DIMENSIONAL ? Config.TILE_D : 1);
+    static constexpr int THREADS_PER_BLOCK = Config::TILE_W * Config::TILE_H * (Config::THREE_DIMENSIONAL ? Config::TILE_D : 1);
 };
 
 

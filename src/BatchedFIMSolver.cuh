@@ -25,7 +25,7 @@ __device__ __constant__ int COMPILED_ARCH =
  *
  * @tparam CHANNELS   The number of independent sources/channels per grid element.
  */
-template <FIMConfig Config>
+template <typename Config>
 class BatchedFIMSolver {
 private:
     // ---------------------------------------------------------
@@ -127,12 +127,12 @@ public:
 		}
 		
 		// Get the maximum number of thread blocks that fit on the GPU for the FIM kernel.
-        fim_kernel_ptr = (void*) &batched_fim_kernel_new<
-			Config.TILE_W, Config.TILE_H, Config.TILE_D,
-            Config.NX, Config.NY, Config.NZ,
-            Config.CHANNELS, Config.CHANNELS_F, Config.CHANNELS_V,
-            Config.THREE_DIMENSIONAL,
-            Config.MSFM, Config.MAX_LOCAL_ITERS, Config.DOUBLE_BUFFERED_SMEM, Config.BACKWARD_PASS, Config.GATED_X>;
+        fim_kernel_ptr = (void*) &batched_fim_kernel_new<Config::TILE_W, Config::TILE_H, Config::TILE_D,
+            Config::NX, Config::NY, Config::NZ,
+            Config::CHANNELS, Config::CHANNELS_F, Config::CHANNELS_V,
+            Config::THREE_DIMENSIONAL,
+            Config::MSFM, Config::MAX_LOCAL_ITERS, Config::DOUBLE_BUFFERED_SMEM, 
+            Config::BACKWARD_PASS, Config::GATED_X>;
 
 		int num_sms, blocks_per_sm;
         CUDA_CHECK(cudaDeviceGetAttribute(&num_sms, cudaDevAttrMultiProcessorCount, device_id));
@@ -184,7 +184,7 @@ public:
         
         ensure_capacity(total_blocks);
 		
-		assert(Config.THREE_DIMENSIONAL || depth == 1);  // "Depth must be 1 for 2D eikonal equation solving."
+		assert(Config::THREE_DIMENSIONAL || depth == 1);  // "Depth must be 1 for 2D eikonal equation solving."
 		
         // Update persistent class variables (so fimArgs sees the new values)
 		void* fimArgs[] = { 
@@ -202,7 +202,7 @@ public:
 		};
 		
 		// Define dynamic block dimensions based on mode
-        dim3 block_dims(Config.TILE_W, Config.TILE_H, Config.TILE_D);
+        dim3 block_dims(Config::TILE_W, Config::TILE_H, Config::TILE_D);
 		
         // Initialize state arrays.
         int* h_list_ptrs[2] = {d_current_active_block_list, d_next_active_block_list};

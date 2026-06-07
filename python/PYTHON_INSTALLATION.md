@@ -103,54 +103,25 @@ You are now ready to use Eiko.
 
 **Beware**: Every time you open a new terminal, you must run `source eiko/bin/activate` to reactivate the eiko environment.
 
-### Windows
-#### CUDA
-To install CUDA, you first want to ensure your drivers are up to date, so they are compatible with the latest CUDA version.
-Therefore, press the **Windows key**, type **NVIDIA App** (or GeForce Experience), and open the update application. Navigate to **Drivers** and install the latest version.
+### Windows Installation
 
-Then, CUDA can be downloaded from [NVIDIA's website](https://developer.nvidia.com/cuda-downloads).
+You can set up your entire environment (CUDA, C++ Compilers, Python 3.12, PyTorch, and Eiko) completely automatically.
 
-#### Compiler
-After installing CUDA, you need a valid compiler. Navigate to [Visual Studio Downloads](https://visualstudio.microsoft.com/downloads/) to download the Visual Studio Installer.
-* You want to install **Visual Studio Community 2022**. If you can't find it, you can just select the latest version and later choose 2022 inside the Visual Studio Installer program.
-* Inside the Visual Studio Installer, select the **Desktop development with C++** workload.
-* Look for the "Installation details" panel on the right of the installer, and make sure **MSVC v143 - VS 2022 C++ x64/x86 build tools** is checked.
+1. Download the **`install_eiko.ps1`** script to your computer.
+2. Right-click the file and select **Run with PowerShell**.
+3. Grant Administrator access if prompted, and let the installer configure your machine.
 
-#### Python
+Once the window closes, your setup is complete, and you can use Eiko!
 
-Download Python from [Python.org](https://www.python.org/downloads/windows/) to download and install Python. Here is our recommended installation:
-* Check the box that says "**Add python.exe to PATH**".
-* Select "Customize Installation" and make sure that **pip** is selected.
-* When you get the option (next page), check "**Install Python for all users**" to install Python in "C:\Program Files\". Also select **Precompile standard library**, **Download debugging symbols**, and **Download debug binaries**.
-
-Next, you want to install Eiko inside a virtual environment.
-Press the Windows key and search for **x64 Native Tools Command Prompt for VS 2022**. You *must* use this specific command prompt, not standard PowerShell, as it loads the necessary C++ compiler paths.
-
-To verify the Python installation, run the following
+**Beware:** Whenever you open a fresh terminal window to work with Eiko again, you must activate the environment with:
+```powershell
+& "$env:USERPROFILE\eiko\Scripts\Activate.ps1"
 ```
-python --version
-pip --version
+if using PowerShell, or
+```dos
+%USERPROFILE%\eiko\Scripts\activate.bat
 ```
-
-Next, set up and activate the virtual environment inside `C:\Users\YOURUSERNAME\eiko` by running:
-```
-cd %USERPROFILE%
-python -m venv eiko
-%USERPROFILE%\eiko\Scripts\activate
-```
-Your command line should now start with `(eiko)`.
-
-You want to install Pytorch within this environment. Navigate to [PyTorch Get Started](https://pytorch.org/get-started/), select **Stable**, **Windows**, **Pip**, and **Python**.
-For the **Compute Platform**, select the CUDA version that matches the output of `nvcc --version`.
-
-After getting PyTorch, you can install and verify Eiko with
-```
-pip install eiko
-python -c "import eiko.eiko_torch"
-```
-You are now ready to use Eiko!
-
-**Beware**: Every time you open a new command prompt, you must run `%USERPROFILE%\eiko\Scripts\activate` to reactivate the eiko environment.
+if using Command Prompt (cmd).
 
 ## Zero-Installation Setups
 Since the installation process is quite involved, this section provides a an alternative way to running Eiko.

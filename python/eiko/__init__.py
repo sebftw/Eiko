@@ -1,106 +1,54 @@
 import os
 import sys
+import shutil
+import tempfile
 
 # ---------------------------------------------------------
-# PATH RESOLUTION
+# PACKAGE METADATA & VERSION
 # ---------------------------------------------------------
-# Resolve paths once for the entire package.
-
-# Base directory where this file lives (Eiko/python/eiko/ or .../site-packages/eiko/).
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Option A: Path when the package is installed via pip (src is inside eiko/).
-SRC_DIR_INSTALLED = os.path.join(BASE_DIR, 'src')
-
-# Option B: Path when running locally during development (src is sibling to python/).
-SRC_DIR_DEV = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'src'))
-
-# Dynamically choose the folder that actually contains your files
-if os.path.exists(SRC_DIR_INSTALLED):
-    SRC_DIR = SRC_DIR_INSTALLED
-elif os.path.exists(SRC_DIR_DEV):
-    SRC_DIR = SRC_DIR_DEV
-else:
-    raise FileNotFoundError(
-        f"Could not find Eiko C++/CUDA source directory. Tried:\n"
-        f"1. {SRC_DIR_INSTALLED}\n"
-        f"2. {SRC_DIR_DEV}"
-    )
+# This acts as the single source of truth for the package version.
+# It is placed at the very top so internal submodules can safely import it.
+__version__ = "0.8.5"
 
 # ---------------------------------------------------------
-# COMPILER FLAGS
+# PATH & ENVIRONMENT INITIALIZATION
 # ---------------------------------------------------------
-if sys.platform == "win32":
-    CXX_ARGS = ['/std:c++20', '/Zc:preprocessor', '/DNOMINMAX']
-    NVCC_ARGS = [
-        '-std=c++20', 
-        '-allow-unsupported-compiler', 
-        '-Xcompiler', '/Zc:preprocessor', 
-        '-Xcompiler', '/std:c++20', 
-        '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
-        '-DNOMINMAX', 
-        '--use_fast_math', 
-        '-arch=native'
-    ]
-else:
-    CXX_ARGS = ['-std=c++20', '-O3']
-    NVCC_ARGS = ['-std=c++20', '--use_fast_math', '-arch=native']
+from eiko.build_config import SRC_DIR, BIN_CACHE_DIR
 
+# Inject the binary cache directory into sys.path globally.
+# This ensures both Torch and JAX submodules can instantly resolve 
+# precompiled or JIT-compiled binaries via native import statements.
+if BIN_CACHE_DIR not in sys.path:
+    sys.path.insert(0, BIN_CACHE_DIR)
 
-EXTRA_INCLUDE_PATHS = [SRC_DIR]
-
-try:
-    from torch.utils.cpp_extension import CUDA_HOME
-    if CUDA_HOME:
-        cccl_base = os.path.join(CUDA_HOME, 'include', 'cccl')
-        if os.path.exists(cccl_base):
-            EXTRA_INCLUDE_PATHS.extend([
-                cccl_base,
-                os.path.join(cccl_base, 'thrust'),
-                os.path.join(cccl_base, 'libcudacxx', 'include'),
-                os.path.join(cccl_base, 'cub'),
-            ])
-except ImportError:
-    # Let individual wrappers handle the missing torch error cleanly
-    pass
+# Windows Python 3.8+ requires explicit DLL directory registration
+if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    try:
+        os.add_dll_directory(BIN_CACHE_DIR)
+        # Also ensure PyTorch's own lib directory is discoverable for c10.dll/torch.dll
+        import torch
+        torch_lib_path = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib_path):
+            os.add_dll_directory(torch_lib_path)
+    except Exception:
+        pass
 
 # ---------------------------------------------------------
-# PUBLIC API EXPORTS
+# INTERNAL UTILITIES
 # ---------------------------------------------------------
-
 def _is_jax_array(obj):
     """Safely checks if an object is a JAX array without importing JAX."""
     return type(obj).__module__.startswith('jax')
 
+# ---------------------------------------------------------
+# DYNAMIC ROUTING API
+# ---------------------------------------------------------
 def eiko2d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
     """
     EIKO2D Computes the shortest time-of-flight in an arbitrary 2D medium.
 
     Calculates the time-of-flight (u), given a slowness map (f = 1/c), and
     initial conditions (u_init, initialized as infinity at unknown points).
-
-    EXAMPLE USAGES:
-        u = eiko2d(u_init, f)                                 # (Standard usage).
-        u = eiko2d(u_init, f, dx=0.5, msfm=True)              # (Named arguments).
-        u, v_out = eiko2d(u_init, f, v_init=advection_field)  # (Advection).
-
-    REQUIRED INPUTS:
-        u_init  - Initial conditions (known arrival times/delays).
-                  Shape: (H, W) for a single image, or (B, H, W) for a batch.
-        f       - Slowness. Can be (H, W) [broadcast to batch] or (B, H, W).
-
-    OPTIONAL INPUTS:
-        dx      - Input grid spacing. Default: 1.0.
-        v_init  - The initial advection field. Same size as u. Default: None (not used).
-        msfm    - Whether to enable Multi-Stencil Fast Marching (MSFM).
-                  Reduces bias along diagonal directions. Default: False.
-        gated   - Whether to enforce positive propagation along the first 
-                  data dimension. Speeds up computations. It is valid when 
-                  time only increases when moving axially. Default: False.
-
-    OUTPUTS:
-        u       - Computed arrival time (time-of-flight) map. Shape matches u_init.
-        v       - Output advection vectors (returned only if v_init was supplied).
     """
     if _is_jax_array(u_init):
         from .eiko_jax import eiko2d as jax_eiko2d
@@ -115,29 +63,6 @@ def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
 
     Calculates the time-of-flight (u), given a slowness map (f = 1/c), and
     initial conditions (u_init, initialized as infinity at unknown points).
-
-    EXAMPLE USAGES:
-        u = eiko3d(u_init, f)                                 # (Standard usage).
-        u = eiko3d(u_init, f, dx=0.5, msfm=True)              # (Named arguments).
-        u, v_out = eiko3d(u_init, f, v_init=advection_field)  # (Advection).
-
-    REQUIRED INPUTS:
-        u_init  - Initial conditions (known arrival times/delays).
-                  Shape: (D, H, W) for a single volume, or (B, D, H, W) for a batch.
-        f       - Slowness. Can be (D, H, W) [broadcast to batch] or (B, D, H, W).
-
-    OPTIONAL INPUTS:
-        dx      - Input grid spacing. Default: 1.0.
-        v_init  - The initial advection field. Same size as u. Default: None (not used).
-        msfm    - Whether to enable Multi-Stencil Fast Marching (MSFM).
-                  Reduces bias along diagonal directions. Default: False.
-        gated   - Whether to enforce positive propagation along the first 
-                  data dimension. Speeds up computations. It is valid when 
-                  time only increases when moving axially. Default: False.
-
-    OUTPUTS:
-        u       - Computed arrival time (time-of-flight) map. Shape matches u_init.
-        v       - Output advection vectors (returned only if v_init was supplied).
     """
     if _is_jax_array(u_init):
         from .eiko_jax import eiko3d as jax_eiko3d
@@ -146,14 +71,64 @@ def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
         from .eiko_torch import eiko3d as pt_eiko3d
         return pt_eiko3d(u_init, f, v_init, dx, msfm, gated)
 
+# Alias default 2D solver
 eiko = eiko2d
 
+# ---------------------------------------------------------
+# CACHE MANAGEMENT UTILITIES
+# ---------------------------------------------------------
+def clear_binary_cache():
+    """
+    Removes all precompiled and JIT-compiled binaries from the persistent local cache.
+    Useful if you switch CUDA drivers or encounter corrupted compilation states.
+    """
+    if os.path.exists(BIN_CACHE_DIR):
+        try:
+            print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
+            shutil.rmtree(BIN_CACHE_DIR)
+        except PermissionError:
+            print("\n" + "="*75)
+            print("[Eiko] PERMISSION ERROR: Binaries are probably currently in use.")
+            print("="*75)
+            print("The operating system cannot delete the files that are")
+            print("currently loaded into the active Python memory space.")
+            print("\nHOW TO FIX:")
+            print("1. Restart your Python session (or restart your Jupyter kernel).")
+            print("2. Run the cache clearing command *before* calling any Eiko solvers.")
+            print("="*75 + "\n")
+        except OSError as e:
+            print(f"[Eiko] Failed to clear binary cache due to an OS error: {e}")
+
+def clear_download_cache():
+    """
+    Removes any cached wheel archives from the temporary download directory.
+    """
+    eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
+    if os.path.exists(eiko_tmp_dir):
+        print(f"[Eiko] Clearing downloaded wheels at: {eiko_tmp_dir}")
+        shutil.rmtree(eiko_tmp_dir)
+
+def clear_caches():
+    """
+    Completely resets the Eiko installation footprint by wiping both 
+    downloaded wheels and compiled binaries.
+    """
+    clear_download_cache()
+    clear_binary_cache()
+
+
+# ---------------------------------------------------------
+# MODULE IMPORTS & EXPORTS
+# ---------------------------------------------------------
 from .animate_eikonal import animate_eikonal
 
-# Define what is imported when a user runs `from eiko import *`.
-__all__ = ['eiko', 'eiko3d', 'animate_eikonal']
-
-# Define the version number, so it is easily accessible.
-from importlib.metadata import version
-__version__ = version("eiko")
-
+# Add these functions and fields to the public API exports
+__all__ = [
+    'eiko', 
+    'eiko3d', 
+    'animate_eikonal', 
+    '__version__',
+    'clear_binary_cache',
+    'clear_download_cache',
+    'clear_caches'
+]
