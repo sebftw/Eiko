@@ -9,7 +9,7 @@ param (
     [switch]$ElevatedSession  # Internal flag to track elevation loops
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Inquire"
 
 # 1. Ensure the script is running with Administrator privileges
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -139,6 +139,29 @@ if ($msvcCheck -match "Microsoft.VisualStudio.2022.BuildTools") {
 	Refresh-EnvPath
 }
 
+# AUTOMATICALLY IMPORT MSVC ENVs FOR COMPILING
+function Invoke-MsvcEnvironment {
+    Write-Host "-> Integrating MSVC Developer paths into current shell..." -ForegroundColor DarkGray
+    $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (Test-Path $vsWhere) {
+        $installPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if ($installPath -and (Test-Path "$installPath\Common7\Tools\Launch-VsDevShell.ps1")) {
+            # Quietly import the build environment vars into the current active session
+            Import-Module "$installPath\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+            
+            # FIXED: Using -DevCmdArguments to pass architecture specifications correctly
+            Enter-VsDevShell -VsInstallPath $installPath -SkipAutomaticLocation -DevCmdArguments "-arch=amd64 -host_arch=amd64" | Out-Null
+            
+            Write-Host "-> Success: MSVC environment activated!" -ForegroundColor Green
+        } else {
+            Write-Host "-> Warning: Could not find Launch-VsDevShell.ps1. High-level ML libraries may fail to compile." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "-> Warning: vswhere.exe not found. Skipping path adjustments." -ForegroundColor Yellow
+    }
+}
+Invoke-MsvcEnvironment
+
 # ---------------------------------------------------------
 # Step 3: Check and Install Python (Requires >= 3.9)
 # ---------------------------------------------------------
@@ -209,16 +232,17 @@ if (Test-Path "$venvPath\Scripts\Activate.ps1") {
 # ---------------------------------------------------------
 Write-Host "`n[5/5] Checking existing Eiko ML Stack..." -ForegroundColor Cyan
 
-function Run-PipCommand ([string[]]$PipArgs) {
-    & "$venvPath\Scripts\pip.exe" $PipArgs
+function Run-PipCommand ($PipArgs) {
+    & "$venvPath\Scripts\python.exe" -m pip $PipArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
         if (-not $ElevatedSession) { Read-Host "Press Enter to exit" }
-        throw "Pip command failed. Script halted." # CHANGED
+        throw "Pip command failed. Script halted." 
     }
 }
 
-Run-PipCommand "install", "--upgrade", "pip", "--quiet"
+# This will now upgrade flawlessly without hitting a Windows file lock error!
+Run-PipCommand @("install", "--upgrade", "pip", "--quiet")
 
 $pythonCheck = @"
 import sys
@@ -256,6 +280,6 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host "`n[*] Installation Complete!" -ForegroundColor Green
 
 # Only pause if this is not part of the background elevated automation pipeline
-if (-not $ElevatedSession) {
-    Write-Host "Done. You are now inside the Eiko environment." -ForegroundColor Cyan
-}
+#if (-not $ElevatedSession) {
+#    Write-Host "Done. You are now inside the Eiko environment." -ForegroundColor Cyan
+#}
