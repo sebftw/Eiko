@@ -228,7 +228,7 @@ else
         # Inject CUDA paths into the activate script
         echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> "$VENV_PATH/bin/activate"
         echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> "$VENV_PATH/bin/activate"
-		# export PATH="$VENV_PATH/bin:$PATH"
+		echo 'export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:${LD_PRELOAD}' >> "$VENV_PATH/bin/activate"
     fi
 fi
 
@@ -239,6 +239,8 @@ source "$VENV_PATH/bin/activate"
 # Step 5: Install Python Libraries (with Smart Bypass)
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
+
+export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:$LD_PRELOAD
 
 run_pip_command() {
     local pip_exe="$VENV_PATH/bin/pip"
