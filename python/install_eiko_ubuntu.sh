@@ -243,7 +243,7 @@ echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 # export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:$LD_PRELOAD
 
 run_pip_command() {
-    local pip_exe="$VENV_PATH/bin/pip"
+    local pip_exe="pip"
     set +e 
     "$pip_exe" "$@"
     local exit_code=$?
@@ -258,7 +258,7 @@ run_pip_command install --upgrade pip --quiet
 
 # Inline Python check for existing, valid PyTorch
 TORCH_VALID=false
-if "$VENV_PATH/bin/python" -c "
+if "python" -c "
 import sys
 try:
     import torch
@@ -289,7 +289,7 @@ echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} Verification Running...                            ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
-"$VENV_PATH/bin/python" -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"
+python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"
 
 echo -e "\n${GREEN}[*] Installation Complete!${NC}"
 if [ -z "$VIRTUAL_ENV" ]; then
