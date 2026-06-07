@@ -40,7 +40,7 @@ fi
 # 3. Activate the environment
 echo -e "\033[1;32m-> Activating Eiko virtual environment...\033[0m"
 source "$VENV_PATH/bin/activate"
-exec bash
+exec bash &
 
 
 :WINDOWS_START
