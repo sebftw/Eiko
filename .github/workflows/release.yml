@@ -24,7 +24,7 @@ jobs:
           # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
 
           # --- Next-Gen Tier (CUDA 13+) ---
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -243,7 +243,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: false 
+    if: true
     strategy:
       fail-fast: false
       matrix:
@@ -259,8 +259,8 @@ jobs:
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
           # - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
-          # - { torch: '2.12.0', cuda: '13.2.0' }
-          - { torch: 'skip', cuda: 'skip' } # Dummy row keeps YAML valid
+          - { torch: '2.12.0', cuda: '13.2.0' }
+          # - { torch: 'skip', cuda: 'skip' } # Dummy row keeps YAML valid
 
     steps:
       - name: Checkout code
@@ -280,7 +280,7 @@ jobs:
           cuda: ${{ matrix.platform.cuda }}
           method: 'network'
           use-github-cache: 'true'
-          sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "cublas", "cublas_dev", "cusparse", "cusparse_dev", "cusolver", "cusolver_dev", "visual_studio_integration"]'
+          # sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "cublas", "cublas_dev", "cusparse", "cusparse_dev", "cusolver", "cusolver_dev", "visual_studio_integration"]'
           
       - name: Format CUDA version and PATHs for PyTorch
         shell: bash
