@@ -11,7 +11,12 @@ REMOTE_INSTALLER_URL="https://raw.githubusercontent.com/sebftw/Eiko/main/python/
 
 # 1. Check if eiko is already available in the current environment
 if command -v python3 >/dev/null 2>&1 && python3 -c "import eiko" >/dev/null 2>&1; then
-    exec python3 "$@"
+    if [ $# -gt 0 ]; then
+        exec python3 "$@"
+    else
+        # Launch Python and force it to read from the terminal, not the pipe
+        exec python3 < /dev/tty
+    fi
 fi
 
 # 2. Fallback to dedicated Eiko sandbox
