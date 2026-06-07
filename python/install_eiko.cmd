@@ -1,7 +1,7 @@
 #!/bin/bash
-:<<'cls'
+:<<'BATCH'
 @GOTO WINDOWS_START
-cls
+BATCH
 
 # ==============================================================================
 # LINUX RUNNER (Bash)
@@ -50,10 +50,13 @@ REM ============================================================================
 SET "REMOTE_INSTALLER_URL=https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_windows.ps1"
 
 REM 1. Check if eiko is already available in the current environment
-python -c "import eiko" >nul 2>&1
+WHERE python >nul 2>&1
 IF %ERRORLEVEL% EQU 0 (
-    python %*
-    EXIT /B %ERRORLEVEL%
+    python -c "import eiko" >nul 2>&1
+    IF %ERRORLEVEL% EQU 0 (
+        python %*
+        EXIT /B %ERRORLEVEL%
+    )
 )
 
 REM 2. Fallback to dedicated Eiko sandbox
@@ -74,6 +77,12 @@ PowerShell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager
 IF %ERRORLEVEL% NEQ 0 (
     ECHO -^> Installation failed. Exiting.
     EXIT /B %ERRORLEVEL%
+)
+
+:: Re-verify after install to ensure it actually exists now
+IF NOT EXIST "%VENV_PATH%\Scripts\python.exe" (
+    ECHO -^> Installation script completed, but Python executable was not found.
+    EXIT /B 1
 )
 
 :RUN_EIKO
