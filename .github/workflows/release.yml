@@ -16,7 +16,7 @@ jobs:
         platform:
           # --- Legacy Baseline ---
           # Split into 20.04 (for Python 3.9) and 22.04 (for Python 3.10+)
-          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
           #- { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This seems redundant if we already have 20.04, but it is used to target a newer Python version.
           #- { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
           #- { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
@@ -27,64 +27,73 @@ jobs:
           #- { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
   
           # --- Bleeding Edge ---
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
   
         # Target active Python versions
-        python_version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
   
         exclude:
-          # ==========================================
-          # 1. OS vs PYTHON REALITY CHECKS
-          # ==========================================
-          # Ubuntu 20.04 lacks OpenSSL 3.0; exclude modern Python
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          # ==========================================================
+          # 1. HARD OS CONSTRAINTS (Ubuntu 20.04 SSL/GLIBC Limitations)
+          # ==========================================================
+          # Drop Python 3.10+ on Ubuntu 20.04 across all applicable torch/cuda pairs
+          - platform: { os_version: '20.04' }
             python_version: '3.10'
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - platform: { os_version: '20.04' }
             python_version: '3.11'
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - platform: { os_version: '20.04' }
             python_version: '3.12'
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
+          - platform: { os_version: '20.04' }
             python_version: '3.13'
 
-          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-            python_version: '3.10'
-          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-            python_version: '3.11'
-          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
-            python_version: '3.12'
-          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          # ==========================================================
+          # 2. PYTORCH VS PYTHON VERSION COMPATIBILITY DROPS
+          # ==========================================================
+          # PyTorch 2.4 does not support Python 3.13
+          - platform: { torch: '2.4.0' }
             python_version: '3.13'
 
-          # Ubuntu 22.04 ships with 3.10 natively; avoid building legacy 3.9 here
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
+          # PyTorch 2.10+ explicitly drops Python 3.9 support
+          - platform: { torch: '2.10.0' }
             python_version: '3.9'
-          - platform: { torch: '2.7.0', cuda: '12.6.3', os_version: '22.04' }
+          - platform: { torch: '2.11.0' }
             python_version: '3.9'
-          - platform: { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+          - platform: { torch: '2.12.0' }
             python_version: '3.9'
-          - platform: { torch: '2.11.0', cuda: '13.0.1', os_version: '22.04' }
-            python_version: '3.9'
-          - platform: { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
-            python_version: '3.9'
-
-          # Ubuntu 24.04 ships with 3.12 natively; exclude older versions
-          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
-            python_version: '3.9'
-          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
-            python_version: '3.10'
-          - platform: { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
-            python_version: '3.11'
-
-          # ==========================================
-          # 2. PYTORCH vs PYTHON COMPATIBILITY
-          # ==========================================
-          # PyTorch 2.4 predates Python 3.13
-          - platform: { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' }
-            python_version: '3.13'
             
-          # PyTorch 2.12 drops Python 3.10
-          - platform: { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+          # ==========================================================
+          # 3. OPTIONAL OS DESIGN CHOICE EXCLUSIONS
+          # ==========================================================
+          # Exclude Python 3.9 from running on newer Ubuntu baselines
+          - platform: { os_version: '22.04' }
+            python_version: '3.9'
+          - platform: { os_version: '24.04' }
+            python_version: '3.9'
+
+          # Exclude older Pythons from Ubuntu 24.04 to focus strictly on modern runtimes
+          - platform: { os_version: '24.04' }
             python_version: '3.10'
+          - platform: { os_version: '24.04' }
+            python_version: '3.11'
+
+          # ==========================================================
+          # Clean up Python 3.8 for all modern tiers
+          # ==========================================================
+          # Python 3.8 is EOL; explicitly skip it on Ubuntu 22.04 and 24.04
+          - platform: { os_version: '22.04' }
+            python_version: '3.8'
+          - platform: { os_version: '24.04' }
+            python_version: '3.8'
+
+          # PyTorch 2.7+ completely dropped Python 3.8 support globally
+          - platform: { torch: '2.7.0' }
+            python_version: '3.8'
+          - platform: { torch: '2.10.0' }
+            python_version: '3.8'
+          - platform: { torch: '2.11.0' }
+            python_version: '3.8'
+          - platform: { torch: '2.12.0' }
+            python_version: '3.8'
         
         
     container:
