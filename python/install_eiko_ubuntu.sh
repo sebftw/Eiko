@@ -119,7 +119,7 @@ fi
 
 if [ -n "$NVCC_CMD" ]; then
     CUDA_VER=$("$NVCC_CMD" --version | grep -oP 'release \K[0-9]+\.[0-9]+')
-    if awk "BEGIN {exit !($CUDA_VER >= $TARGET_CUDA_VER)}"; then
+    if [ "$(printf '%s\n' "$TARGET_CUDA_VER" "$CUDA_VER" | sort -V | head -n1)" = "$TARGET_CUDA_VER" ]; then
         echo -e "${YELLOW}-> Found CUDA $CUDA_VER. Skipping installation.${NC}"
         INSTALL_CUDA=false
     fi
@@ -151,7 +151,7 @@ PYTHON_EXE="python3"
 
 if command -v python3 >/dev/null 2>&1; then
     PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    if awk "BEGIN {exit !($PY_VER >= $MIN_PYTHON_VER)}"; then
+    if [ "$(printf '%s\n' "$MIN_PYTHON_VER" "$PY_VER" | sort -V | head -n1)" = "$MIN_PYTHON_VER" ]; then
         echo -e "${YELLOW}-> Found Python $PY_VER. Skipping installation.${NC}"
         INSTALL_PYTHON=false
     fi
@@ -183,8 +183,13 @@ else
     if [ ! -f "$VENV_PATH/bin/activate" ]; then
         echo -e "${MAGENTA}-> Creating new virtual environment...${NC}"
         $PYTHON_EXE -m venv "$VENV_PATH"
+        
+        # Inject CUDA paths into the activate script
+        echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> "$VENV_PATH/bin/activate"
+        echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> "$VENV_PATH/bin/activate"
     fi
 fi
+
 
 # ---------------------------------------------------------
 # Step 5: Install Python Libraries (with Smart Bypass)
@@ -203,7 +208,7 @@ run_pip_command() {
     fi
 }
 
-run_pip_command install --upgrade pip quiet
+run_pip_command install --upgrade pip --quiet
 
 # Inline Python check for existing, valid PyTorch
 TORCH_VALID=false
@@ -222,9 +227,14 @@ sys.exit(1)
     TORCH_VALID=true
 fi
 
+if [ "$TORCH_VALID" = false ]; then
+    echo -e "${MAGENTA}-> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
+    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL
+fi
+
 # Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install eiko[jax]
+run_pip_command install eiko[jax] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 # ---------------------------------------------------------
 # Verification
