@@ -128,8 +128,10 @@ fi
 if [ "$INSTALL_CUDA" = true ]; then
     echo -e "${MAGENTA}-> Installing ${TARGET_CUDA_PKG}...${NC}"
     OS_ID=${VERSION_ID//./}
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "aarch64" ]; then ARCH="sbsa"; fi # NVIDIA uses 'sbsa' for ARM64 repos
     
-    wget -qO cuda-keyring.deb "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${OS_ID}/x86_64/cuda-keyring_1.1-1_all.deb"
+    wget -qO cuda-keyring.deb "https://developer.download.nvidia.com/compute/cuda/repos/${OS_REPO_STR}/${ARCH}/cuda-keyring_1.1-1_all.deb"
     sudo dpkg -i cuda-keyring.deb
     rm cuda-keyring.deb
     
