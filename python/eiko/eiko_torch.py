@@ -108,12 +108,17 @@ except ImportError:
                 print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
                 
             # 3. NVCC Missing (Cross-Platform)
-            elif "nvcc" in error_msg or "cuda" in error_msg:
-                print("DIAGNOSIS: The NVIDIA CUDA Toolkit ('nvcc') was not found or failed to execute.")
-                print("FIX: Ensure the CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
+            elif "['which', 'nvcc']" in error_msg or "command 'nvcc' failed" in error_msg or "executable 'nvcc' not found" in error_msg:
+                print("DIAGNOSIS: The NVIDIA CUDA compiler ('nvcc') was not found on your system path.")
+                print("FIX: Ensure the NVIDIA CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
                 print("🔗 Download CUDA here: https://developer.nvidia.com/cuda-downloads")
-                
-            # 4. Generic Compilation Failure
+            # 4. CUDA Architecture or Runtime Mismatch (e.g., your recent sm_120 error)
+            elif "sm_" in error_msg or "compute_" in error_msg or "compatibility" in error_msg or "undefined symbol" in error_msg:
+                print("DIAGNOSIS: Hardware/Software architecture compatibility mismatch.")
+                print("The compilation failed because your PyTorch or CUDA driver version doesn't align with your GPU capability.")
+                print("\nCOMPILER OUTPUT SNIPPET:")
+                print(str(e))
+            # 5. Generic Compilation Failure
             else:
                 print("COMPILER OUTPUT:")
                 print(str(e))

@@ -49,7 +49,6 @@ else:
 
 EXTRA_INCLUDE_PATHS = [SRC_DIR]
 
-print(f"Extra include dir: {SRC_DIR}")
 # ------------------------------------------------------------------------
 # 4. CUDA Toolkit & CCCL Include Resolution
 # ------------------------------------------------------------------------
