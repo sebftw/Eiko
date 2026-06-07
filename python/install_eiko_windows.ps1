@@ -4,7 +4,8 @@
 # Capture the active virtual environment before elevation context is lost
 param (
     [string]$InheritedVenv = $env:VIRTUAL_ENV,
-    [string]$InvokerProfile = $env:USERPROFILE
+    [string]$InvokerProfile = $env:USERPROFILE,
+    [string]$InvokerName = $env:USERNAME # Add this
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +16,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     Write-Host "[*] Requesting Administrator privileges for system checks..." -ForegroundColor Cyan
     # Pass the current VIRTUAL_ENV to the elevated process so it isn't forgotten
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`"" -Verb RunAs
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`" -InvokerName `"$InvokerName`"" -Verb RunAs
     Exit
 }
 
@@ -58,7 +59,7 @@ if ($nvidiaSmi) {
             $driverValid = $false
         } else {
             $driverValid = $true
-        )
+        }
     }
 } else {
     Write-Host "-> No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
@@ -139,7 +140,7 @@ if ($pyCheck) {
 
 if ($installPython) {
     Write-Host "-> Installing Python 3.12..." -ForegroundColor Magenta
-    winget install -e --id Python.Python.3.12 --accept-source-agreements --scope machine --override "/passive Precompile=1 Include_debug=1 Include_symbols=1" --accept-package-agreements
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --scope machine --override "/passive Precompile=1 Include_debug=1 Include_symbols=1 PrependPath=1" --accept-package-agreements
     Refresh-EnvPath
 }
 
@@ -156,13 +157,10 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
     Write-Host "-> Skipping environment creation. Integrating directly." -ForegroundColor Yellow
 } else {
     # Scenario B & C: No active venv, check for existing or create new
-    $venvPath = "$env:USERPROFILE\eiko"
-    
     if (Test-Path "$venvPath\Scripts\activate") {
         Write-Host "-> Found existing 'eiko' environment at $venvPath." -ForegroundColor Yellow
     } else {
         Write-Host "-> Creating new virtual environment at $venvPath..." -ForegroundColor Magenta
-        
         # Ensure we only grab the first result if multiple python exes exist
         $pythonExe = (Get-Command python -ErrorAction SilentlyContinue | Select-Object -First 1).Source
         if (-not $pythonExe) { 
@@ -171,6 +169,12 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
         }
         
         & $pythonExe -m venv $venvPath
+
+        # Grant the standard user full control over the new venv
+        $acl = Get-Acl $venvPath
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($InvokerName, "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+        $acl.AddAccessRule($rule)
+        Set-Acl -Path $venvPath -AclObject $acl
     }
 }
 
@@ -180,7 +184,7 @@ if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) {
 Write-Host "`n[5/5] Checking existing Eiko ML Stack..." -ForegroundColor Cyan
 
 function Run-PipCommand ([string[]]$PipArgs) {
-    & "$venvPath\Scripts\pip.exe" @PipArgs
+    & "$venvPath\Scripts\pip.exe" $PipArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Network or Package Error occurred during pip installation." -ForegroundColor Red
         Write-Host "Command failed: pip $($PipArgs -join ' ')" -ForegroundColor DarkGray
