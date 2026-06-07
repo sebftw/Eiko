@@ -287,7 +287,7 @@ echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} Verification Running...                            ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
-"$VENV_PATH/bin/python" -c "import ninja; import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"
+"$VENV_PATH/bin/python" -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"
 
 echo -e "\n${GREEN}[*] Installation Complete!${NC}"
 if [ -z "$VIRTUAL_ENV" ]; then
