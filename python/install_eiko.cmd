@@ -38,8 +38,8 @@ fi
 # Execute the user's script using the venv Python
 exec "$VENV_PATH/bin/python" "$@"
 
-# Crucial: Stop Bash from reading into the Windows section
-exit $?
+# Stop Bash from reading into the Windows section
+exit 0
 
 :WINDOWS_START
 @ECHO OFF
