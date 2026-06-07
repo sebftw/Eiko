@@ -36,16 +36,14 @@ if [ ! -f "$VENV_PATH/bin/activate" ] || ! "$VENV_PATH/bin/python" -c "import ei
     fi
 fi
 
-# Execute the user's script if arguments are provided, 
-# otherwise launch the interactive Python shell safely.
+# Execute the user's script using the venv Python
 if [ $# -gt 0 ]; then
     exec "$VENV_PATH/bin/python" "$@"
 else
-    exec "$VENV_PATH/bin/python"
+    # If no arguments, launch an interactive REPL cleanly 
+    # without letting it read the rest of this file.
+    exec "$VENV_PATH/bin/python" < /dev/tty
 fi
-
-# Stop Bash from reading into the Windows section
-exit 0
 
 :WINDOWS_START
 @ECHO OFF
