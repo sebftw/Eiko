@@ -35,4 +35,5 @@
 # Specifically ensure shell scripts and python scripts use LF
 *.sh text eol=lf
 *.cmd text eol=lf
+*.bat text eol=lf
 *.py text eol=lf
