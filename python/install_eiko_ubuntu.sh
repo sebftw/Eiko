@@ -2,7 +2,8 @@
 # ==============================================================================
 # Eiko Smart Linux Environment Installer (Ubuntu/Debian)
 # ==============================================================================
-set -e
+# We remove global 'set -e' because it forces violent drops when sourced.
+# Instead, we will catch errors surgically.
 
 # Colors for terminal output
 GREEN='\033[0;32m'
@@ -13,13 +14,24 @@ RED='\033[0;31m'
 DARK_GRAY='\033[1;30m'
 NC='\033[0m' # No Color
 
+# Helper function to exit cleanly whether sourced or executed directly
+safe_exit() {
+    local code=${1:-0}
+    # Check if the script was sourced or executed directly
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+        return "$code"
+    else
+        exit "$code"
+    fi
+}
+
 echo -e "${GREEN}====================================================${NC}"
 echo -e "${GREEN} Starting Eiko Smart Environment Setup (Linux)      ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
 # Request sudo privileges upfront for system checks
 echo -e "[*] Requesting sudo privileges for system checks..."
-sudo -v
+sudo -v || safe_exit 1
 # Keep sudo alive while the script runs
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
@@ -41,7 +53,6 @@ if grep -qi microsoft /proc/version || [ -n "$WSL_DISTRO_NAME" ]; then
 fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
-    # This command works in both Linux and WSL
     DRIVER_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | cut -d'.' -f1)
     echo -e "${DARK_GRAY}-> Found active NVIDIA driver: v${DRIVER_VER}${NC}"
 
@@ -59,7 +70,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then
             echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
             echo -e "  3. Reboot your computer and run this script again."
             read -p $'\nPress Enter to exit'
-            exit 1
+            safe_exit 1
         else
             UPDATE_DRIVER=true
         fi
@@ -77,7 +88,7 @@ else
         echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
         echo -e "  3. Reboot your computer and run this script again."
         read -p $'\nPress Enter to exit'
-        exit 1
+        safe_exit 1
     else
         UPDATE_DRIVER=true
     fi
@@ -93,15 +104,15 @@ if [ "$UPDATE_DRIVER" = true ]; then
         sudo ubuntu-drivers autoinstall
         
         echo -e "\n${RED}====================================================${NC}"
-        echo -e "${RED} CRITICAL: SYSTEM REBOOT REQUIRED                   ${NC}"
+        echo -e "${RED} CRITICAL: SYSTEM REBOOT REQUIRED                    ${NC}"
         echo -e "${RED}====================================================${NC}"
         echo -e "${YELLOW}The NVIDIA display driver has been updated. The CUDA toolkit cannot map to the GPU until the kernel reloads.${NC}"
         echo -e "Please reboot your computer, then run this script again to finish the Eiko installation."
-        exit 0
+        safe_exit 0
     else
         echo -e "\n${RED}[!] Cannot proceed without a compatible NVIDIA driver.${NC}"
         echo -e "Update your drivers manually, reboot, and rerun this script."
-        exit 1
+        safe_exit 1
     fi
 fi
 
@@ -129,18 +140,17 @@ source /etc/os-release
 # ---------------------------------------------------------
 # Determine Target Matrix based on OS Version
 # ---------------------------------------------------------
-
 if [ "$VERSION_ID" == "20.04" ]; then
     echo -e "${YELLOW}-> Detected Ubuntu 20.04. Engaging Legacy Compatibility Mode...${NC}"
-    TARGET_CUDA_PKG="cuda-toolkit-12-1" # Highest version for Ubuntu 20.04 is 12.4
-    TARGET_CUDA_VER="12.1" # Lowest version that we support
+    TARGET_CUDA_PKG="cuda-toolkit-12-1"
+    TARGET_CUDA_VER="12.1"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu121"
     TARGET_TORCH_VER="torch==2.4.0 torchvision"
-	TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
+    TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
     MIN_PYTHON_VER=3.8
 else
     echo -e "${CYAN}-> Detected Modern Ubuntu. Engaging Next-Gen Mode...${NC}"
-    TARGET_CUDA_PKG="cuda-toolkit-12-6" # Highest version for Ubuntu 22.04 is 12.8
+    TARGET_CUDA_PKG="cuda-toolkit-12-6"
     TARGET_CUDA_VER="12.6"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu126"
     TARGET_TORCH_VER="torch torchvision"
@@ -174,16 +184,19 @@ fi
 
 if [ "$INSTALL_CUDA" = true ]; then
     echo -e "${MAGENTA}-> Installing ${TARGET_CUDA_PKG}...${NC}"
-    OS_ID=${VERSION_ID//./}
     ARCH=$(uname -m)
-    if [ "$ARCH" = "aarch64" ]; then ARCH="sbsa"; fi # NVIDIA uses 'sbsa' for ARM64 repos
+    if [ "$ARCH" = "aarch64" ]; then ARCH="sbsa"; fi
     
-    wget -qO cuda-keyring.deb "https://developer.download.nvidia.com/compute/cuda/repos/${OS_REPO_STR}/${ARCH}/cuda-keyring_1.1-1_all.deb"
-    sudo dpkg -i cuda-keyring.deb
-    rm cuda-keyring.deb
-    
-    sudo apt-get update -qq
-    sudo apt-get install -y $TARGET_CUDA_PKG
+    # Simple explicit error check for wget payload
+    if wget -qO cuda-keyring.deb "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${VERSION_ID//./}/${ARCH}/cuda-keyring_1.1-1_all.deb"; then
+        sudo dpkg -i cuda-keyring.deb
+        rm cuda-keyring.deb
+        sudo apt-get update -qq
+        sudo apt-get install -y $TARGET_CUDA_PKG
+    else
+        echo -e "${RED}[!] Failed to download CUDA GPG keys.${NC}"
+        safe_exit 1
+    fi
 fi
 
 export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
@@ -215,7 +228,6 @@ if [ "$INSTALL_PYTHON" = true ]; then
     PYTHON_EXE="python3.12"
 fi
 
-# Ensure the native venv module is installed if we are using the system Python
 if [ "$INSTALL_PYTHON" = false ]; then
     sudo apt-get install -y python${PY_VER}-venv python${PY_VER}-dev >/dev/null 2>&1 || true
 fi
@@ -225,7 +237,6 @@ fi
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[4/5] Checking virtual environment...${NC}"
 
-# (Environment detection remains exactly the same)
 VENV_PATH="$HOME/eiko"
 if [ -n "$VIRTUAL_ENV" ]; then
     VENV_PATH="$VIRTUAL_ENV"
@@ -235,10 +246,9 @@ else
         echo -e "${MAGENTA}-> Creating new virtual environment...${NC}"
         $PYTHON_EXE -m venv "$VENV_PATH"
         
-        # Inject CUDA paths into the activate script
         echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> "$VENV_PATH/bin/activate"
         echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> "$VENV_PATH/bin/activate"
-		echo 'export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:${LD_PRELOAD}' >> "$VENV_PATH/bin/activate"
+        echo 'export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:${LD_PRELOAD}' >> "$VENV_PATH/bin/activate"
     fi
 fi
 
@@ -247,28 +257,24 @@ source "$VENV_PATH/bin/activate"
 export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:$LD_PRELOAD
 
 # ---------------------------------------------------------
-# Step 5: Install Python Libraries (with Smart Bypass)
+# Step 5: Install Python Libraries
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 
-
 run_pip_command() {
     local pip_exe="pip"
-    set +e 
-    "$pip_exe" "$@"
-    local exit_code=$?
-    set -e
-    if [ $exit_code -ne 0 ]; then
+    # Execute pip silently, safely handle failures manually rather than using set -e
+    if ! "$pip_exe" "$@" --quiet; then
         echo -e "\n${RED}[!] Error occurred during pip installation.${NC}"
-        exit 1
+        return 1
     fi
+    return 0
 }
 
-run_pip_command install --upgrade pip --quiet
+run_pip_command install --upgrade pip || safe_exit 1
 
-# Inline Python check for existing, valid PyTorch
 TORCH_VALID=false
-if "python" -c "
+if python -c "
 import sys
 try:
     import torch
@@ -285,13 +291,12 @@ fi
 
 if [ "$TORCH_VALID" = false ]; then
     echo -e "${MAGENTA}-> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
-    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --quiet
+    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL || safe_exit 1
 fi
 
-# Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html --quiet
-run_pip_command install "eiko[jax]" --quiet
+run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
+run_pip_command install "eiko[jax]" || safe_exit 1
 
 # ---------------------------------------------------------
 # Verification
@@ -300,10 +305,12 @@ echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} Verification Running...                            ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
-python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"
-
-echo -e "\n${GREEN}[*] Installation Complete!${NC}"
-if [ -z "$VIRTUAL_ENV" ]; then
-    echo -e "To activate your environment in the future, run: \n${CYAN}source $VENV_PATH/bin/activate${NC}"
+if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')" 2>/dev/null; then
+    echo -e "\n${GREEN}[*] Installation Complete!${NC}"
+    if [ -z "$VIRTUAL_ENV" ]; then
+        echo -e "Your environment is now active in this shell!"
+    fi
+else
+    echo -e "${RED}[!] Verification failed. Runtime environment setup is broken.${NC}"
+    safe_exit 1
 fi
-
