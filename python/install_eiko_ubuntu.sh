@@ -277,13 +277,13 @@ fi
 
 if [ "$TORCH_VALID" = false ]; then
     echo -e "${MAGENTA}-> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
-    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL
+    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL > /dev/null 2>&1
 fi
 
 # Install Eiko (pip will natively accept the existing torch if TORCH_VALID was true)
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-run_pip_command install "eiko[jax]"
+run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html > /dev/null 2>&1
+run_pip_command install "eiko[jax]" > /dev/null 2>&1
 
 # ---------------------------------------------------------
 # Verification
