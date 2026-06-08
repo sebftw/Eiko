@@ -330,7 +330,7 @@ echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} Verification Running...                            ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
-if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')" then
+if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"; then
     echo -e "\n${GREEN}[*] Installation Complete!${NC}"
     if [ -z "$VIRTUAL_ENV" ]; then
         echo -e "Your environment is now active in this shell!"
