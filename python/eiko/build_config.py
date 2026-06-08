@@ -117,7 +117,7 @@ else:
     # Prioritize g++-10 on older setups, but fall back to g++-11/default if on newer OS
     custom_compiler = shutil.which("g++-10") or shutil.which("g++-11")
     if custom_compiler:
-        NVCC_ARGS += [f"-ccbin={custom_compiler}"]
+        NVCC_ARGS.append(f"-ccbin={custom_compiler}")
 
 if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')

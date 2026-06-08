@@ -263,13 +263,20 @@ echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 
 run_pip_command() {
     local pip_exe="pip"
-    # Execute pip silently, safely handle failures manually rather than using set -e
-    if ! "$pip_exe" "$@" --quiet; then
+    
+    # 1. Run pip normally (no --quiet flags)
+    # 2. Filter out the specific "Requirement already satisfied" lines via grep
+    # 3. Preserve exit codes so failures are still caught accurately
+    set +e
+    "$pip_exe" "$@" 2>&1 | grep -v "Requirement already satisfied"
+    local exit_code=${PIPESTATUS[0]} # Captures the exit code of pip, not grep
+    set -e
+    
+    if [ $exit_code -ne 0 ]; then
         echo -e "\n${RED}[!] Error occurred during pip installation.${NC}"
         return 1
     fi
     return 0
-}
 
 run_pip_command install --upgrade pip || safe_exit 1
 
