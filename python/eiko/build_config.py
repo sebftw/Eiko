@@ -114,7 +114,8 @@ else:
     CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-fPIC', '-fvisibility=hidden'])
     NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC'])
     
-    custom_compiler = shutil.which("g++-11")
+    # Prioritize g++-10 on older setups, but fall back to g++-11/default if on newer OS
+    custom_compiler = shutil.which("g++-10") or shutil.which("g++-11")
     if custom_compiler:
         NVCC_ARGS += [f"-ccbin={custom_compiler}"]
 

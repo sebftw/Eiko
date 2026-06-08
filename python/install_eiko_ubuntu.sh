@@ -116,12 +116,12 @@ else
     sudo apt-get install -y build-essential
 fi
 
-# 2. Install GCC 11 toolchain (leaves default gcc/g++ untouched)
-if dpkg -s g++-11 >/dev/null 2>&1; then
-    echo -e "${YELLOW}-> GCC 11 toolchain already available.${NC}"
+# Install GCC 10 toolchain (leaves default gcc/g++ untouched)
+if dpkg -s g++-10 >/dev/null 2>&1; then
+    echo -e "${YELLOW}-> GCC 10 toolchain already available.${NC}"
 else
-    echo -e "${MAGENTA}-> Installing GCC 11 toolchain for isolated C++20 compilation...${NC}"
-    sudo apt-get install -y gcc-11 g++-11
+    echo -e "${MAGENTA}-> Installing GCC 10 toolchain for isolated C++20 compilation...${NC}"
+    sudo apt-get install -y gcc-10 g++-10
 fi
 
 source /etc/os-release
