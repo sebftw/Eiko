@@ -8,7 +8,6 @@ dynamic = ["version", "license"]  # Grab version and license from setup.py
 description = "Eiko: the GPU-accelerated Eikonal equation solver"
 readme = "README.md"
 requires-python = ">=3.8"  # Required for PyTorch 2.4.0
-license = { file = "LICENSE" }
 authors = [
     {name = "Sebastian Kazmarek Præsius", email = "sebastian.devel@gmail.com"},
 ]
