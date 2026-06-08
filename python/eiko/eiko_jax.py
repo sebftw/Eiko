@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+from functools import partial
 
 try:
     import jax
