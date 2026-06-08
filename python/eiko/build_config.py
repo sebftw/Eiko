@@ -87,7 +87,7 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
-        '/permissive-', '/EHsc', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
+        '/permissive-', '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX', '/wd3189'
     ])
     NVCC_ARGS.extend([
@@ -95,11 +95,11 @@ if sys.platform == "win32":
         '-Xcompiler', '/Zc:preprocessor', 
         '-Xcompiler', '/wd3189', 
         '-Xcompiler', '/permissive-',
-        '-Xcompiler', '/EHsc',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '-DTHRUST_FORCE_COMPATIBILITY',
         '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
-        '-DNOMINMAX'
+        '-DNOMINMAX',
+        '-Xcompiler', '/MD,/EHsc'
     ])
 else:
     # Safely detect the ABI flag from the active PyTorch installation
@@ -110,8 +110,8 @@ else:
         # Fallback to "0" (or "1" depending on your project's primary target) if torch isn't installed yet
         abi_val = "0"
 
-    CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}'])
-    NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}'])
+    CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-fPIC', '-fvisibility=hidden'])
+    NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC'])
 
 if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')
