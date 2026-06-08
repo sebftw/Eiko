@@ -127,14 +127,6 @@ else
     sudo apt-get install -y build-essential
 fi
 
-# Install GCC 10 toolchain (leaves default gcc/g++ untouched)
-if dpkg -s g++-10 >/dev/null 2>&1; then
-    echo -e "${YELLOW}-> GCC 10 toolchain already available.${NC}"
-else
-    echo -e "${MAGENTA}-> Installing GCC 10 toolchain for isolated C++20 compilation...${NC}"
-    sudo apt-get install -y gcc-10 g++-10
-fi
-
 source /etc/os-release
 
 # ---------------------------------------------------------
@@ -148,6 +140,14 @@ if [ "$VERSION_ID" == "20.04" ]; then
     TARGET_TORCH_VER="torch==2.4.0 torchvision"
     TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
     MIN_PYTHON_VER=3.8
+	
+	# Install GCC 10 toolchain (leaves default gcc/g++ untouched)
+	if dpkg -s g++-10 >/dev/null 2>&1; then
+		echo -e "${YELLOW}-> GCC 10 toolchain already available.${NC}"
+	else
+		echo -e "${MAGENTA}-> Installing GCC 10 toolchain for isolated C++20 compilation...${NC}"
+		sudo apt-get install -y gcc-10 g++-10
+	fi
 else
     echo -e "${CYAN}-> Detected Modern Ubuntu. Engaging Next-Gen Mode...${NC}"
     TARGET_CUDA_PKG="cuda-toolkit-12-6"
@@ -245,16 +245,33 @@ else
     if [ ! -f "$VENV_PATH/bin/activate" ]; then
         echo -e "${MAGENTA}-> Creating new virtual environment...${NC}"
         $PYTHON_EXE -m venv "$VENV_PATH"
-        
-        echo 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' >> "$VENV_PATH/bin/activate"
-        echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' >> "$VENV_PATH/bin/activate"
-        echo 'export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:${LD_PRELOAD}' >> "$VENV_PATH/bin/activate"
     fi
 fi
 
+# Helper function to append a line to the activate file ONLY if it doesn't exist
+append_if_missing() {
+    local line="$1"
+    local file="$2"
+    # Escapes backslashes and special chars to avoid grep pattern breakage
+    if ! grep -Fq "$line" "$file" 2>/dev/null; then
+        echo "$line" >> "$file"
+    fi
+}
+
+ACTIVATE_SCRIPT="$VENV_PATH/bin/activate"
+
+# Inject core CUDA paths safely (Idempotent)
+append_if_missing 'export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}' "$ACTIVATE_SCRIPT"
+append_if_missing 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}' "$ACTIVATE_SCRIPT"
+append_if_missing 'export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:${LD_PRELOAD}' "$ACTIVATE_SCRIPT"
+
+# Inject C++20 isolated compiler overrides if on Ubuntu 20.04 (Idempotent)
+if [ "$VERSION_ID" == "20.04" ]; then
+    append_if_missing 'if command -v g++-10 >/dev/null 2>&1; then export CC=gcc-10; export CXX=g++-10; fi' "$ACTIVATE_SCRIPT"
+fi
+
 echo -e "${DARK_GRAY}-> Activating environment session...${NC}"
-source "$VENV_PATH/bin/activate"
-export LD_PRELOAD=/usr/local/cuda/lib64/libcudart.so:$LD_PRELOAD
+source "$ACTIVATE_SCRIPT"
 
 # ---------------------------------------------------------
 # Step 5: Install Python Libraries
