@@ -1,5 +1,6 @@
 import os
 import sys
+import shutil
 from pathlib import Path
 
 # ------------------------------------------------------------------------
@@ -112,6 +113,10 @@ else:
 
     CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-fPIC', '-fvisibility=hidden'])
     NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC'])
+    
+    custom_compiler = shutil.which("g++-11")
+    if custom_compiler:
+        NVCC_ARGS += [f"-ccbin={custom_compiler}"]
 
 if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')
