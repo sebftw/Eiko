@@ -134,10 +134,10 @@ source /etc/os-release
 # ---------------------------------------------------------
 if [ "$VERSION_ID" == "20.04" ]; then
     echo -e "${YELLOW}-> Detected Ubuntu 20.04. Engaging Legacy Compatibility Mode...${NC}"
-    TARGET_CUDA_PKG="cuda-toolkit-12-1"
-    TARGET_CUDA_VER="12.1"
-    TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu121"
-    TARGET_TORCH_VER="torch==2.4.0 torchvision"
+    TARGET_CUDA_PKG="cuda-toolkit-12-4"
+    TARGET_CUDA_VER="12.4"
+    TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu124"
+    TARGET_TORCH_VER="torch==2.4.1 torchvision"
     TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
     MIN_PYTHON_VER=3.8
 	
@@ -281,22 +281,22 @@ echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 run_pip_command() {
     local pip_exe="pip"
     
-    # 1. Run pip normally (no --quiet flags)
-    # 2. Filter out the specific "Requirement already satisfied" lines via grep
-    # 3. Preserve exit codes so failures are still caught accurately
     set +e
-    "$pip_exe" "$@" 2>&1 | grep -E -v "Requirement already satisfied|does not provide the extra"
-    local exit_code=${PIPESTATUS[0]} # Captures the exit code of pip, not grep
+    # 1. 2>&1 merges stderr into stdout so grep can filter both
+    # 2. --line-buffered prevents the terminal from appearing "frozen" during long steps
+    "$pip_exe" --no-input "$@" 2>&1 | grep --line-buffered -E -v "Requirement already satisfied|does not provide the extra|Looking in links"
+    
+    local exit_code=${PIPESTATUS[0]}
     set -e
     
     if [ $exit_code -ne 0 ]; then
-        echo -e "\n${RED}[!] Error occurred during pip installation.${NC}"
+        echo -e "\n${RED}[!] Error occurred during pip execution.${NC}"
         return 1
     fi
     return 0
 }
 
-run_pip_command install --upgrade pip || safe_exit 1
+run_pip_command install --upgrade pip --no-input || safe_exit 1
 
 TORCH_VALID=false
 if python -c "
@@ -310,25 +310,24 @@ except ImportError:
     pass
 sys.exit(1)
 " 2>/dev/null; then
-    echo -e "${GREEN}-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping wheel downloads.${NC}"
+    echo -e "${YELLOW}-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping installation.${NC}"
     TORCH_VALID=true
 fi
 
 if [ "$TORCH_VALID" = false ]; then
     echo -e "${MAGENTA}-> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
-    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL || safe_exit 1
+    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
 fi
 
 echo -e "${MAGENTA}-> Installing Eiko...${NC}"
-run_pip_command install $TARGET_JAX_VER -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
-run_pip_command install "eiko[jax]" || safe_exit 1
+run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
+run_pip_command install "eiko[jax]" --no-input || safe_exit 1
 
 # ---------------------------------------------------------
 # Verification
 # ---------------------------------------------------------
-echo -e "\n${GREEN}====================================================${NC}"
-echo -e "${GREEN} Verification Running...                            ${NC}"
-echo -e "${GREEN}====================================================${NC}"
+echo -e "${MAGENTA}-> Verifying Eiko installation...${NC}"
+export TORCH_CUDA_ARCH_LIST=$(python3 -c "import torch; print('.'.join(map(str, torch.cuda.get_device_capability())))")
 
 if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"; then
     echo -e "\n${GREEN}[*] Installation Complete!${NC}"
@@ -339,4 +338,3 @@ else
     echo -e "${RED}[!] Verification failed. Runtime environment setup is broken.${NC}"
     safe_exit 1
 fi
-
