@@ -15,8 +15,8 @@ jobs:
       matrix:
         platform:
           # --- Legacy Floor (Max Backwards Compatibility) ---
-          - { torch: '2.4.0', cuda: '12.1.1', os_version: '20.04' }
-          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          - { torch: '2.4.0', cuda: '12.4.1', os_version: '20.04' }
+          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
           # - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
@@ -243,7 +243,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: false 
+    if: false
     strategy:
       fail-fast: false
       matrix:
