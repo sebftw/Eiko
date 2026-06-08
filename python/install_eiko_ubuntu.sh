@@ -294,6 +294,7 @@ run_pip_command() {
         return 1
     fi
     return 0
+}
 
 run_pip_command install --upgrade pip || safe_exit 1
 
