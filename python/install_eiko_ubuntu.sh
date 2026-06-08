@@ -285,7 +285,7 @@ run_pip_command() {
     # 2. Filter out the specific "Requirement already satisfied" lines via grep
     # 3. Preserve exit codes so failures are still caught accurately
     set +e
-    "$pip_exe" "$@" 2>&1 | grep -v "Requirement already satisfied"
+    "$pip_exe" "$@" 2>&1 | grep -E -v "Requirement already satisfied|does not provide the extra"
     local exit_code=${PIPESTATUS[0]} # Captures the exit code of pip, not grep
     set -e
     
@@ -330,7 +330,7 @@ echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} Verification Running...                            ${NC}"
 echo -e "${GREEN}====================================================${NC}"
 
-if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')" 2>/dev/null; then
+if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')" then
     echo -e "\n${GREEN}[*] Installation Complete!${NC}"
     if [ -z "$VIRTUAL_ENV" ]; then
         echo -e "Your environment is now active in this shell!"
