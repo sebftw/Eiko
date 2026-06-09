@@ -43,7 +43,18 @@ sudo apt-get update -qq
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[0/5] Checking NVIDIA Driver Compatibility...${NC}"
 
-MIN_DRIVER=550 
+# Source OS release early to set driver versions dynamically
+if [ -f /etc/os-release ]; then
+    source /etc/os-release
+fi
+
+# Dynamically assign minimum driver based on targeted CUDA version
+if [ "$VERSION_ID" == "20.04" ]; then
+    MIN_DRIVER=550 # Requirement for CUDA 12.4
+else
+    MIN_DRIVER=560 # Requirement for CUDA 12.6
+fi
+
 UPDATE_DRIVER=false
 IS_WSL=false
 
@@ -126,8 +137,6 @@ else
     echo -e "${MAGENTA}-> Installing GCC and standard build utilities...${NC}"
     sudo apt-get install -y build-essential
 fi
-
-source /etc/os-release
 
 # ---------------------------------------------------------
 # Determine Target Matrix based on OS Version
