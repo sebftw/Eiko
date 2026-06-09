@@ -9,6 +9,9 @@
 % which will correctly use this function.
 % =========================================================================
 function [u_out, varargout] = solve_eikonal_core(u_init, f, v, dx, msfm, gated_x, is_3d)
+    
+    eiko_lib.setup();
+    
     % Whether v is supplied.
     has_v = ~isempty(v);
 
