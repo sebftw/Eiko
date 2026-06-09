@@ -4,6 +4,7 @@
 :; # ==============================================================================
 :; # Linux/Bash Section
 :; source <(wget -qO- https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_ubuntu.sh) #
+:; read -n 1 -s -r -p "Installation complete. Press any key to continue..." #
 :; exit $? #
 
 @echo off
