@@ -12,3 +12,8 @@ replace = "__version__ = '{new_version}'"
 file = "CITATION.cff"
 search = "version: {current_version}"
 replace = "version: {new_version}"
+
+[[tool.bumpversion.files]]
+file = "matlab/eiko/eiko_lib/setup.m"
+search = "version = '{current_version}'"
+replace = "version = '{new_version}'"
