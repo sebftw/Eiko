@@ -2,8 +2,8 @@ function ver_out = setup(build_type)
     % SETUP Compiles and installs Eiko CUDA MEX bindings for MATLAB.
     %
     % Usage:
-    %   setup()          - Compiles for the local GPU (-arch=native) using C++17.
-    %   setup('native')  - Compiles for the local GPU (-arch=native) using C++17.
+    %   setup()          - Compiles for the local GPU (-arch=native).
+    %   setup('native')  - Compiles for the local GPU (-arch=native).
     %   setup('release') - Compiles a fat binary (-arch=all-major).
     %   setup('version') - Returns the current version of Eiko.
     
@@ -14,9 +14,9 @@ function ver_out = setup(build_type)
     end
     
     EIKO_VERSION = '0.8.5';
-    ver_out = EIKO_VERSION;
     
     if strcmpi(build_type, 'version')
+        ver_out = EIKO_VERSION;
         return;
     end
     
@@ -31,14 +31,16 @@ function ver_out = setup(build_type)
     %% 1. CUDA Setup & Version Detection
     logMessage('Compiling MEX extension for MATLAB... (This may take a minute)');
     
-    builtin_ver = getBuiltinCUDAVersion();
-    [user_nvcc, user_ver] = findUserCUDA();
+    [best_nvcc, nvcc_ver] = findBestNVCC();
     
-    use_user_cuda = (user_ver > builtin_ver);
-    if use_user_cuda
-        logMessage('Detected user-installed CUDA (v%.1f).', user_ver);
+    if ~isempty(best_nvcc)
+        if contains(best_nvcc, matlabroot)
+            logMessage('Detected MATLAB-shipped NVCC (v%.1f).', nvcc_ver);
+        else
+            logMessage('Detected user-installed CUDA (v%.1f).', nvcc_ver);
+        end
     else
-        logMessage('Using MATLAB''s built-in CUDA (v%.1f).', builtin_ver);
+        logMessage('No standalone NVCC found. Relying strictly on mexcuda fallbacks.');
     end
     
     %% 2. Compilation Flags & Architecture Configuration
@@ -51,7 +53,7 @@ function ver_out = setup(build_type)
     base_flags = '-std=c++17 -DMATLAB_MEX_FILE --use_fast_math ';
     
     % OS-Specific Flags
-    [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(user_nvcc);
+    [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(best_nvcc);
     
     nvcc_arg_specific = ['NVCCFLAGS=', arch_flag, ' ', base_flags, os_flags];
     nvcc_arg_fallback = ['NVCCFLAGS=', base_flags, os_flags];
@@ -66,27 +68,26 @@ function ver_out = setup(build_type)
     includes = includes(cellfun(@(x) exist(x, 'dir') == 7, includes));
     includes_str = strjoin(cellfun(@(x) sprintf('-I"%s"', x), includes, 'UniformOutput', false), ' ');
     
-    [link_flags, fallback_libs] = getLinkerFlags(user_nvcc);
+    [link_flags, fallback_libs] = getLinkerFlags(best_nvcc);
 
     %% 4. Execution Phase
     success = false;
     attempt = 1;
     
-    if use_user_cuda
-        logMessage('Attempt %d: Compiling with user-installed CUDA (bypassing mexcuda)...', attempt);
+    if ~isempty(best_nvcc)
+        logMessage('Attempt %d: Compiling with NVCC...', attempt);
         
-        % Formulate NVCC Command
         obj_file = fullfile(config.OutDir, ['mex_bindings', obj_ext]);
-        cccl_flags = getCCCLFlags(user_nvcc);
-        [cuda_root, ~, ~] = fileparts(fileparts(user_nvcc));
+        cccl_flags = getCCCLFlags(best_nvcc);
+        [cuda_root, ~, ~] = fileparts(fileparts(best_nvcc));
         
         nvcc_cmd = sprintf('"%s" %s -c "%s" -o "%s" %s %s %s %s %s %s -I"%s"', ...
-            user_nvcc, ccbin_flag, config.SourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag, fullfile(cuda_root, 'include'));
+            best_nvcc, ccbin_flag, config.SourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag, fullfile(cuda_root, 'include'));
         
         if ispc
             vcvars_cmd = getMSVCEnvironment();
             if ~isempty(vcvars_cmd)
-                logMessage('Pre-activating shell environment.');
+                logMessage('Activating MSVC environment.');
                 nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
             end
         end
@@ -94,7 +95,7 @@ function ver_out = setup(build_type)
         try
             [st, cmdout] = system(nvcc_cmd);
             if st == 0
-                logMessage('NVCC compilation succeeded. Starting MEX linkage...');
+                logMessage('NVCC compilation successful. Linking MEX...');
                 mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', config.OutDir, '-lut', link_flags{:});
                 
                 if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file')
@@ -127,7 +128,7 @@ function ver_out = setup(build_type)
                 mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_fallback, sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
                 success = true;
             catch ME2
-                logMessage('Compilation completely failed.');
+                logMessage('Compilation failed.');
                 rethrow(ME2);
             end
         end
@@ -147,22 +148,24 @@ function logMessage(msg, varargin)
     fprintf(['[Eiko] ' msg '\n'], varargin{:});
 end
 
-function ver = getBuiltinCUDAVersion()
-    ver = 0;
-    try
-        parallel.gpu.enableCUDAForwardCompatibility(true); 
-        gpu = gpuDevice();
-        ver = gpu.ToolkitVersion;
-    catch
-        % Fails safely if no GPU
-    end
-end
-
-function [best_nvcc, max_ver] = findUserCUDA()
+function [best_nvcc, max_ver] = findBestNVCC()
     candidates = {};
     ext = ''; if ispc, ext = '.exe'; end
     
-    % Strategy 1: Environment Variables
+    % Strategy 1: Built-in MATLAB Shipped NVCC
+    arch = computer('arch');
+    matlab_paths = {
+        fullfile(matlabroot, 'sys', 'cuda', arch, 'cuda', 'bin', ['nvcc' ext]), ...
+        fullfile(matlabroot, 'toolbox', 'parallel', 'gpu', 'extern', 'bin', ['nvcc' ext]), ...
+        fullfile(matlabroot, 'bin', arch, ['nvcc' ext])
+    };
+    for i = 1:length(matlab_paths)
+        if exist(matlab_paths{i}, 'file')
+            candidates{end+1} = matlab_paths{i}; %#ok<AGROW>
+        end
+    end
+    
+    % Strategy 2: Environment Variables
     env_vars = {'CUDA_PATH', 'CUDA_HOME'};
     for i = 1:length(env_vars)
         p = getenv(env_vars{i});
@@ -174,7 +177,7 @@ function [best_nvcc, max_ver] = findUserCUDA()
         end
     end
     
-    % Strategy 2: System Path
+    % Strategy 3: System Path
     cmd = 'which nvcc'; if ispc, cmd = 'where nvcc'; end
     [st, out] = system(cmd);
     if st == 0 && ~isempty(out)
@@ -186,7 +189,7 @@ function [best_nvcc, max_ver] = findUserCUDA()
         end
     end
     
-    % Strategy 3: Common Default Paths
+    % Strategy 4: Common Default Paths
     if ispc
         base = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA';
         if exist(base, 'dir')
@@ -199,26 +202,25 @@ function [best_nvcc, max_ver] = findUserCUDA()
             end
         end
     else
-        % Scan for generic 'cuda' and versioned 'cuda-X.X' folders
         bases = {'/usr/local', '/opt'};
         for b = 1:length(bases)
-            cuda_folders = dir(fullfile(bases{b}, 'cuda*'));
-            for i = 1:length(cuda_folders)
-                test_path = fullfile(bases{b}, cuda_folders(i).name, 'bin', 'nvcc');
-                if exist(test_path, 'file')
-                    candidates{end+1} = test_path; %#ok<AGROW>
+            if exist(bases{b}, 'dir')
+                cuda_folders = dir(fullfile(bases{b}, 'cuda*'));
+                for i = 1:length(cuda_folders)
+                    test_path = fullfile(bases{b}, cuda_folders(i).name, 'bin', 'nvcc');
+                    if exist(test_path, 'file')
+                        candidates{end+1} = test_path; %#ok<AGROW>
+                    end
                 end
             end
         end
     end
     
-    % Remove duplicate paths found across different strategies
     candidates = unique(candidates);
-    
     best_nvcc = '';
     max_ver = 0;
     
-    % Test all unique candidates and keep the one with the highest version
+    % Evaluate all candidates; best match wins.
     for i = 1:length(candidates)
         current_path = candidates{i};
         [st, out] = system(['"' current_path '" --version']);
@@ -295,10 +297,10 @@ function vcvars_cmd = getMSVCEnvironment()
                 vcvars_cmd = sprintf('"%s" %s', base, details.CommandLineShellArg);
             else
                 if startsWith(base, '"')
-					vcvars_cmd = base;
-				else
-					vcvars_cmd = sprintf('"%s"', base);
-				end
+                    vcvars_cmd = base;
+                else
+                    vcvars_cmd = sprintf('"%s"', base);
+                end
             end
         end
     end
@@ -316,9 +318,9 @@ function vcvars_cmd = getMSVCEnvironment()
     end
 end
 
-function [link_flags, fallback_libs] = getLinkerFlags(user_nvcc)
+function [link_flags, fallback_libs] = getLinkerFlags(best_nvcc)
     if ispc
-        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib', 'x64');
+        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib', 'x64');
         ml_lib_dir = fullfile(matlabroot, 'extern', 'lib', computer('arch'), 'microsoft');
         link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart'};
         
@@ -327,17 +329,17 @@ function [link_flags, fallback_libs] = getLinkerFlags(user_nvcc)
         if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
         fallback_libs = {'-lut'};
     else
-        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib64');
+        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
         link_flags = {['-L' cuda_lib_dir], '-lmwgpu', '-lcudart', '-ldl'}; 
         fallback_libs = {'-lut', '-ldl'}; 
     end
 end
 
-function cccl_flags = getCCCLFlags(user_nvcc)
+function cccl_flags = getCCCLFlags(best_nvcc)
     cccl_flags = '';
     cccl_include = getenv('CCCL_ROOT');
     if isempty(cccl_include) || ~exist(cccl_include, 'dir')
-        [cuda_root, ~, ~] = fileparts(fileparts(user_nvcc));
+        [cuda_root, ~, ~] = fileparts(fileparts(best_nvcc));
         cccl_include = fullfile(cuda_root, 'include', 'cccl');
     end
     if exist(cccl_include, 'dir')
