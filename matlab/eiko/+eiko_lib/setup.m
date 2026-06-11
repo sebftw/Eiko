@@ -1,4 +1,4 @@
-function version = setup(build_type)
+function ver_out = setup(build_type)
     % SETUP Compiles and installs Eiko CUDA MEX bindings for MATLAB.
     %
     % Usage:
@@ -7,359 +7,341 @@ function version = setup(build_type)
     %   setup('release') - Compiles a fat binary (-arch=all-major).
     %   setup('version') - Returns the current version of Eiko.
     
-    version = '0.8.5';
-
     if nargin < 1
         build_type = 'native';
-    elseif strcmpi(build_type, 'version')
-        return
+    else
+        build_type = validatestring(lower(build_type), {'native', 'release', 'version'});
     end
-
-    % TODO: Add a check that verifies the eiko mex file version matches the expected version.
-
     
-    is_release = strcmpi(build_type, 'release');
-
-    % Input/Output Path Setup
-    config = eiko_lib.BuildConfig.getInstance();
+    EIKO_VERSION = '0.8.5';
+    ver_out = EIKO_VERSION;
     
-    % Try to download the MEX file, but just exit early if it already
-    % exists. However, for release mode, we always compile.
-    
-    if not(is_release) && eiko_lib.bootstrap(version, config.OutFile)
+    if strcmpi(build_type, 'version')
         return;
     end
     
-    %% CUDA Setup & Version Detection
+    is_release = strcmpi(build_type, 'release');
+    config = eiko_lib.BuildConfig.getInstance();
     
-    user_ver = 0;     % User-installed CUDA toolkit version.
-    builtin_ver = 0;  % MATLAB's internal CUDA toolkit version.
-    
-    % Query MATLAB for its built-in CUDA version.
-	try
-		tf = parallel.gpu.enableCUDAForwardCompatibility(true); 
-        gpu = gpuDevice();
-        builtin_ver = gpu.ToolkitVersion;
-		parallel.gpu.enableCUDAForwardCompatibility(tf);
-	catch
-        % Fails safely if no GPU is present on the system.
-    end
-
-    % Hunt for a user-installed CUDA toolkit.
-    user_nvcc = '';
-    
-    % Strategy 1: Check standard Environment Variables.
-    env_vars = {'CUDA_PATH', 'CUDA_HOME'};
-    for i = 1:length(env_vars)
-        p = getenv(env_vars{i});
-        if ~isempty(p)
-            nvcc_ext = ''; if ispc, nvcc_ext = '.exe'; end
-            test_path = fullfile(p, 'bin', ['nvcc' nvcc_ext]);
-            if exist(test_path, 'file')
-                user_nvcc = test_path;
-                break;
-            end
-        end
+    % Download MEX if it already exists (skip for release mode)
+    if ~is_release && eiko_lib.bootstrap(EIKO_VERSION, config.OutFile)
+        return;
     end
     
-    % Strategy 2: Fallback to querying the system PATH.
-    if isempty(user_nvcc)
-        if ispc
-            [st, out] = system('where nvcc');
-        else
-            [st, out] = system('which nvcc');
-        end
-        if st == 0 && ~isempty(out)
-            % 'where'/'which' might return multiple paths; take the first.
-            paths = strsplit(strtrim(out), '\n');
-            user_nvcc = paths{1}; 
-        end
-    end
-	
-	% Strategy 3: Fallback to common default installation paths.
-    if isempty(user_nvcc)
-        if ispc
-            % Windows: Typically installs in versioned subfolders
-            base_cuda_dir = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA';
-            if exist(base_cuda_dir, 'dir')
-                % Find all subfolders starting with 'v'
-                cuda_versions = dir(fullfile(base_cuda_dir, 'v*'));
-                if ~isempty(cuda_versions)
-                    % Sort descending so the highest version string is checked first
-                    [~, idx] = sort({cuda_versions.name}, 'descend');
-                    cuda_versions = cuda_versions(idx);
-                    
-                    for i = 1:length(cuda_versions)
-                        test_path = fullfile(base_cuda_dir, cuda_versions(i).name, 'bin', 'nvcc.exe');
-                        if exist(test_path, 'file')
-                            user_nvcc = test_path;
-                            break;
-                        end
-                    end
-                end
-            end
-        else
-            % Linux: Typically symlinked to /usr/local/cuda or installed in /opt/cuda
-            common_paths = {'/usr/local/cuda', '/opt/cuda'};
-            for i = 1:length(common_paths)
-                test_path = fullfile(common_paths{i}, 'bin', 'nvcc');
-                if exist(test_path, 'file')
-                    user_nvcc = test_path;
-                    break;
-                end
-            end
-        end
-    end
+    %% 1. CUDA Setup & Version Detection
+    logMessage('Compiling MEX extension for MATLAB... (This may take a minute)');
     
-    % Extract the specific version number from the found NVCC binary.
-    if ~isempty(user_nvcc) && exist(user_nvcc, 'file')
-        [st, out] = system(['"' user_nvcc '" --version']);
-        if st == 0
-            % Matches standard nvcc output, e.g., "release 12.1, V12.1.105"
-            tok = regexp(out, 'release (\d+\.\d+)', 'tokens');
-            if ~isempty(tok)
-                user_ver = str2double(tok{1}{1});
-            end
-        end
-    end
+    builtin_ver = getBuiltinCUDAVersion();
+    [user_nvcc, user_ver] = findUserCUDA();
     
-    % Prefer the user's CUDA toolkit if it is newer than MATLAB's.
     use_user_cuda = (user_ver > builtin_ver);
-    
-    disp('[Eiko] Compiling MEX extension for MATLAB... (This may take a minute)');
     if use_user_cuda
-        fprintf('Detected user-installed CUDA (v%.1f).\n', user_ver);
+        logMessage('Detected user-installed CUDA (v%.1f).', user_ver);
     else
-        fprintf('Using MATLAB''s built-in CUDA (v%.1f).\n', builtin_ver);
+        logMessage('Using MATLAB''s built-in CUDA (v%.1f).', builtin_ver);
     end
     
-    %% Compilation Flags & Architecture configuration
-    
+    %% 2. Compilation Flags & Architecture Configuration
+    arch_flag = '-arch=native';
     if is_release
-        % Fat binary formulation: embeds PTX and SASS for robust distribution.
         arch_flag = '-arch=all-major';
-        disp('Release mode: Compiling fat binary (-arch=all-major).');
-    else
-        % Native formulation: compiles strictly for the current machine's GPU.
-        arch_flag = '-arch=native';
-    end
-
-    % Universal flags applied to both Windows and Linux compilation paths.
-    base_flags = [ ...
-        '-std=c++17 ', ...          % C++17 ensures compatibility with Ubuntu 20.04's default GCC 9.4.
-        '-DMATLAB_MEX_FILE ', ...  % Asserts to the headers that we are building a MEX file.
-        '--use_fast_math ' ...     % Enables fast hardware approximations for trig, div, and sqrt.
-    ];
-    
-    if ~ispc % && is_release 
-        % LINUX FIX: Statically link the C++ standard library.
-        % This prevents fatal "GLIBCXX_X.X.X not found" errors when a user tries 
-        % to run the MEX file in a MATLAB version shipped with an older libstdc++.
-        
-        % Baseline safe linker flags (always apply these)
-        ld_flags_str = 'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++ -Wl,-s';
-        host_ldflags = {ld_flags_str};
-        
-        % Defensive check for explicit GCC 10 override
-        gcc10_path = '/usr/bin/gcc-10';
-        gxx10_path = '/usr/bin/g++-10';
-        
-        if exist(gcc10_path, 'file') && exist(gxx10_path, 'file')
-            fprintf('Target GCC 10 detected. Forcing explicit toolchain override.\n');
-            host_ldflags = [{['GCC=', gcc10_path]}, {['G++=', gxx10_path]}, host_ldflags];
-            use_gcc10_fallback = true;
-        else
-            warning('GCC 10 / G++ 10 not found at expected system path. Falling back to default system compiler.');
-            use_gcc10_fallback = false;
-        end
-    else
-        host_ldflags = {};
-        use_gcc10_fallback = false;
+        logMessage('Release mode: Compiling fat binary (-arch=all-major).');
     end
     
-    if ispc
-        % Windows-specific MSVC compiler overrides and safety bypasses.
-        os_flags = [ ...
-            '-allow-unsupported-compiler ', ...                % Bypasses strict Visual Studio version locks.
-            '-Xcompiler "/Zc:preprocessor" ', ...              % Forces MSVC to use standard-compliant preprocessing.
-            '-Xcompiler "/std:c++17" ', ...                    % Forces MSVC host compilation to C++17.
-            '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH ', ... % Disables fatal errors on STL version mismatches.
-            '-DNOMINMAX ' ...                                  % Prevents Windows.h from overwriting std::min/max.
-        ];
-    else
-        os_flags = '';
-    end
+    base_flags = '-std=c++17 -DMATLAB_MEX_FILE --use_fast_math ';
     
-    % Host compiler flags strictly enforced on the `mex` linkage phase.
-    host_cflags   = 'CFLAGS=$CFLAGS';
-    host_cxxflags = 'CXXFLAGS=$CXXFLAGS -std=c++17 ';
-
-    % Fallback configurations for the mexcuda pipeline.
+    % OS-Specific Flags
+    [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(user_nvcc);
+    
     nvcc_arg_specific = ['NVCCFLAGS=', arch_flag, ' ', base_flags, os_flags];
     nvcc_arg_fallback = ['NVCCFLAGS=', base_flags, os_flags];
     
-    %% Include Paths and Linker Directives
+    %% 3. Include Paths and Linker Directives
+    includes = { config.IncludeDir, ...
+                 fullfile(matlabroot, 'extern', 'include'), ...
+                 fullfile(matlabroot, 'toolbox', 'parallel', 'gpu', 'extern', 'include'), ...
+                 fullfile(matlabroot, 'toolbox', 'distcomp', 'gpu', 'extern', 'include') };
     
-    % Gather all potential include directories required by MATLAB and CUDA.
-    includes = { ...
-        config.IncludeDir, ...
-        fullfile(matlabroot, 'extern', 'include'), ...
-        fullfile(matlabroot, 'toolbox', 'parallel', 'gpu', 'extern', 'include'), ...
-        fullfile(matlabroot, 'toolbox', 'distcomp', 'gpu', 'extern', 'include') ... % Legacy distcomp fallback
-    };
-    
-    % Silently filter out non-existent paths to prevent compiler warnings.
+    % Filter existent paths
     includes = includes(cellfun(@(x) exist(x, 'dir') == 7, includes));
     includes_str = strjoin(cellfun(@(x) sprintf('-I"%s"', x), includes, 'UniformOutput', false), ' ');
     
-    % Configure linker flags based on the operating system.
-    if ispc
-        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib', 'x64');
-        ml_lib_dir = fullfile(matlabroot, 'extern', 'lib', computer('arch'), 'microsoft');
-        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lmwgpu', '-lcudart'};
-        fallback_libs = {'-lut'}; % libut allows MEX to detect MATLAB CTRL+C interrupts.
-    else
-        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib64');
-        link_flags = {['-L' cuda_lib_dir], '-lmwgpu', '-lcudart', '-ldl'}; % -ldl required for dlopen dynamics.
-        fallback_libs = {'-lut', '-ldl'}; 
-    end
+    [link_flags, fallback_libs] = getLinkerFlags(user_nvcc);
 
-    %% Execution Phase
+    %% 4. Execution Phase
     success = false;
     attempt = 1;
     
     if use_user_cuda
-        fprintf('Attempt %d: Compiling with user-installed CUDA (bypassing mexcuda)...\n', attempt);
+        logMessage('Attempt %d: Compiling with user-installed CUDA (bypassing mexcuda)...', attempt);
         
-        % Step 1: Attempt to inject modern CCCL (Thrust, CUB, libcudacxx) if available.
-        [cuda_bin_dir, ~, ~] = fileparts(user_nvcc);
-        [cuda_root, ~, ~] = fileparts(cuda_bin_dir);
-		
-		% Allow CI to provide the exact path to a cloned CCCL repo via environment variable.
-        % This is critical if using a lightweight pip/conda NVCC package.
-        cccl_include = getenv('CCCL_ROOT');
-        if isempty(cccl_include) || not(exist(cccl_include, 'dir'))
-            % Fallback to looking inside the CUDA root
-            cccl_include = fullfile(cuda_root, 'include', 'cccl');
-        end
-		
-        cccl_flags = '';
-        if exist(cccl_include, 'dir')
-            cccl_flags = sprintf('-I"%s" -I"%s" -I"%s" -I"%s" ', ...
-                cccl_include, fullfile(cccl_include, 'thrust'), fullfile(cccl_include, 'libcudacxx'), fullfile(cccl_include, 'cub'));
-        end
-        
-        % Step 2: Force NVCC to use MATLAB's specifically configured host compiler.
-        % This is vital on Windows so NVCC can locate cl.exe without Developer Prompt environment vars.
-        if ispc && ~isempty(getenv('IS_RELEASE_BUILD'))
-			% Retrieve the active MSVC directory from the environment
-			% ilammy/msvc-dev-cmd sets VCToolsInstallDir automatically
-			msvc_root = getenv('VCToolsInstallDir');
-
-			if isempty(msvc_root)
-				error('MSVC environment not found. Ensure ilammy/msvc-dev-cmd is used in GitHub Actions.');
-			end
-
-			% Construct the path to cl.exe
-			% VCToolsInstallDir usually ends in a backslash, so we join carefully
-			cc_bin_dir = fullfile(msvc_root, 'bin', 'Hostx64', 'x64');
-			
-			if exist(fullfile(cc_bin_dir, 'cl.exe'), 'file')
-				ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
-				fprintf('Using MSVC compiler at: %s\n', cc_bin_dir);
-			else
-				error('Could not locate cl.exe in the detected MSVC directory: %s', cc_bin_dir);
-			end
-		else
-			% We are on a local machine. Trust MATLAB's selected C++ compiler.
-			cc_info = mex.getCompilerConfigurations('C++', 'Selected');
-			if ~isempty(cc_info)
-				cc_bin_dir = fileparts(cc_info(1).Details.CompilerExecutable);
-				ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
-			else
-				ccbin_flag = '';
-			end
-		end
-        
-        % Step 3: Define output objects and Position Independent Code (PIC) flags.
-        if ispc
-            obj_ext = '.obj';
-            pic_flag = '-Xcompiler "/MD"'; % Dynamic runtime linkage required by MSVC for MEX.
-        else
-            obj_ext = '.o';
-            if use_gcc10_fallback
-                % Explicitly lock NVCC's host compiler to g++-10
-                pic_flag = '-ccbin "/usr/bin/g++-10" -Xcompiler "-fPIC"'; 
-            else
-                % Let NVCC fall back to the system default compiler configuration
-                pic_flag = '-Xcompiler "-fPIC"'; 
-            end
-        end
+        % Formulate NVCC Command
         obj_file = fullfile(config.OutDir, ['mex_bindings', obj_ext]);
-        obj_file = fullfile(config.OutDir, ['mex_bindings', obj_ext]);
+        cccl_flags = getCCCLFlags(user_nvcc);
+        [cuda_root, ~, ~] = fileparts(fileparts(user_nvcc));
         
-        % Formulate the raw system NVCC command.
         nvcc_cmd = sprintf('"%s" %s -c "%s" -o "%s" %s %s %s %s %s %s -I"%s"', ...
             user_nvcc, ccbin_flag, config.SourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag, fullfile(cuda_root, 'include'));
         
-        try
-			% Execute device compilation (NVCC -> .o/.obj)
-			[st, cmdout] = system(nvcc_cmd);
-			if st == 0
-				fprintf('NVCC compilation succeeded. Starting MEX linkage...\n');
-				
-				% Compile
-				mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', config.OutDir, '-lut', link_flags{:});
-				
-				% Programmatically verify file generation
-				expected_mex = fullfile(config.OutDir, ['mex_bindings.', mexext]);
-				if exist(expected_mex, 'file')
-					success = true;
-					fprintf('MEX compilation completely successful: %s\n', expected_mex);
-				else
-					error('MEX run finished but output file "%s" is missing.', expected_mex);
-				end
-			else
-				% Force a hard crash if NVCC fails so CI runners drop a red flag
-				error('NVCC device compilation failed! Command output was:\n%s', cmdout);
-			end
-		catch ME
-			% Use generic rethrow or severe warning to ensure it doesn't pass silently
-			warning('Compilation attempt %d aborted due to error.', attempt);
-			% rethrow(ME); 
-		end
-        
-        % Clean up intermediate object file.
-        if exist(obj_file, 'file')
-            delete(obj_file);
+        if ispc
+            vcvars_cmd = getMSVCEnvironment();
+            if ~isempty(vcvars_cmd)
+                logMessage('Pre-activating shell environment.');
+                nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
+            end
         end
+        
+        try
+            [st, cmdout] = system(nvcc_cmd);
+            if st == 0
+                logMessage('NVCC compilation succeeded. Starting MEX linkage...');
+                mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', config.OutDir, '-lut', link_flags{:});
+                
+                if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file')
+                    success = true;
+                    logMessage('MEX compilation successful.');
+                else
+                    error('MEX run finished but output file is missing.');
+                end
+            else
+                error('NVCC device compilation failed!\n%s', cmdout);
+            end
+        catch ME
+            warning('Compilation attempt %d aborted: %s', attempt, ME.message);
+        end
+        
+        if exist(obj_file, 'file'), delete(obj_file); end
         attempt = attempt + 1;
     end
     
+    % Fallbacks using mexcuda
     if ~success
         try
-            % Fallback 1: Try MATLAB's built-in CUDA toolkit with specific architecture.
-            fprintf('Attempt %d: Compiling with MATLAB''s built-in CUDA (%s)...\n', attempt, arch_flag);
-            mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_specific, ['-I', config.IncludeDir], '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+            logMessage('Attempt %d: Compiling with MATLAB''s built-in CUDA (%s)...', attempt, arch_flag);
+            mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_specific, sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+            success = true;
         catch ME
-            fprintf('Compilation failed due to: %s\n', ME.message);
+            logMessage('Compilation failed: %s', ME.message);
             try
-                % Fallback 2: Try MATLAB's built-in CUDA toolkit with default architecture flags.
-                fprintf('Attempt %d: Compiling with MATLAB''s built-in CUDA (default arch)...\n', attempt+1);
-                mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_fallback, ['-I', config.IncludeDir], '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+                logMessage('Attempt %d: Compiling with built-in CUDA (default arch)...', attempt+1);
+                mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_fallback, sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+                success = true;
             catch ME2
-                fprintf('Compilation failed due to: %s\n', ME2.message);
-                disp('Compilation failed. :(');
+                logMessage('Compilation completely failed.');
                 rethrow(ME2);
             end
         end
     end
-
+    
     if success
-        disp(['MEX file saved to: ', config.OutDir]);
-        disp(' ');
+        logMessage('MEX file saved to: %s\n', config.OutDir);
         disp('Congratulations, you are now ready to use Eiko! :)');
         disp('Run "help eiko" to read the documentation.');
         addpath(config.EikoDir);
+    end
+end
+
+%% --- Local Subroutines ---
+
+function logMessage(msg, varargin)
+    fprintf(['[Eiko] ' msg '\n'], varargin{:});
+end
+
+function ver = getBuiltinCUDAVersion()
+    ver = 0;
+    try
+        parallel.gpu.enableCUDAForwardCompatibility(true); 
+        gpu = gpuDevice();
+        ver = gpu.ToolkitVersion;
+    catch
+        % Fails safely if no GPU
+    end
+end
+
+function [best_nvcc, max_ver] = findUserCUDA()
+    candidates = {};
+    ext = ''; if ispc, ext = '.exe'; end
+    
+    % Strategy 1: Environment Variables
+    env_vars = {'CUDA_PATH', 'CUDA_HOME'};
+    for i = 1:length(env_vars)
+        p = getenv(env_vars{i});
+        if ~isempty(p)
+            test_path = fullfile(p, 'bin', ['nvcc' ext]);
+            if exist(test_path, 'file')
+                candidates{end+1} = test_path; %#ok<AGROW>
+            end
+        end
+    end
+    
+    % Strategy 2: System Path
+    cmd = 'which nvcc'; if ispc, cmd = 'where nvcc'; end
+    [st, out] = system(cmd);
+    if st == 0 && ~isempty(out)
+        paths = splitlines(strtrim(out));
+        for i = 1:length(paths)
+            if exist(paths{i}, 'file')
+                candidates{end+1} = paths{i}; %#ok<AGROW>
+            end
+        end
+    end
+    
+    % Strategy 3: Common Default Paths
+    if ispc
+        base = 'C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA';
+        if exist(base, 'dir')
+            cuda_versions = dir(fullfile(base, 'v*'));
+            for i = 1:length(cuda_versions)
+                test_path = fullfile(base, cuda_versions(i).name, 'bin', 'nvcc.exe');
+                if exist(test_path, 'file')
+                    candidates{end+1} = test_path; %#ok<AGROW>
+                end
+            end
+        end
+    else
+        % Scan for generic 'cuda' and versioned 'cuda-X.X' folders
+        bases = {'/usr/local', '/opt'};
+        for b = 1:length(bases)
+            cuda_folders = dir(fullfile(bases{b}, 'cuda*'));
+            for i = 1:length(cuda_folders)
+                test_path = fullfile(bases{b}, cuda_folders(i).name, 'bin', 'nvcc');
+                if exist(test_path, 'file')
+                    candidates{end+1} = test_path; %#ok<AGROW>
+                end
+            end
+        end
+    end
+    
+    % Remove duplicate paths found across different strategies
+    candidates = unique(candidates);
+    
+    best_nvcc = '';
+    max_ver = 0;
+    
+    % Test all unique candidates and keep the one with the highest version
+    for i = 1:length(candidates)
+        current_path = candidates{i};
+        [st, out] = system(['"' current_path '" --version']);
+        if st == 0
+            tok = regexp(out, 'release (\d+\.\d+)', 'tokens');
+            if ~isempty(tok)
+                current_ver = str2double(tok{1}{1});
+                if current_ver > max_ver
+                    max_ver = current_ver;
+                    best_nvcc = current_path;
+                end
+            end
+        end
+    end
+end
+
+function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(~)
+    host_cflags = 'CFLAGS=$CFLAGS';
+    if ispc
+        os_flags = '-allow-unsupported-compiler -Xcompiler "/Zc:preprocessor" -Xcompiler "/std:c++17" -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH -DNOMINMAX ';
+        host_cxxflags = 'COMPFLAGS="$COMPFLAGS /std:c++17"';
+        host_ldflags = {};
+        pic_flag = '-Xcompiler "/MD"';
+        obj_ext = '.obj';
+        
+        msvc_root = getenv('VCToolsInstallDir');
+        ccbin_flag = '';
+        if ~isempty(msvc_root)
+            cc_bin_dir = fullfile(msvc_root, 'bin', 'Hostx64', 'x64');
+            if exist(fullfile(cc_bin_dir, 'cl.exe'), 'file')
+                ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+            end
+        end
+    else
+        os_flags = '';
+        host_cxxflags = 'CXXFLAGS=$CXXFLAGS -std=c++17 ';
+        host_ldflags = {'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++ -Wl,-s'};
+        obj_ext = '.o';
+        
+        if exist('/usr/bin/gcc-10', 'file') && exist('/usr/bin/g++-10', 'file')
+            host_ldflags = [{'GCC=/usr/bin/gcc-10'}, {'G++=/usr/bin/g++-10'}, host_ldflags];
+            pic_flag = '-ccbin "/usr/bin/g++-10" -Xcompiler "-fPIC -static-libstdc++ -static-libgcc"'; 
+            ccbin_flag = '';
+        else
+            pic_flag = '-Xcompiler "-fPIC -static-libstdc++ -static-libgcc"'; 
+            
+            cc_info = mex.getCompilerConfigurations('C++', 'Selected');
+            if ~isempty(cc_info)
+                ccbin_flag = sprintf('-ccbin "%s"', fileparts(cc_info(1).Details.CompilerExecutable));
+            else
+                ccbin_flag = '';
+            end
+        end
+    end
+end
+
+function vcvars_cmd = getMSVCEnvironment()
+    vcvars_cmd = '';
+    cc_info = mex.getCompilerConfigurations('C++', 'Selected');
+    
+    if ~isempty(cc_info)
+        details = cc_info(1).Details;
+
+        % Safe check for both older (struct) and newer (object) MATLAB versions
+        has_shell = (isstruct(details) && isfield(details, 'CommandLineShell')) || ...
+                    (isobject(details) && isprop(details, 'CommandLineShell'));
+
+        if has_shell && ~isempty(details.CommandLineShell)
+            base = details.CommandLineShell;
+            
+            has_args = (isstruct(details) && isfield(details, 'CommandLineShellArg')) || ...
+                       (isobject(details) && isprop(details, 'CommandLineShellArg'));
+            if has_args && ~isempty(details.CommandLineShellArg)
+                vcvars_cmd = sprintf('"%s" %s', base, details.CommandLineShellArg);
+            else
+                if startsWith(base, '"')
+					vcvars_cmd = base;
+				else
+					vcvars_cmd = sprintf('"%s"', base);
+				end
+            end
+        end
+    end
+    
+    % Fallback to VCToolsInstallDir if the above failed.
+    if isempty(vcvars_cmd)
+        msvc_root = getenv('VCToolsInstallDir');
+        if ~isempty(msvc_root)
+            idx = strfind(msvc_root, fullfile('VC', 'Tools', 'MSVC'));
+            if ~isempty(idx)
+                vcvars_path = fullfile(msvc_root(1:idx-1), 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
+                if exist(vcvars_path, 'file'), vcvars_cmd = sprintf('"%s"', vcvars_path); end
+            end
+        end
+    end
+end
+
+function [link_flags, fallback_libs] = getLinkerFlags(user_nvcc)
+    if ispc
+        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib', 'x64');
+        ml_lib_dir = fullfile(matlabroot, 'extern', 'lib', computer('arch'), 'microsoft');
+        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart'};
+        
+        if exist(fullfile(ml_lib_dir, 'gpu.lib'), 'file'), link_flags{end+1} = '-lgpu'; end
+        if exist(fullfile(ml_lib_dir, 'mwgpu.lib'), 'file'), link_flags{end+1} = '-lmwgpu'; end
+        if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
+        fallback_libs = {'-lut'};
+    else
+        cuda_lib_dir = fullfile(fileparts(fileparts(user_nvcc)), 'lib64');
+        link_flags = {['-L' cuda_lib_dir], '-lmwgpu', '-lcudart', '-ldl'}; 
+        fallback_libs = {'-lut', '-ldl'}; 
+    end
+end
+
+function cccl_flags = getCCCLFlags(user_nvcc)
+    cccl_flags = '';
+    cccl_include = getenv('CCCL_ROOT');
+    if isempty(cccl_include) || ~exist(cccl_include, 'dir')
+        [cuda_root, ~, ~] = fileparts(fileparts(user_nvcc));
+        cccl_include = fullfile(cuda_root, 'include', 'cccl');
+    end
+    if exist(cccl_include, 'dir')
+        cccl_flags = sprintf('-I"%s" -I"%s" -I"%s" -I"%s" ', ...
+            cccl_include, fullfile(cccl_include, 'thrust'), fullfile(cccl_include, 'libcudacxx'), fullfile(cccl_include, 'cub'));
     end
 end
