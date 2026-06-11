@@ -2,7 +2,6 @@
 ![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko)
 [![PyPI version](https://img.shields.io/pypi/v/eiko)](https://pypi.org/project/eiko/)
-![GitHub License](https://img.shields.io/github/license/sebftw/Eiko)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
 <!-- [![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=blue&label=GitHub%20Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases) -->
 
