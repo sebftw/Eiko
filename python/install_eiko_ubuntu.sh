@@ -11,8 +11,7 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 MAGENTA='\033[1;35m'
 RED='\033[0;31m'
-DARK_GRAY='\033[1;30m'
-NC='\033[0m' # No Color
+NC='\033[0m' # No Color (Standard Terminal Text)
 
 # Helper function to exit cleanly whether sourced or executed directly
 safe_exit() {
@@ -21,27 +20,50 @@ safe_exit() {
     if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
         return "$code"
     else
+        echo -e "\n${CYAN}Press Enter to exit...${NC}"
+        read -r
         exit "$code"
     fi
 }
 
-echo -e "${GREEN}====================================================${NC}"
-echo -e "${GREEN} Starting Eiko Smart Environment Setup (Linux)      ${NC}"
-echo -e "${GREEN}====================================================${NC}"
+echo -e "${CYAN}====================================================${NC}"
+echo -e "${CYAN} Eiko Smart Environment Setup (Linux)               ${NC}"
+echo -e "${CYAN}====================================================${NC}"
 
-# Request sudo privileges upfront for system checks
-echo -e "[*] Requesting sudo privileges for system checks..."
+# ---------------------------------------------------------
+# Step 0: Explanation and User Confirmation
+# ---------------------------------------------------------
+echo -e "\nThis script will configure your system for the Eiko environment by performing the following actions:"
+echo -e "  1. Validate NVIDIA display driver compatibility."
+echo -e "  2. Install the appropriate C++ Build Tools."
+echo -e "  3. Install or verify the NVIDIA CUDA Toolkit based on your Ubuntu version."
+echo -e "  4. Install Python 3.12 (if necessary) and configure an isolated virtual environment."
+echo -e "  5. Install PyTorch, JAX, and Eiko."
+echo -e "  6. Verify that Eiko was installed correctly."
+
+echo -e "\n${YELLOW}[!] DISCLAIMER: This script requires sudo privileges and modifies system packages."
+echo -e "    It is provided 'as-is' without any express or implied warranties. Run at your own risk.${NC}"
+
+read -p $'\nDo you agree to these terms and want to proceed? (y/N): ' confirm
+if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+    echo -e "\n${YELLOW}[*] Setup cancelled by user.${NC}"
+    safe_exit 0
+fi
+
+# Request sudo privileges upfront for system checks now that the user agreed
+echo -e "\n${MAGENTA}[INFO] Requesting sudo privileges for system installation...${NC}"
 sudo -v || safe_exit 1
+
 # Keep sudo alive while the script runs
 while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
-# Ensure system is updated
+# Ensure system package lists are updated
 sudo apt-get update -qq
 
 # ---------------------------------------------------------
-# Step 0: Check NVIDIA Driver Version
+# Step 1: Check NVIDIA Driver Version
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[0/5] Checking NVIDIA Driver Compatibility...${NC}"
+echo -e "\n${CYAN}[1/5] Checking NVIDIA Driver Compatibility...${NC}"
 
 # Source OS release early to set driver versions dynamically
 if [ -f /etc/os-release ]; then
@@ -65,14 +87,14 @@ fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
     DRIVER_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | cut -d'.' -f1)
-    echo -e "${DARK_GRAY}-> Found active NVIDIA driver: v${DRIVER_VER}${NC}"
+    echo -e "  -> Found active NVIDIA driver: v${DRIVER_VER}"
 
     if [ "$DRIVER_VER" -lt "$MIN_DRIVER" ]; then
-        echo -e "${YELLOW}-> Driver is too old (Requires v${MIN_DRIVER}+).${NC}"
+        echo -e "${YELLOW}  -> Driver is too old (Requires v${MIN_DRIVER}+).${NC}"
         
         if [ "$IS_WSL" = true ]; then
             echo -e "\n${RED}====================================================${NC}"
-            echo -e "${RED} CRITICAL: NVIDIA DRIVER UPDATE REQUIRED             ${NC}"
+            echo -e "${RED} CRITICAL ERROR: NVIDIA DRIVER UPDATE REQUIRED       ${NC}"
             echo -e "${RED}====================================================${NC}"
             echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
             echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
@@ -80,17 +102,16 @@ if command -v nvidia-smi >/dev/null 2>&1; then
             echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
             echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
             echo -e "  3. Reboot your computer and run this script again."
-            read -p $'\nPress Enter to exit'
             safe_exit 1
         else
             UPDATE_DRIVER=true
         fi
     fi
 else
-    echo -e "${YELLOW}-> No active NVIDIA display driver detected.${NC}"
+    echo -e "${YELLOW}  -> No active NVIDIA display driver detected.${NC}"
     if [ "$IS_WSL" = true ]; then
         echo -e "\n${RED}====================================================${NC}"
-        echo -e "${RED} CRITICAL: NVIDIA DRIVER UPDATE REQUIRED             ${NC}"
+        echo -e "${RED} CRITICAL ERROR: NVIDIA DRIVER UPDATE REQUIRED       ${NC}"
         echo -e "${RED}====================================================${NC}"
         echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
         echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
@@ -98,7 +119,6 @@ else
         echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
         echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
         echo -e "  3. Reboot your computer and run this script again."
-        read -p $'\nPress Enter to exit'
         safe_exit 1
     else
         UPDATE_DRIVER=true
@@ -108,10 +128,10 @@ fi
 # Only proceed with the auto-update logic if NOT in WSL
 if [ "$UPDATE_DRIVER" = true ]; then
     echo -e "${MAGENTA}WARNING: Updating Linux display drivers may cause a screen flicker and requires a reboot.${NC}"
-    read -p "Would you like to automatically install the recommended NVIDIA driver now? (y/N): " confirm
+    read -p "Would you like to automatically install the recommended NVIDIA driver now? (y/N): " driver_confirm
     
-    if [[ "$confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${MAGENTA}-> Fetching and installing the recommended proprietary driver...${NC}"
+    if [[ "$driver_confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${MAGENTA}  -> Fetching and installing the recommended proprietary driver...${NC}"
         sudo ubuntu-drivers autoinstall
         
         echo -e "\n${RED}====================================================${NC}"
@@ -128,13 +148,13 @@ if [ "$UPDATE_DRIVER" = true ]; then
 fi
 
 # ---------------------------------------------------------
-# Step 1: Check and Install C++ Build Tools
+# Step 2: Check and Install C++ Build Tools
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[1/5] Checking GCC Build Tools...${NC}"
+echo -e "\n${CYAN}[2/5] Checking GCC Build Tools...${NC}"
 if dpkg -s build-essential >/dev/null 2>&1; then
-    echo -e "${YELLOW}-> build-essential already installed. Skipping.${NC}"
+    echo -e "${YELLOW}  -> build-essential is already installed. Skipping.${NC}"
 else
-    echo -e "${MAGENTA}-> Installing GCC and standard build utilities...${NC}"
+    echo -e "${MAGENTA}  -> Installing GCC and standard build utilities...${NC}"
     sudo apt-get install -y build-essential
 fi
 
@@ -142,23 +162,23 @@ fi
 # Determine Target Matrix based on OS Version
 # ---------------------------------------------------------
 if [ "$VERSION_ID" == "20.04" ]; then
-    echo -e "${YELLOW}-> Detected Ubuntu 20.04. Engaging Legacy Compatibility Mode...${NC}"
+    echo -e "${YELLOW}  -> Detected Ubuntu 20.04. Engaging Legacy Compatibility Mode...${NC}"
     TARGET_CUDA_PKG="cuda-toolkit-12-4"
     TARGET_CUDA_VER="12.4"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu124"
     TARGET_TORCH_VER="torch==2.4.1 torchvision"
     TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
     MIN_PYTHON_VER=3.8
-	
-	# Install GCC 10 toolchain (leaves default gcc/g++ untouched)
-	if dpkg -s g++-10 >/dev/null 2>&1; then
-		echo -e "${YELLOW}-> GCC 10 toolchain already available.${NC}"
-	else
-		echo -e "${MAGENTA}-> Installing GCC 10 toolchain for isolated C++20 compilation...${NC}"
-		sudo apt-get install -y gcc-10 g++-10
-	fi
+    
+    # Install GCC 10 toolchain (leaves default gcc/g++ untouched)
+    if dpkg -s g++-10 >/dev/null 2>&1; then
+        echo -e "${YELLOW}  -> GCC 10 toolchain already available.${NC}"
+    else
+        echo -e "${MAGENTA}  -> Installing GCC 10 toolchain for isolated C++20 compilation...${NC}"
+        sudo apt-get install -y gcc-10 g++-10
+    fi
 else
-    echo -e "${CYAN}-> Detected Modern Ubuntu. Engaging Next-Gen Mode...${NC}"
+    echo -e "  -> Detected Modern Ubuntu. Engaging Next-Gen Mode..."
     TARGET_CUDA_PKG="cuda-toolkit-12-6"
     TARGET_CUDA_VER="12.6"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu126"
@@ -168,9 +188,9 @@ else
 fi
 
 # ---------------------------------------------------------
-# Step 2: Check and Install Target CUDA
+# Step 3: Check and Install Target CUDA
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[2/5] Checking CUDA installation (Requires >= ${TARGET_CUDA_VER})...${NC}"
+echo -e "\n${CYAN}[3/5] Checking CUDA installation (Requires >= ${TARGET_CUDA_VER})...${NC}"
 INSTALL_CUDA=true
 NVCC_CMD=""
 
@@ -186,13 +206,13 @@ fi
 if [ -n "$NVCC_CMD" ]; then
     CUDA_VER=$("$NVCC_CMD" --version | grep -oP 'release \K[0-9]+\.[0-9]+')
     if [ "$(printf '%s\n' "$TARGET_CUDA_VER" "$CUDA_VER" | sort -V | head -n1)" = "$TARGET_CUDA_VER" ]; then
-        echo -e "${YELLOW}-> Found CUDA $CUDA_VER. Skipping installation.${NC}"
+        echo -e "${YELLOW}  -> Found CUDA $CUDA_VER. Skipping installation.${NC}"
         INSTALL_CUDA=false
     fi
 fi
 
 if [ "$INSTALL_CUDA" = true ]; then
-    echo -e "${MAGENTA}-> Installing ${TARGET_CUDA_PKG}...${NC}"
+    echo -e "${MAGENTA}  -> Installing ${TARGET_CUDA_PKG}...${NC}"
     ARCH=$(uname -m)
     if [ "$ARCH" = "aarch64" ]; then ARCH="sbsa"; fi
     
@@ -214,22 +234,22 @@ export CUDA_HOME=/usr/local/cuda
 export CUDA_PATH=/usr/local/cuda
 
 # ---------------------------------------------------------
-# Step 3: Check and Install Python
+# Step 4: Check and Install Python & Virtual Environment
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[3/5] Checking Python installation...${NC}"
+echo -e "\n${CYAN}[4/5] Checking Python and Virtual Environment...${NC}"
 INSTALL_PYTHON=true
 PYTHON_EXE="python3"
 
 if command -v python3 >/dev/null 2>&1; then
     PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     if [ "$(printf '%s\n' "$MIN_PYTHON_VER" "$PY_VER" | sort -V | head -n1)" = "$MIN_PYTHON_VER" ]; then
-        echo -e "${YELLOW}-> Found Python $PY_VER. Skipping installation.${NC}"
+        echo -e "${YELLOW}  -> Found Python $PY_VER. Skipping system installation.${NC}"
         INSTALL_PYTHON=false
     fi
 fi
 
 if [ "$INSTALL_PYTHON" = true ]; then
-    echo -e "${MAGENTA}-> System Python is below v${MIN_PYTHON_VER}. Upgrading to 3.12 via Deadsnakes...${NC}"
+    echo -e "${MAGENTA}  -> System Python is below v${MIN_PYTHON_VER}. Upgrading to 3.12 via Deadsnakes...${NC}"
     sudo apt-get install -y software-properties-common
     sudo add-apt-repository ppa:deadsnakes/ppa -y
     sudo apt-get update -qq
@@ -241,18 +261,13 @@ if [ "$INSTALL_PYTHON" = false ]; then
     sudo apt-get install -y python${PY_VER}-venv python${PY_VER}-dev >/dev/null 2>&1 || true
 fi
 
-# ---------------------------------------------------------
-# Step 4: Virtual Environment Setup
-# ---------------------------------------------------------
-echo -e "\n${CYAN}[4/5] Checking virtual environment...${NC}"
-
 VENV_PATH="$HOME/eiko"
 if [ -n "$VIRTUAL_ENV" ]; then
     VENV_PATH="$VIRTUAL_ENV"
-    echo -e "${GREEN}-> Detected active virtual environment at: $VENV_PATH${NC}"
+    echo -e "${GREEN}  -> Detected active virtual environment at: $VENV_PATH${NC}"
 else
     if [ ! -f "$VENV_PATH/bin/activate" ]; then
-        echo -e "${MAGENTA}-> Creating new virtual environment...${NC}"
+        echo -e "${MAGENTA}  -> Creating new virtual environment at $VENV_PATH...${NC}"
         $PYTHON_EXE -m venv "$VENV_PATH"
     fi
 fi
@@ -279,11 +294,11 @@ if [ "$VERSION_ID" == "20.04" ]; then
     append_if_missing 'if command -v g++-10 >/dev/null 2>&1; then export CC=gcc-10; export CXX=g++-10; fi' "$ACTIVATE_SCRIPT"
 fi
 
-echo -e "${DARK_GRAY}-> Activating environment session...${NC}"
+echo -e "  -> Activating environment session..."
 source "$ACTIVATE_SCRIPT"
 
 # ---------------------------------------------------------
-# Step 5: Install Python Libraries
+# Step 5: Install Python Libraries & Verify
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[5/5] Checking existing Eiko ML stack...${NC}"
 
@@ -319,31 +334,33 @@ except ImportError:
     pass
 sys.exit(1)
 " 2>/dev/null; then
-    echo -e "${YELLOW}-> Found valid PyTorch (CUDA enabled, v2.4+). Skipping installation.${NC}"
+    echo -e "${YELLOW}  -> Found valid PyTorch (CUDA enabled, v2.4+). Skipping installation.${NC}"
     TORCH_VALID=true
 fi
 
 if [ "$TORCH_VALID" = false ]; then
-    echo -e "${MAGENTA}-> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
+    echo -e "${MAGENTA}  -> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
     run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
 fi
 
-echo -e "${MAGENTA}-> Installing Eiko...${NC}"
+echo -e "${MAGENTA}  -> Installing Eiko dependencies...${NC}"
 run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
 run_pip_command install "eiko[jax]" --no-input || safe_exit 1
 
 # ---------------------------------------------------------
-# Verification
+# Final Verification
 # ---------------------------------------------------------
-echo -e "${MAGENTA}-> Verifying Eiko installation...${NC}"
+echo -e "\n${MAGENTA}  -> Verifying Eiko installation...${NC}"
 export TORCH_CUDA_ARCH_LIST=$(python3 -c "import torch; print('.'.join(map(str, torch.cuda.get_device_capability())))")
 
-if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('-> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"; then
+if python -c "import eiko.eiko_torch; import eiko.eiko_jax; print('  -> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"; then
     echo -e "\n${GREEN}[*] Installation Complete!${NC}"
     if [ -z "$VIRTUAL_ENV" ]; then
-        echo -e "Your environment is now active in this shell!"
+        echo -e "Your environment is now active in this shell! (Run 'source $ACTIVATE_SCRIPT' in new terminals)"
     fi
 else
-    echo -e "${RED}[!] Verification failed. Runtime environment setup is broken.${NC}"
+    echo -e "\n${RED}[!] Verification failed. Runtime environment setup is broken.${NC}"
     safe_exit 1
 fi
+
+safe_exit 0
