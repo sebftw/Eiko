@@ -1,6 +1,9 @@
 import torch
 import pytest
 from eiko import eiko, eiko3d
+import numpy as np
+import jax.numpy as jnp
+import math
 
 # ==========================================
 # 2D Solver Tests
@@ -223,5 +226,131 @@ def test_eiko3d_default_dx():
     
     # Tolerance is 1.75 * (dx / c) = 1.75 * (1.0 / 1.0) = 1.75
     assert max_error <= 1.75, f"3D Default dx test failed! Max error: {max_error:.4e}"
+
+# ==========================================
+# Backend Helper Functions
+# ==========================================
+
+def cast_to_backend(arrays, backend):
+    """
+    Converts a list of NumPy arrays to the specified computational backend.
+    Ensures that PyTorch tensors are placed on the GPU if available.
+    """
+    if backend == "torch":
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return [torch.tensor(arr, device=device) for arr in arrays]
+    elif backend == "jax":
+        return [jnp.array(arr) for arr in arrays]
+    raise ValueError(f"Unknown backend: {backend}")
+
+def extract_to_numpy(tensor, backend):
+    """
+    Converts a framework-specific tensor back to a standard NumPy array 
+    to unify the final error calculation and validation logic.
+    """
+    if backend == "torch":
+        return tensor.detach().cpu().numpy()
+    elif backend == "jax":
+        return np.array(tensor)
+    raise ValueError(f"Unknown backend: {backend}")
+
+# ==========================================
+# Snell's Law Test
+# ==========================================
+
+@pytest.mark.parametrize("msfm", [True, False])
+@pytest.mark.parametrize("backend", ["torch", "jax"])
+def test_eiko2d_snells_law(msfm, backend):
+    """
+    Validates refraction according to Snell's Law. 
+    A planar wavefront is initialized in a top medium and propagates across a 
+    horizontal interface into a bottom medium with a different speed of sound.
+    The resulting wave angle in the bottom medium is compared against the analytical solution.
+    """
+    # 1. Domain and Physics Setup
+    dim_y, dim_x = 201, 201
+    dx = 0.01
+    
+    # Define the speeds of sound for the top (c1) and bottom (c2) media
+    c1 = 1000.0
+    c2 = 1500.0
+    
+    # Define the physical depth of the interface and its corresponding grid index
+    y_int = 1.0  
+    idx_int = int(y_int / dx)
+    
+    # Define the incident angle of the plane wave in the top medium
+    theta1 = math.pi / 8  # 22.5 degrees
+    sin_t1 = math.sin(theta1)
+    cos_t1 = math.cos(theta1)
+    
+    # Calculate the expected refracted angle in the bottom medium using Snell's Law:
+    # sin(theta2) / c2 = sin(theta1) / c1
+    sin_t2 = (c2 / c1) * sin_t1
+    
+    # Ensure the incident angle does not exceed the critical angle, 
+    # which would cause total internal reflection (unsupported by standard eikonal models)
+    assert sin_t2 < 1.0, "Critical angle exceeded, total internal reflection will occur."
+    cos_t2 = math.sqrt(1.0 - sin_t2**2)
+    
+    # Construct the physical coordinate grids for the domain
+    y_coords = np.arange(dim_y, dtype=np.float32) * dx
+    x_coords = np.arange(dim_x, dtype=np.float32) * dx
+    Y, X = np.meshgrid(y_coords, x_coords, indexing='ij')
+    
+    # 2. Slowness Field Initialization
+    # Initialize the slowness (1/c) for both media in pure NumPy
+    f_np = np.empty((dim_y, dim_x), dtype=np.float32)
+    f_np[:idx_int, :] = 1.0 / c1
+    f_np[idx_int:, :] = 1.0 / c2
+    
+    # 3. Input Condition Initialization
+    # Initialize the travel time array with infinity
+    u_init_np = np.full((dim_y, dim_x), np.inf, dtype=np.float32)
+    
+    # Populate the entire top medium with the exact analytical travel times 
+    # for an incoming plane wave. This establishes a continuous boundary condition 
+    # pushing down onto the interface.
+    u_top_analytical = (X * sin_t1 + Y * cos_t1) / c1
+    u_init_np[:idx_int, :] = u_top_analytical[:idx_int, :]
+    
+    # 4. Backend Execution
+    # Cast the initialized NumPy arrays to PyTorch or JAX
+    u_init, f = cast_to_backend([u_init_np, f_np], backend)
+    
+    # Execute the solver
+    if backend == "torch":
+        with torch.no_grad():
+            u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
+    elif backend == "jax":
+        u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
+        
+    # Return the computed field to NumPy for validation
+    u_numerical_np = extract_to_numpy(u_numerical, backend)
+        
+    # 5. Validation
+    # Construct the analytical solution for the refracted plane wave in the bottom medium.
+    # The total travel time is the time accumulated traveling through the bottom medium 
+    # plus the specific entry time at the interface.
+    u_bottom_analytical = (X * sin_t2 + (Y - y_int) * cos_t2) / c2 + (X * sin_t1 + y_int * cos_t1) / c1
+    
+    error_map = np.abs(u_numerical_np - u_bottom_analytical)
+    
+    # The finite grid domain introduces edge diffractions because the initialized plane wave 
+    # abruptly ends at the left and right boundaries (x=0 and x=dim_x). 
+    # To isolate and validate pure refraction, we crop the validation region to the 
+    # center 50% of the bottom medium, away from the interface and lateral edges.
+    c_start, c_end = int(0.25 * dim_x), int(0.75 * dim_x)
+    test_region = error_map[idx_int + 5 : -5, c_start : c_end]
+    
+    max_error = np.max(test_region)
+    
+    # The expected error bounds scale with the grid spacing (dx) and the highest slowness (1/c1).
+    tol = 2.0 * (dx / c1)
+    
+    assert max_error <= tol, (
+        f"Snell's Law failed on {backend} (msfm={msfm})! "
+        f"Expected error <= {tol:.4e}, got {max_error:.4e}"
+    )
 
 # TODO: Add JAX tests, gradient tests, and advection tests.
