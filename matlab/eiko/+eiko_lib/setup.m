@@ -108,13 +108,7 @@ function ver_out = setup(build_type)
                 error('NVCC device compilation failed!\n%s', cmdout);
             end
         catch ME
-            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file')
-                % For some reason, it might throw an exception "This is not a MEX file", even though it successfully compiled the file...
-                success = true;
-                logMessage('MEX compilation successful.');
-            else
-                warning('Compilation attempt %d aborted: %s', attempt, ME.message);
-            end
+            warning('Compilation attempt %d aborted: %s', attempt, ME.message);
         end
         
         if exist(obj_file, 'file'), delete(obj_file); end
@@ -328,26 +322,20 @@ function [link_flags, fallback_libs] = getLinkerFlags(best_nvcc)
     if ispc
         cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib', 'x64');
         ml_lib_dir = fullfile(matlabroot, 'extern', 'lib', computer('arch'), 'microsoft');
-        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart'};
+        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart_static'};
         
         if exist(fullfile(ml_lib_dir, 'gpu.lib'), 'file'), link_flags{end+1} = '-lgpu'; end
         if exist(fullfile(ml_lib_dir, 'mwgpu.lib'), 'file'), link_flags{end+1} = '-lmwgpu'; end
         if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
         fallback_libs = {'-lut'};
     else
-        % DEFINE MATLAB LIBRARY PATH: Usually /bin/glnxa64 or /bin/maci64
-        ml_lib_dir = fullfile(matlabroot, 'bin', computer('arch'));
         cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
+        ml_lib_dir = fullfile(matlabroot, 'bin', computer('arch'));
+        link_flags = {['-L' cuda_lib_dir], '-lcudart_static', '-ldl'}; 
         
-        % ADD TO LINKER FLAGS: Include -L ml_lib_dir so ld knows where to look
-        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart', '-ldl'}; 
-        
-        ext = '.so';
-        % DYNAMIC CHECKS: Mimic the Windows block's safe inclusion
-        if exist(fullfile(ml_lib_dir, ['libgpu' ext]), 'file'), link_flags{end+1} = '-lgpu'; end
-        if exist(fullfile(ml_lib_dir, ['libmwgpu' ext]), 'file'), link_flags{end+1} = '-lmwgpu'; end
-        if exist(fullfile(ml_lib_dir, ['libgpumexbinder' ext]), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
-        
+        if exist(fullfile(ml_lib_dir, 'libgpu.so'), 'file'), link_flags{end+1} = '-lgpu'; end
+        if exist(fullfile(ml_lib_dir, 'libmwgpu.so'), 'file'), link_flags{end+1} = '-lmwgpu'; end
+        if exist(fullfile(ml_lib_dir, 'libgpumexbinder.so'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
         fallback_libs = {'-lut', '-ldl'};
     end
 end
