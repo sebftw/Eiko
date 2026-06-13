@@ -337,6 +337,7 @@ function [link_flags, fallback_libs] = getLinkerFlags(best_nvcc)
     else
         % DEFINE MATLAB LIBRARY PATH: Usually /bin/glnxa64 or /bin/maci64
         ml_lib_dir = fullfile(matlabroot, 'bin', computer('arch'));
+        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
         
         % ADD TO LINKER FLAGS: Include -L ml_lib_dir so ld knows where to look
         link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart', '-ldl'}; 
