@@ -90,7 +90,11 @@ jobs:
           MW_NVCC_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe
           CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
         with:
-          command: addpath('matlab/eiko'); eiko_lib.setup();
+          # Force MATLAB to lock in the C++ compiler before running your script
+          command: >
+            mex -setup C++; 
+            addpath('matlab/eiko'); 
+            eiko_lib.setup();
 
       - name: Upload Windows MEX Artifact
         uses: actions/upload-artifact@v4
