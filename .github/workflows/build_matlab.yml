@@ -81,7 +81,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
-          release: 'R2021a'
+          release: 'R2021b'
           products: >
             Parallel_Computing_Toolbox
 
@@ -93,7 +93,6 @@ jobs:
         with:
           # Force MATLAB to lock in the C++ compiler before running your script
           command: >
-            mex('-setup', fullfile(matlabroot, 'bin', 'win64', 'mexopts', 'msvcpp2019.xml'), 'C++');
             addpath('matlab/eiko'); 
             eiko_lib.setup('release');
 
