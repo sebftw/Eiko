@@ -1,4 +1,13 @@
 #####################################
+##               EIKO              ##
+#####################################
+python/start_eiko.sh
+python/start_eiko.bat
+matlab/start_eiko.sh
+matlab/start_eiko.bat
+
+
+#####################################
 ##              MATLAB             ##
 #####################################
 # Autosave files

@@ -106,11 +106,15 @@ except ImportError:
         cmd += include_flags
 
         try:
-            # 1. Compile atomically to the unique temp file
+            # Compile atomically to the unique temp file
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             
-            # 2. Atomically swap it into the active path
+            # Atomically swap it into the active path
             os.replace(tmp_output_lib, final_output_lib)
+            
+            # Flush Python's directory and import caches
+            import importlib
+            importlib.invalidate_caches()
             
             import eiko_jax_impl as _fim_jax_impl
             print("[Eiko] Compilation complete. JAX bindings are ready! :)")

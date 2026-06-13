@@ -1,5 +1,5 @@
 # ==============================================================================
-# Eiko Smart Windows Environment Installer
+# Eiko Smart Windows Environment Installer (CUDA 13.0 / Blackwell Target)
 # ==============================================================================
 param (
     [string]$InheritedVenv = $env:VIRTUAL_ENV,
@@ -13,26 +13,35 @@ $ErrorActionPreference = "Continue"
 
 # Unified exit handler
 function Exit-Script {
-    Write-Host "`nPress any key to exit..." -ForegroundColor Cyan
+    Write-Host "`nPress any key to finish..." -ForegroundColor Cyan
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    exit
+    
+    # Only exit if we are in the elevated background worker
+    if ($ElevatedSession) {
+        exit
+    }
 }
 
 # ---------------------------------------------------------
 # Step 0: Explanation and User Confirmation (Runs Once)
 # ---------------------------------------------------------
 if (-not $ElevatedSession) {
+    # Resolve the target path early for the display message
+    $targetVenvPath = "$InvokerProfile\eiko"
+    if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) { $targetVenvPath = $InheritedVenv }
+    
     Write-Host "====================================================" -ForegroundColor Cyan
     Write-Host " Eiko Smart Environment Setup (Windows)             " -ForegroundColor Cyan
     Write-Host "====================================================" -ForegroundColor Cyan
 
     Write-Host "`nThis script will configure your system for the Eiko environment by performing the following actions:" -ForegroundColor Gray
-    Write-Host "  1. Validate NVIDIA display driver compatibility." -ForegroundColor Gray
-    Write-Host "  2. Deploy or verify the NVIDIA CUDA Toolkit (v12.6)." -ForegroundColor Gray
-    Write-Host "  3. Provision the Microsoft Visual C++ Build Tools." -ForegroundColor Gray
+    Write-Host "  1. Validate NVIDIA display driver compatibility (v575+)." -ForegroundColor Gray
+    Write-Host "  2. Install or verify the NVIDIA CUDA Toolkit (>= v13.0)." -ForegroundColor Gray
+    Write-Host "  3. Install Microsoft Visual C++ Build Tools." -ForegroundColor Gray
     Write-Host "  4. Install Python 3.12 (if not already present)." -ForegroundColor Gray
-    Write-Host "  5. Configure a local Python virtual environment." -ForegroundColor Gray
-    Write-Host "  6. Install the Eiko ML stack (PyTorch, etc.)." -ForegroundColor Gray
+    Write-Host "  5. Configure a Python eiko virtual environment at:" -ForegroundColor Gray
+    Write-Host "     -> $targetVenvPath" -ForegroundColor Cyan
+    Write-Host "  6. Install the Eiko ML stack (PyTorch CU130, etc.)." -ForegroundColor Gray
 
     Write-Host "`n[!] DISCLAIMER: This script requires administrative privileges and modifies system variables." -ForegroundColor Yellow
     Write-Host "    It is provided 'as-is' without any express or implied warranties. Run at your own risk." -ForegroundColor Yellow
@@ -57,21 +66,20 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     Write-Host "`n[INFO] Requesting Administrator privileges for system installation..." -ForegroundColor Magenta
     
-    # Run the administrative steps in an elevated window, then come back
+    # Run the administrative steps in an elevated window, then wait for it to finish
     $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -InheritedVenv `"$InheritedVenv`" -InvokerProfile `"$InvokerProfile`" -InvokerName `"$InvokerName`" -InvokerDomain `"$InvokerDomain`" -ElevatedSession"
-    $proc = Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -Wait -PassThru
+    $proc = Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -Wait
     
-    # --- Post-Elevation Hand-off to User Session ---
+    # When the elevated window closes, gracefully activate the environment in the parent shell (if it's still open)
     $venvPath = "$InvokerProfile\eiko"
     if (-not [string]::IsNullOrWhiteSpace($InheritedVenv)) { $venvPath = $InheritedVenv }
     
     if (Test-Path "$venvPath\Scripts\Activate.ps1") {
-        Write-Host "`n[*] Activating Eiko Environment in your current session..." -ForegroundColor Green
-        # Dot-sourcing is required here so the environment persists in the parent shell
         . "$venvPath\Scripts\Activate.ps1"
     }
     
-    Exit-Script 
+    # Silently close the background installer process
+    exit
 }
 
 # (The banner prints again inside the elevated window for clarity)
@@ -106,7 +114,7 @@ function Refresh-EnvPath {
 # ---------------------------------------------------------
 Write-Host "`n[1/6] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
 
-$minDriver = 550
+$minDriver = 575
 $driverValid = $false
 $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 
@@ -117,7 +125,7 @@ if ($nvidiaSmi) {
         Write-Host "  -> Found active NVIDIA driver: v$driverVer" -ForegroundColor Gray
 
         if ($driverVer -lt $minDriver) {
-            Write-Host "  -> Driver is too old for CUDA 12.6 (Requires v$minDriver+)." -ForegroundColor Yellow
+            Write-Host "  -> Driver is too old for CUDA 13.0 (Requires v$minDriver+)." -ForegroundColor Yellow
             $driverValid = $false
         } else {
             $driverValid = $true
@@ -136,9 +144,9 @@ if (-not $driverValid) {
 }
 
 # ---------------------------------------------------------
-# Step 2: Check and Install CUDA (Requires >= 12.6)
+# Step 2: Check and Install CUDA (Requires >= 13.0)
 # ---------------------------------------------------------
-Write-Host "`n[2/6] Checking CUDA installation (Target: 12.6)..." -ForegroundColor Cyan
+Write-Host "`n[2/6] Checking CUDA installation (Target: 13.0)..." -ForegroundColor Cyan
 
 $installCuda = $true
 $cudaCheck = Get-Command nvcc -ErrorAction SilentlyContinue
@@ -147,7 +155,7 @@ if ($cudaCheck) {
     $nvccOutput = nvcc --version | Out-String
     if ($nvccOutput -match "release (\d+\.\d+)") {
         $cudaVer = [version]$matches[1]
-        if ($cudaVer -ge [version]"12.6") {
+        if ($cudaVer -ge [version]"13.0") {
             Write-Host "  -> Found CUDA $cudaVer. Skipping installation." -ForegroundColor Yellow
             $installCuda = $false
         }
@@ -155,8 +163,8 @@ if ($cudaCheck) {
 }
 
 if ($installCuda) {
-    Write-Host "  -> Installing/Upgrading to CUDA 12.6..." -ForegroundColor Magenta
-    winget install --id Nvidia.CUDA -v 12.6.0 -e --accept-package-agreements --accept-source-agreements
+    Write-Host "  -> Installing/Upgrading to CUDA 13.0..." -ForegroundColor Magenta
+    winget install --id Nvidia.CUDA -v 13.0.0 -e --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) {
         Write-Host "`n[!] Critical Error: CUDA installation failed with exit code $LASTEXITCODE." -ForegroundColor Red
         Exit-Script
@@ -301,8 +309,8 @@ $pythonCheck | & "$venvPath\Scripts\python.exe"
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  -> Found valid PyTorch (CUDA enabled, v2.4+). Skipping wheel downloads." -ForegroundColor Yellow
 } else {
-    Write-Host "  -> Installing default ML target stack..." -ForegroundColor Magenta
-    Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu126"
+    Write-Host "  -> Installing default ML target stack (CUDA 13.0)..." -ForegroundColor Magenta
+    Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu130"
 }
 
 Write-Host "  -> Installing Eiko..." -ForegroundColor Magenta
@@ -317,13 +325,26 @@ Write-Host "====================================================" -ForegroundCol
 
 & "$venvPath\Scripts\python.exe" -c "import eiko.eiko_torch; print('  -> Success: Eiko and PyTorch CUDA layers are fully operational!')"
 
-Write-Host "`n[*] Installation Complete!" -ForegroundColor Green
+# Create the quick-start launcher in the same directory as the installer
+$launcherPath = "$PSScriptRoot\start_eiko.bat"
+$batContent = "@echo off`ntitle Eiko Environment`ncall `"$venvPath\Scripts\activate.bat`"`ncmd /k"
+Set-Content -Path $launcherPath -Value $batContent
 
-# Gracefully close the elevated worker window so the parent window can take over
-if ($ElevatedSession) {
-    Write-Host "`n[*] Background setup finished. Returning to your original terminal in 3 seconds..." -ForegroundColor Cyan
-    Start-Sleep -Seconds 3
-    exit
+Write-Host "`n====================================================" -ForegroundColor Green
+Write-Host " EIKO ENVIRONMENT INSTALLED SUCCESSFULLY" -ForegroundColor Green
+Write-Host "====================================================" -ForegroundColor Green
+
+# 1. Address the immediate present: Get them ready to work right now
+if (Test-Path "$venvPath\Scripts\Activate.ps1") {
+    . "$venvPath\Scripts\Activate.ps1"
 }
 
+# 2. Address the future: Give them the simplest possible rule to remember
+Write-Host ""
+Write-Host "[!] How to use Eiko:" -ForegroundColor Yellow
+Write-Host "    Simply double-click " -NoNewline
+Write-Host "start_eiko.bat" -ForegroundColor Cyan -NoNewline
+Write-Host "    (It will automatically open a ready-to-use terminal)`n" -ForegroundColor DarkGray
+
+# Ensure the active window stays open until the user acknowledges
 Exit-Script
