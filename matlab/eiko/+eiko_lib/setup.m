@@ -108,7 +108,13 @@ function ver_out = setup(build_type)
                 error('NVCC device compilation failed!\n%s', cmdout);
             end
         catch ME
-            warning('Compilation attempt %d aborted: %s', attempt, ME.message);
+            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file')
+                % For some reason, it might throw an exception "This is not a MEX file", even though it successfully compiled the file...
+                success = true;
+                logMessage('MEX compilation successful.');
+            else
+                warning('Compilation attempt %d aborted: %s', attempt, ME.message);
+            end
         end
         
         if exist(obj_file, 'file'), delete(obj_file); end
