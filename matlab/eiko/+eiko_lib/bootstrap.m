@@ -33,7 +33,6 @@ function success = bootstrap(package_version, full_mex_path)
     registry_path = fullfile(script_dir, 'registry.json');
     
     if ~exist(registry_path, 'file')
-        fprintf('[Eiko] Local registry.json not found. Falling back to local compilation.\n');
         return;
     end
 
