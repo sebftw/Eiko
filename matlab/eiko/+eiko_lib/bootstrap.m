@@ -67,47 +67,13 @@ function success = bootstrap(package_version, full_mex_path)
 
     matched_build = [];
 
-    if strcmp(os_name, 'windows')
-        % Windows: Single unified build
-        for i = 1:numel(builds)
-            if strcmp(builds(i).os, 'windows')
-                matched_build = builds(i);
-                break;
-            end
-        end
-    else
-        % Linux: Determine Ubuntu version to map to CUDA target
-        target_cuda = '12.8'; % Default to 22.04+ baseline
-        
-        try
-            % Check OS release natively (avoids missing lsb_release package issues)
-            [status, cmdout] = system('cat /etc/os-release | grep "VERSION_ID"');
-            if status == 0 && contains(cmdout, '20.04')
-                target_cuda = '12.4';
-            end
-        catch
-            % Silently fall back to default 12.8 target on error
-        end
-        
-        % Search for the exact Linux + Target CUDA combination
-        for i = 1:numel(builds)
-            if strcmp(builds(i).os, 'linux') && strcmp(builds(i).cuda, target_cuda)
-                matched_build = builds(i);
-                break;
-            end
-        end
-        
-        % Safety fallback: If target CUDA build is missing, grab the first available Linux build
-        if isempty(matched_build)
-            for i = 1:numel(builds)
-                if strcmp(builds(i).os, 'linux')
-                    matched_build = builds(i);
-                    break;
-                end
-            end
+    for i = 1:numel(builds)
+        if strcmp(builds(i).os, os_name)
+            matched_build = builds(i);
+            break;
         end
     end
-
+    
     if isempty(matched_build)
         fprintf('[Eiko] No precompiled binaries match OS: %s. Falling back to compilation.\n', os_name);
         return;
