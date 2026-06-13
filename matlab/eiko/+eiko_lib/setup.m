@@ -91,23 +91,39 @@ function ver_out = setup(build_type)
                 nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
             end
         end
-        
+
         try
+            % Compile with NVCC
             [st, cmdout] = system(nvcc_cmd);
-            if st == 0
-                logMessage('NVCC compilation successful. Linking MEX...');
-                mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, '-outdir', config.OutDir, '-lut', link_flags{:});
-                
-                if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file')
-                    success = true;
-                    logMessage('MEX compilation successful.');
+            if st ~= 0
+                error('NVCC device compilation failed!\n%s', cmdout);
+            end
+            logMessage('NVCC compilation successful. Linking MEX...');
+        
+            % Link with MEX
+            try
+                mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, ...
+                    '-outdir', config.OutDir, '-lut', link_flags{:});
+            catch mex_ME
+                % MATLAB occasionally throws a spurious "... is not a MEX file" error 
+                % even when it succeeds. We catch it here silently and rely on the 
+                % file existence check below as the ultimate source of truth.
+            end
+            
+            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') == 3
+                success = true;
+                logMessage('MEX compilation successful.');
+            else
+                % If the file is missing, figure out why and throw the appropriate error
+                if exist('mex_ME', 'var')
+                    error('MEX compilation failed: %s', mex_ME.message);
                 else
                     error('MEX run finished but output file is missing.');
                 end
-            else
-                error('NVCC device compilation failed!\n%s', cmdout);
             end
+        
         catch ME
+            % Handle genuine, unrecoverable errors (like NVCC failing)
             warning('Compilation attempt %d aborted: %s', attempt, ME.message);
         end
         
