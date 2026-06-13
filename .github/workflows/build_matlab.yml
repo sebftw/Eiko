@@ -42,6 +42,7 @@ jobs:
         env:
           # Inside the NVIDIA container, nvcc is reliably located here:
           MW_NVCC_PATH: /usr/local/cuda/bin/nvcc
+          CUDA_HOME: /usr/local/cuda/
         with:
           command: addpath('matlab/eiko'); eiko_lib.setup();
 
@@ -49,7 +50,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eiko-linux-mex
-          path: matlab/eiko/*.mexa64
+          path: matlab/eiko/+eiko_lib/*.mexa64
           if-no-files-found: error
 
   # ==========================================
@@ -74,7 +75,7 @@ jobs:
         with:
           cuda: '12.8.1'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cccl", "crt", "thrust"]'
+          sub-packages: '["nvcc", "cudart", "thrust"]'
       
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
@@ -87,6 +88,7 @@ jobs:
         uses: matlab-actions/run-command@v2
         env:
           MW_NVCC_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe
+          CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
         with:
           command: addpath('matlab/eiko'); eiko_lib.setup();
 
@@ -94,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: eiko-windows-mex
-          path: matlab/eiko/*.mexw64
+          path: matlab/eiko/+eiko_lib/*.mexw64
           if-no-files-found: error
 
   # ==========================================
@@ -114,13 +116,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: eiko-linux-mex
-          path: matlab/eiko/
+          path: matlab/eiko/+eiko_lib/
           
       - name: Download Windows MEX
         uses: actions/download-artifact@v4
         with:
           name: eiko-windows-mex
-          path: matlab/eiko/
+          path: matlab/eiko/+eiko_lib/
 
       - name: Create Release Zip
         run: |
