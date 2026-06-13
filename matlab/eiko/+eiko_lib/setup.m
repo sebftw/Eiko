@@ -331,12 +331,12 @@ function [link_flags, fallback_libs] = getLinkerFlags(best_nvcc)
     else
         cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
         ml_lib_dir = fullfile(matlabroot, 'bin', computer('arch'));
-        link_flags = {['-L' cuda_lib_dir], '-lcudart_static', '-ldl'}; 
+        link_flags = {['-L' cuda_lib_dir], '-lcudart_static', '-ldl', '-lrt'}; 
         
         if exist(fullfile(ml_lib_dir, 'libgpu.so'), 'file'), link_flags{end+1} = '-lgpu'; end
         if exist(fullfile(ml_lib_dir, 'libmwgpu.so'), 'file'), link_flags{end+1} = '-lmwgpu'; end
         if exist(fullfile(ml_lib_dir, 'libgpumexbinder.so'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
-        fallback_libs = {'-lut', '-ldl'};
+        fallback_libs = {'-lut', '-ldl', '-lrt'};
     end
 end
 
