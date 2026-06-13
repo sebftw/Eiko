@@ -34,6 +34,8 @@ jobs:
         uses: matlab-actions/setup-matlab@v2
         with:
           release: 'R2021a'
+          products: >
+            Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
         uses: matlab-actions/run-command@v2
@@ -71,12 +73,15 @@ jobs:
         with:
           cuda: '12.8.1'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "visual_studio_integration"]'
+          sub-packages: '["nvcc", "cudart", "cccl", "visual_studio_integration"]'
+          # sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "visual_studio_integration"]'
       
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
           release: 'R2021a'
+          products: >
+            Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
         uses: matlab-actions/run-command@v2
