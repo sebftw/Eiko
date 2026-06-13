@@ -45,7 +45,7 @@ jobs:
           MW_NVCC_PATH: /usr/local/cuda/bin/nvcc
           CUDA_HOME: /usr/local/cuda/
         with:
-          command: addpath('matlab/eiko'); eiko_lib.setup();
+          command: addpath('matlab/eiko'); eiko_lib.setup('release');
 
       - name: Upload Linux MEX Artifact
         uses: actions/upload-artifact@v4
@@ -95,7 +95,7 @@ jobs:
           command: >
             mex('-setup', fullfile(matlabroot, 'bin', 'win64', 'mexopts', 'msvcpp2019.xml'), 'C++');
             addpath('matlab/eiko'); 
-            eiko_lib.setup();
+            eiko_lib.setup('release');
 
       - name: Upload Windows MEX Artifact
         uses: actions/upload-artifact@v4
