@@ -1,0 +1,130 @@
+name: Package Eiko MATLAB Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  # ==========================================
+  # 1. LINUX MATLAB BUILD (CONTAINERIZED)
+  # ==========================================
+  build_matlab_linux:
+    name: MATLAB Build (Linux, CUDA 12.8)
+    runs-on: ubuntu-22.04
+    container:
+      # Use the devel image so it includes nvcc and the compiler toolchain
+      image: nvidia/cuda:12.8.2-devel-ubuntu20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Utilities for MATLAB Action
+        # The NVIDIA base image is barebones. The setup-matlab action requires 
+        # wget and unzip to fetch and extract the MATLAB runtime.
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update
+          apt-get install -y wget unzip ca-certificates build-essential
+          apt-get install -y gcc-10 g++-10
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: 'R2021a'
+
+      - name: Run MATLAB Setup Script
+        uses: matlab-actions/run-command@v2
+        env:
+          # Inside the NVIDIA container, nvcc is reliably located here:
+          MW_NVCC_PATH: /usr/local/cuda/bin/nvcc
+        with:
+          command: addpath('matlab/eiko'); eiko_lib.setup();
+
+      - name: Upload Linux MEX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eiko-linux-mex
+          path: matlab/eiko/*.mexa64
+          if-no-files-found: error
+
+  # ==========================================
+  # 2. WINDOWS MATLAB BUILD
+  # ==========================================
+  build_matlab_windows:
+    name: MATLAB Build (Windows, CUDA 12.8)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install CUDA Toolkit 12.8
+        uses: Jimver/cuda-toolkit@v0.2.35
+        id: cuda-toolkit
+        with:
+          cuda: '12.8.1'
+          method: 'network'
+          sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "visual_studio_integration"]'
+      
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+        with:
+          release: 'R2021a'
+
+      - name: Run MATLAB Setup Script
+        uses: matlab-actions/run-command@v2
+        env:
+          MW_NVCC_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe
+        with:
+          command: addpath('matlab/eiko'); eiko_lib.setup();
+
+      - name: Upload Windows MEX Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eiko-windows-mex
+          path: matlab/eiko/*.mexw64
+          if-no-files-found: error
+
+  # ==========================================
+  # 3. COMBINE AND PACKAGE RELEASE
+  # ==========================================
+  package_matlab_release:
+    name: Package Cross-Platform MATLAB Release
+    needs: [build_matlab_linux, build_matlab_windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      # Download both Linux and Windows artifacts directly into the eiko directory
+      # This injects the compiled binaries alongside the source .m files
+      - name: Download Linux MEX
+        uses: actions/download-artifact@v4
+        with:
+          name: eiko-linux-mex
+          path: matlab/eiko/
+          
+      - name: Download Windows MEX
+        uses: actions/download-artifact@v4
+        with:
+          name: eiko-windows-mex
+          path: matlab/eiko/
+
+      - name: Create Release Zip
+        run: |
+          cd matlab
+          # Zip the 'eiko' folder so when a user extracts it, they get a single directory
+          zip -r eiko_matlab_release.zip eiko/
+          
+      - name: Upload Final ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eiko-matlab-release
+          path: matlab/eiko_matlab_release.zip
