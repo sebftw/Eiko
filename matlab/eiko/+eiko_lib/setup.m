@@ -335,9 +335,19 @@ function [link_flags, fallback_libs] = getLinkerFlags(best_nvcc)
         if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
         fallback_libs = {'-lut'};
     else
-        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
-        link_flags = {['-L' cuda_lib_dir], '-lmwgpu', '-lcudart', '-ldl'}; 
-        fallback_libs = {'-lut', '-ldl'}; 
+        % DEFINE MATLAB LIBRARY PATH: Usually /bin/glnxa64 or /bin/maci64
+        ml_lib_dir = fullfile(matlabroot, 'bin', computer('arch'));
+        
+        % ADD TO LINKER FLAGS: Include -L ml_lib_dir so ld knows where to look
+        link_flags = {['-L' ml_lib_dir], ['-L' cuda_lib_dir], '-lcudart', '-ldl'}; 
+        
+        ext = '.so';
+        % DYNAMIC CHECKS: Mimic the Windows block's safe inclusion
+        if exist(fullfile(ml_lib_dir, ['libgpu' ext]), 'file'), link_flags{end+1} = '-lgpu'; end
+        if exist(fullfile(ml_lib_dir, ['libmwgpu' ext]), 'file'), link_flags{end+1} = '-lmwgpu'; end
+        if exist(fullfile(ml_lib_dir, ['libgpumexbinder' ext]), 'file'), link_flags{end+1} = '-lgpumexbinder'; end
+        
+        fallback_libs = {'-lut', '-ldl'};
     end
 end
 
