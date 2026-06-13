@@ -66,6 +66,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+          toolset: '14.2'  # Forces the action to locate and activate the MSVC 2019 (v142) compiler
 
       - name: Install CUDA Toolkit 12.8
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -73,8 +74,7 @@ jobs:
         with:
           cuda: '12.8.1'
           method: 'network'
-          sub-packages: '["nvcc", "cudart", "cccl", "visual_studio_integration"]'
-          # sub-packages: '["nvcc", "cudart", "crt", "thrust", "nvvm", "visual_studio_integration"]'
+          sub-packages: '["nvcc", "cudart", "cccl", "crt", "thrust"]'
       
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
