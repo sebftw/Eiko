@@ -613,7 +613,6 @@ jobs:
         with:
           # Force MATLAB to lock in the C++ compiler before running your script
           command: >
-            mex -setup C++;
             addpath('matlab/eiko'); 
             eiko_lib.setup('release');
 
