@@ -371,6 +371,31 @@ public:
                 outer_iteration_cnt++;
 			}
         }
+
+        // =========================================================
+        // ADJOINT POST-PROCESSING
+        // =========================================================
+        if constexpr (Config::BACKWARD_PASS && false) {
+            // Reuse the existing block_dims (TILE_W, TILE_H, TILE_D) 
+            // defined at the start of the solve() method.
+            dim3 grid(
+                (width + block_dims.x - 1) / block_dims.x,
+                (height + block_dims.y - 1) / block_dims.y,
+                (depth * batch_size + block_dims.z - 1) / block_dims.z
+            );
+
+            auto finalize_ptr = (void*) &finalize_adjoint_kernel<
+                Config::MSFM, Config::THREE_DIMENSIONAL, Config::GATED_X, Config::CHANNELS
+            >;
+
+            void* finalizeArgs[] = {
+                &d_u, &pitch_u, &d_tof, &pitch_tof,
+                &width, &height, &depth, &dx, &batch_size
+            };
+
+            // Queued into the same stream ensures it runs strictly after the FIM loop concludes.
+            CUDA_CHECK(cudaLaunchKernel(finalize_ptr, grid, block_dims, finalizeArgs, 0, stream));
+        }
     }
 	
 

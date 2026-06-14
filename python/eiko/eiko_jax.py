@@ -408,11 +408,15 @@ def solve_eikonal_fwd(u_init, f, v, dx, msfm, is_3d, gated_x):
         
     u_out = _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward=False)
     
-    res = (u_out, f)
+    # Identify and cache the source nodes for the backward pass
+    u_init_inf_mask = jnp.isinf(u_init)
+
+    # Pack the mask into the residual tuple
+    res = (u_out, f, u_init_inf_mask)
     return u_out, res
 
 def solve_eikonal_bwd(v, dx, msfm, is_3d, gated_x, res, grad_u):
-    u_out, f = res
+    u_out, f, u_init_inf_mask = res
     lambda_init = jnp.zeros_like(u_out)
     
     lambda_adj = _fim_custom_call(
@@ -420,8 +424,9 @@ def solve_eikonal_bwd(v, dx, msfm, is_3d, gated_x, res, grad_u):
         is_backward=True, tof=u_out
     )
     
-    grad_u_init = lambda_adj
-    grad_f = lambda_adj * f * dx * dx
+    grad_u_init = jnp.where(u_init_inf_mask, 0.0, lambda_adj)
+    grad_f = lambda_adj * f * (dx * dx)
+    grad_f = jnp.where(~u_init_inf_mask, 0.0, grad_f)
     
     if f.ndim == lambda_adj.ndim - 1:
         grad_f = jnp.sum(grad_f, axis=0)

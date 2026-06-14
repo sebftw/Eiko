@@ -1178,12 +1178,12 @@ __global__ void batched_fim_kernel_new(
 							calculated_u = solve_adjoint<MSFM, THREE_DIMENSIONAL>(
 								fetch_card, fetch_diag, 
 								ch, my_weights[iz][iy][ix][ch], 
-								my_f[iz][iy][ix][min(ch, CHANNELS_F-1)] * dx * dx
+								my_f[iz][iy][ix][min(ch, CHANNELS_F-1)]
 							);
 
                             // Instead of: my_u[iz][iy][ix][ch] = calculated_u;
                             diff = fabsf(my_u[iz][iy][ix][ch] - calculated_u);
-                            updated = diff > fmaxf(1e-5f * dx, fabsf(1e-4f * calculated_u)); // fmaxf(1e-6f * dx, fabsf(1e-5f * calculated_u));
+                            updated = diff > fmaxf(1e-5f * dx, fabsf(1e-6f * calculated_u)); // approximately 6 digits of accuracy
 
                             // The backwared system has a spectral radius of 1, meaning numerical noise might bounce around making it appear non-convergent.
                             // Dampening (under-relaxation), puts the spectral radius slightly below 1, ensuring convergence, without affecting the final output much.
@@ -1374,6 +1374,84 @@ __global__ void batched_fim_kernel_new(
 		job_idx = s_job_idx;
 		data_block_id = s_data_block_id;
 	}
+}
+
+// =========================================================
+// ADJOINT FINALIZATION KERNEL
+// Converts the raw FIM adjoint state (\tilde{\lambda}) into 
+// the true gradient (\lambda) by multiplying back the normalizer.
+// =========================================================
+template <bool MSFM = false, bool THREE_DIMENSIONAL = false, bool GATED_X = false, int CHANNELS = 1>
+__global__ void finalize_adjoint_kernel(
+    void* __restrict__ d_u, size_t pitch_u_bytes,
+    const void* __restrict__ d_tof, size_t pitch_tof_bytes,
+    int grid_width, int grid_height, int grid_depth, float dx, int batch_size) 
+{
+    using VecType = typename CudaVec<CHANNELS>::Type;
+
+    int gx = blockIdx.x * blockDim.x + threadIdx.x;
+    int gy = blockIdx.y * blockDim.y + threadIdx.y;
+    int gz_batch = blockIdx.z * blockDim.z + threadIdx.z; 
+
+    // gz_batch handles both the Z-dimension and the Batch dimension
+    if (gx >= grid_width || gy >= grid_height || gz_batch >= grid_depth * batch_size) return;
+
+    int batch_id = gz_batch / grid_depth;
+    int gz = gz_batch % grid_depth;
+
+    constexpr int dX[3][2] = {{-1, 1}, {0, 0}, {0, 0}};
+    constexpr int dY[3][2] = {{0, 0}, {-1, 1}, {0, 0}};
+    constexpr int dZ[3][2] = {{0, 0}, {0, 0}, {-1, 1}};
+    const int dX_diag[12] = {-1, 1, -1, 1,  -1, 1, -1, 1,   0, 0, 0, 0};
+    const int dY_diag[12] = {-1, -1, 1, 1,   0, 0, 0, 0,  -1, 1, -1, 1};
+    const int dZ_diag[12] = { 0, 0, 0, 0,   -1,-1, 1, 1,  -1,-1, 1, 1};
+
+    // Safe fetcher lambdas for the travel-time field (d_tof)
+    auto fetch_T = [&](int axis, int dir, int ch, float T_c) -> float {
+        int nx = gx + dX[axis][dir];
+        int ny = gy + dY[axis][dir];
+        int nz = THREE_DIMENSIONAL ? gz + dZ[axis][dir] : 0;
+        if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
+            int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
+            return ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[nx].f[ch];
+        }
+        return T_c; 
+    };
+
+    auto fetch_T_diag = [&](int d, int ch, float T_c) -> float {
+        int nx = gx + dX_diag[d];
+        int ny = gy + dY_diag[d];
+        int nz = THREE_DIMENSIONAL ? gz + dZ_diag[d] : 0;
+        if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
+            int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
+            return ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[nx].f[ch];
+        }
+        return T_c; 
+    };
+
+    int row = batch_id * (grid_height * grid_depth) + gz * grid_height + gy;
+    
+    // Fetch the raw \tilde{\lambda} (u_val) and the travel-time (t_val)
+    VecType u_val = ((VecType*)((char*)d_u + row * pitch_u_bytes))[gx];
+    VecType t_val = ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[gx];
+
+    #pragma unroll
+    for (int ch = 0; ch < CHANNELS; ++ch) {
+        float T_curr = t_val.f[ch];
+        // Recompute the exact normalizer used in the forward pass
+        AdjointWeights w = precompute_adjoint_weights<MSFM, THREE_DIMENSIONAL, GATED_X>(
+            [&](int a, int d, int c) { return fetch_T(a, d, c, T_curr); }, 
+            [&](int d, int c) { return fetch_T_diag(d, c, T_curr); }, 
+            ch, T_curr, dx
+        );
+
+        // Convert \tilde{\lambda} to \lambda
+        // Note: inv_normalizer is cleanly handled for source points (1.0f)
+        u_val.f[ch] = u_val.f[ch] / w.inv_normalizer;
+    }
+    
+    // Write back the corrected \lambda
+    ((VecType*)((char*)d_u + row * pitch_u_bytes))[gx] = u_val;
 }
 
 // Inverse beamforming kernel.

@@ -121,7 +121,7 @@ classdef EikonalDifferentiableOp < deep.DifferentiableFunction
             
             % Extract the boolean flags and the cached forward variables.
             computeGradients = varargin{base_idx};
-            % u_init         = varargin{base_idx + 1}; % Unused in backward logic
+            u_init         = varargin{base_idx + 1};
             f                = varargin{base_idx + 2};
             % v              = varargin{base_idx + 3}; % Unused in backward logic
             dx               = varargin{base_idx + 4};
@@ -149,14 +149,16 @@ classdef EikonalDifferentiableOp < deep.DifferentiableFunction
                 % Note: ^ We DO NOT broadcast "f" here, as f is the residual (grad_u), in this context.
                 
                 % Assign gradient for the initial condition.
+                non_source_mask = isinf(u_init);
                 if computeGradients(1)
-                    grad_u_init = lambda; 
+                    grad_u_init = lambda;
+                    grad_u_init(non_source_mask) = 0;  % Points with unknown TOF have no gradient (no input means no sensitivity w.r.t. the input).
                 end
                 
                 % Compute gradient for the slowness function (f).
                 if computeGradients(2)
-                    % OPTIMIZED: Scalar squaring first, then array multiplication
-                    grad_f = (dx * dx) * (lambda .* f);
+                    grad_f = lambda .* f * (dx * dx);
+                    grad_f(~non_source_mask) = 0;
                     
                     if obj.broadcast_f
                         batch_dim = 3 + obj.is_3d; 

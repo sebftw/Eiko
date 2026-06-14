@@ -192,6 +192,9 @@ class EikonalSolver(torch.autograd.Function):
 
         # Safely extract scalar value if dx is passed as a PyTorch Tensor.
         dx_val = dx.item() if isinstance(dx, torch.Tensor) else float(dx)
+
+        # Identify and cache the source nodes before u_init is modified/cloned
+        u_init_inf_mask = torch.isinf(u_init)
         
         # Clone to prevent the C++ kernel from modifying the input in-place.
         u_out = u_init.clone()
@@ -204,7 +207,7 @@ class EikonalSolver(torch.autograd.Function):
         solver.solve(u=u_out, f=f, v=v_out, tof=None, dx=dx_val)
 
         # Save context for the backward pass.
-        ctx.save_for_backward(u_out, f)
+        ctx.save_for_backward(u_out, f, u_init_inf_mask)
         ctx.dx = dx_val
         ctx.msfm = msfm
         ctx.is_3d = is_3d
@@ -221,7 +224,8 @@ class EikonalSolver(torch.autograd.Function):
         # We use *grad_outputs to handle whether forward returned 1 or 2 tensors.
         grad_u = grad_outputs[0]
         
-        u_out, f = ctx.saved_tensors
+        # Unpack the saved tensors, including the mask
+        u_out, f, u_init_inf_mask = ctx.saved_tensors
         
         # Ensure the incoming upstream gradient meets memory standards
         grad_u = grad_u.contiguous().float()
@@ -245,11 +249,17 @@ class EikonalSolver(torch.autograd.Function):
 
             # Extract u_init gradient if requested.
             if ctx.needs_input_grad[0]:
-                grad_u_init = lambda_adj  # Gradient w.r.t initial travel times 'u'.
-
+                # Gradient w.r.t initial travel times 'u'.
+                grad_u_init = lambda_adj.clone() 
+                # Zero out the gradient everywhere except the true initial source points
+                grad_u_init.masked_fill_(u_init_inf_mask, 0.0)
+            
             # Extract and reduce f gradient if requested.
             if ctx.needs_input_grad[1]:
-                grad_f = lambda_adj * f * ctx.dx * ctx.dx  # Gradient w.r.t the slowness field 'f'.
+                grad_f = lambda_adj * f * (ctx.dx * ctx.dx)  # Gradient w.r.t the slowness field 'f'.
+
+                # Zero out the gradient at the true initial source points (speed of sound at those nodes does not effect the time, since the time was prescribed).
+                grad_u_init.masked_fill_(~u_init_inf_mask, 0.0)
                 
                 # If f was broadcasted, we must sum the gradient across the batch 
                 # dimension to restore its original shape for the autograd engine.

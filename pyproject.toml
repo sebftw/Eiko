@@ -87,7 +87,7 @@ include-package-data = true  # <-- Crucial for JIT compilation architectures
 "eiko" = "python/eiko"
 
 [tool.pytest.ini_options]
-testpaths = ["python/test"]
+testpaths = ["tests"]
 addopts = "-v"
 
 [tool.coverage.run]
