@@ -83,6 +83,9 @@ jobs:
         # Optional: Added --repo just to be extra safe
         run: gh run watch ${{ env.TARGET_RUN_ID }} --repo ${{ github.repository }} --exit-status
 
+      # ---------------------------------------------------------
+      # ARTIFACT DOWNLOADS
+      # ---------------------------------------------------------
       - name: Download all wheel artifacts
         uses: actions/download-artifact@v4
         with:
@@ -91,6 +94,19 @@ jobs:
           run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download MATLAB Release Artifact
+        uses: actions/download-artifact@v4
+        # continue-on-error prevents the workflow from failing if a specific release doesn't include MATLAB updates
+        continue-on-error: true
+        with:
+          name: eiko-matlab-release
+          path: artifacts
+          run-id: ${{ env.TARGET_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------------------------------------------------------
+      # REGISTRY INJECTION & RELEASE
+      # ---------------------------------------------------------
       - name: Generate Registry and Inject
         run: |
           python3 -c "
