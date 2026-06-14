@@ -110,7 +110,7 @@ function ver_out = setup(build_type)
                 % file existence check below as the ultimate source of truth.
             end
             
-            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') == 3
+            if (exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') == 3) || (exist('eiko_lib.mex_bindings', 'file') == 3)
                 success = true;
                 logMessage('MEX compilation successful.');
             else
