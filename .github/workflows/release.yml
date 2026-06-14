@@ -580,14 +580,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Install Visual Studio 2019 Build Tools
-        run: choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart" -y
-      #- name: Set up MSVC environment
-      #  uses: ilammy/msvc-dev-cmd@v1
-      #  with:
-      #    arch: x64
-      #    toolset: '14.2'  # Forces the action to locate and activate the MSVC 2019 (v142) compiler
+        
+      #- name: Install Visual Studio 2019 Build Tools
+      #  run: choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart" -y
+      
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: '14.2'  # Forces the action to locate and activate the MSVC 2019 (v142) compiler
 
       - name: Install CUDA Toolkit 12.8
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -612,6 +613,7 @@ jobs:
         with:
           # Force MATLAB to lock in the C++ compiler before running your script
           command: >
+            mex -setup C++;
             addpath('matlab/eiko'); 
             eiko_lib.setup('release');
 
