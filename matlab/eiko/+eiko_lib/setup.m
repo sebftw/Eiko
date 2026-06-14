@@ -101,6 +101,7 @@ function ver_out = setup(build_type)
             logMessage('NVCC compilation successful. Linking MEX...');
         
             % Link with MEX
+            mex_err_msg = []
             try
                 mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, ...
                     '-outdir', config.OutDir, '-lut', link_flags{:});
@@ -108,15 +109,16 @@ function ver_out = setup(build_type)
                 % MATLAB occasionally throws a spurious "... is not a MEX file" error 
                 % even when it succeeds. We catch it here silently and rely on the 
                 % file existence check below as the ultimate source of truth.
+                mex_err_msg = mex_ME.message;
             end
             
-            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') == 3
+            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') || (exist('eiko_lib.mex_bindings', 'file') == 3)
                 success = true;
                 logMessage('MEX compilation successful.');
             else
                 % If the file is missing, figure out why and throw the appropriate error
-                if exist('mex_ME', 'var')
-                    error('MEX compilation failed: %s', mex_ME.message);
+                if not(isempty(mex_err_msg))
+                    error('MEX compilation failed: %s', mex_err_msg);
                 else
                     error('MEX run finished but output file is missing.');
                 end
