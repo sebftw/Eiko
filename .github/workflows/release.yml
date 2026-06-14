@@ -549,14 +549,14 @@ jobs:
           apt-get install -y gcc-10 g++-10
 
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
           release: 'R2021a'
           products: >
             Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
-        uses: matlab-actions/run-command@v2
+        uses: matlab-actions/run-command@v3
         env:
           # Inside the NVIDIA container, nvcc is reliably located here:
           MW_NVCC_PATH: /usr/local/cuda/bin/nvcc
@@ -599,14 +599,15 @@ jobs:
           sub-packages: '["nvcc", "cudart", "thrust"]'
       
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2021b'
+          release: 'R2022a'
+          cache: true
           products: >
             Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
-        uses: matlab-actions/run-command@v2
+        uses: matlab-actions/run-command@v3
         env:
           MW_NVCC_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe
           CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
