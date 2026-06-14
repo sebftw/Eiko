@@ -218,12 +218,12 @@ Feel free to contribute to the project. Bug reports and feature requests may be 
 You can cite Eiko as
 ```
 @misc{eiko2026,
-  author = {Pr{\ae}sius, Sebastian},
-  title = {Eiko: the GPU-accelerated Eikonal equation solver},
-  year = {2026},
-  publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/sebftw/Eiko}}
+  author       = {Pr{\ae}sius, Sebastian Kazmarek},
+  title        = {Eiko: the {GPU}-accelerated {E}ikonal equation solver},
+  year         = {2026},
+  publisher    = {GitHub},
+  howpublished = {\url{https://github.com/sebftw/Eiko}},
+  note         = {GitHub repository}
 }
 ```
 
