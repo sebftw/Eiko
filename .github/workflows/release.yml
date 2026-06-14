@@ -551,7 +551,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2021a'
+          release: 'R2022a'
           products: >
             Parallel_Computing_Toolbox
 
