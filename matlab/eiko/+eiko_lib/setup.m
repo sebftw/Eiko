@@ -78,6 +78,7 @@ function ver_out = setup(build_type)
         logMessage('Attempt %d: Compiling with NVCC...', attempt);
         
         obj_file = fullfile(config.OutDir, ['mex_bindings', obj_ext]);
+        c_mexapi_obj = fullfile(config.OutDir, ['c_mexapi_version', obj_ext]);
         cccl_flags = getCCCLFlags(best_nvcc);
         [cuda_root, ~, ~] = fileparts(fileparts(best_nvcc));
         
@@ -90,46 +91,66 @@ function ver_out = setup(build_type)
                 logMessage('Activating MSVC environment.');
                 nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
             end
+        else
+            vcvars_cmd = '';
         end
 
         try
-            % Compile with NVCC
+            % 1. Compile Device Code with NVCC
             [st, cmdout] = system(nvcc_cmd);
             if st ~= 0
                 error('NVCC device compilation failed!\n%s', cmdout);
             end
-            logMessage('NVCC compilation successful. Linking MEX...');
+            logMessage('NVCC compilation successful. Linking via direct system call...');
         
-            % Link with MEX
-            mex_err_msg = []
+            % 2. Direct Linker Invocation
+            out_file = fullfile(config.OutDir, ['mex_bindings.', mexext]);
+            link_err_msg = [];
+            
             try
-                mex('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, obj_file, ...
-                    '-outdir', config.OutDir, '-lut', link_flags{:});
-            catch mex_ME
-                % MATLAB occasionally throws a spurious "... is not a MEX file" error 
-                % even when it succeeds. We catch it here silently and rely on the 
-                % file existence check below as the ultimate source of truth.
-                mex_err_msg = mex_ME.message;
+                % Compile the mandatory MEX API version object
+                compileMexApi(c_mexapi_obj, ispc, vcvars_cmd);
+                
+                % Build the system linker command
+                link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, ispc, matlabroot, computer('arch'));
+                
+                if ispc && ~isempty(vcvars_cmd)
+                    link_cmd = sprintf('%s && %s', vcvars_cmd, link_cmd);
+                end
+                
+                [st_link, cmdout_link] = system(link_cmd);
+                if st_link ~= 0
+                    error('Direct linker call failed:\n%s\nCommand was:\n%s', cmdout_link, link_cmd);
+                end
+            catch link_ME
+                link_err_msg = link_ME.message;
             end
             
-            if exist(fullfile(config.OutDir, ['mex_bindings.', mexext]), 'file') || (exist('eiko_lib.mex_bindings', 'file') == 3)
+            % 3. Verify Output
+            if exist(out_file, 'file') || (exist('eiko_lib.mex_bindings', 'file') == 3)
                 success = true;
-                logMessage('MEX compilation successful.');
+                logMessage('Direct system linkage successful.');
             else
-                % If the file is missing, figure out why and throw the appropriate error
-                if not(isempty(mex_err_msg))
-                    error('MEX compilation failed: %s', mex_err_msg);
+                if not(isempty(link_err_msg))
+                    error('Direct linking failed: %s', link_err_msg);
                 else
-                    error('MEX run finished but output file is missing.');
+                    error('Linker ran but output file is missing.');
                 end
             end
         
         catch ME
-            % Handle genuine, unrecoverable errors (like NVCC failing)
             warning('Compilation attempt %d aborted: %s', attempt, ME.message);
         end
         
+        % Cleanup object files and linker byproducts
         if exist(obj_file, 'file'), delete(obj_file); end
+        if exist(c_mexapi_obj, 'file'), delete(c_mexapi_obj); end
+        if ispc
+            % MSVC link.exe generates .lib and .exp files when building a DLL/MEX
+            out_base = fullfile(config.OutDir, 'mex_bindings');
+            if exist([out_base, '.lib'], 'file'), delete([out_base, '.lib']); end
+            if exist([out_base, '.exp'], 'file'), delete([out_base, '.exp']); end
+        end
         attempt = attempt + 1;
     end
     
@@ -368,5 +389,66 @@ function cccl_flags = getCCCLFlags(best_nvcc)
     if exist(cccl_include, 'dir')
         cccl_flags = sprintf('-I"%s" -I"%s" -I"%s" -I"%s" ', ...
             cccl_include, fullfile(cccl_include, 'thrust'), fullfile(cccl_include, 'libcudacxx'), fullfile(cccl_include, 'cub'));
+    end
+end
+
+function compileMexApi(c_mexapi_obj, is_pc, vcvars_cmd)
+    % Compiles MATLAB's required API version object file
+    c_mexapi_src = fullfile(matlabroot, 'extern', 'version', 'c_mexapi_version.c');
+    
+    if is_pc
+        api_cmd = sprintf('cl.exe /c /nologo /MD /O2 /Fo"%s" "%s"', c_mexapi_obj, c_mexapi_src);
+        if ~isempty(vcvars_cmd), api_cmd = sprintf('%s && %s', vcvars_cmd, api_cmd); end
+    else
+        api_cmd = sprintf('gcc -c -fPIC "%s" -o "%s"', c_mexapi_src, c_mexapi_obj);
+    end
+    
+    [st, cmdout] = system(api_cmd);
+    if st ~= 0
+        error('Failed to compile c_mexapi_version.c:\n%s', cmdout);
+    end
+end
+
+function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, is_pc, ml_root, ml_arch)
+    % Constructs the raw CLI link string, bypassing the MATLAB mex function
+    if is_pc
+        ml_lib_dir = fullfile(ml_root, 'extern', 'lib', ml_arch, 'microsoft');
+        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib', 'x64');
+        
+        libs = sprintf('"%s\\libmx.lib" "%s\\libmex.lib" "%s\\libmat.lib" "%s\\libMatlabDataArray.lib" "%s\\libut.lib" "%s\\cudart_static.lib" ', ...
+            ml_lib_dir, ml_lib_dir, ml_lib_dir, ml_lib_dir, ml_lib_dir, cuda_lib_dir);
+            
+        if exist(fullfile(ml_lib_dir, 'gpu.lib'), 'file'), libs = [libs, sprintf('"%s\\gpu.lib" ', ml_lib_dir)]; end
+        if exist(fullfile(ml_lib_dir, 'mwgpu.lib'), 'file'), libs = [libs, sprintf('"%s\\mwgpu.lib" ', ml_lib_dir)]; end
+        if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), libs = [libs, sprintf('"%s\\gpumexbinder.lib" ', ml_lib_dir)]; end
+        
+        % MSVC uses /EXPORT:mexFunction to expose the correct entrypoint to MATLAB
+        link_cmd = sprintf('link.exe /DLL /nologo /OUT:"%s" /EXPORT:mexFunction "%s" "%s" %s', out_file, obj_file, c_mexapi_obj, libs);
+    else
+        ml_bin = fullfile(ml_root, 'bin', ml_arch);
+        ml_ext_bin = fullfile(ml_root, 'extern', 'bin', ml_arch);
+        ml_ext_lib = fullfile(ml_root, 'extern', 'lib', ml_arch);
+        cuda_lib_dir = fullfile(fileparts(fileparts(best_nvcc)), 'lib64');
+        
+        % The map file specifies exactly what symbols to export
+        map_file = fullfile(ml_ext_lib, 'c_exportsmexfileversion.map');
+        
+        % Extracted directly from the Makefile template to fix glibc & rpath issues
+        ldflags = sprintf('-pthread -shared -O -Wl,--no-undefined -Wl,--version-script,"%s" -Wl,--as-needed ', map_file);
+        ldflags = [ldflags, sprintf('-Wl,-rpath-link,"%s" -L"%s" ', ml_bin, ml_bin)];
+        ldflags = [ldflags, sprintf('-Wl,-rpath-link,"%s" -L"%s" ', ml_ext_bin, ml_ext_bin)];
+        
+        libs = '-lMatlabDataArray -lmx -lmex -lmat -lm -lc -lut ';
+        if exist(fullfile(ml_bin, 'libmwgpu.so'), 'file'), libs = [libs, '-lmwgpu ']; end
+        if exist(fullfile(ml_bin, 'libgpu.so'), 'file'), libs = [libs, '-lgpu ']; end
+        if exist(fullfile(ml_bin, 'libgpumexbinder.so'), 'file'), libs = [libs, '-lgpumexbinder ']; end
+        
+        cuda_libs = sprintf('-L"%s" -lcudart_static -ldl -lrt ', cuda_lib_dir);
+        
+        % Static glibc linking, mirroring your Makefile
+        static_libs = '-static-libstdc++ -static-libgcc ';
+        
+        % Use g++ explicitly
+        link_cmd = sprintf('g++ "%s" "%s" %s %s %s %s -o "%s"', obj_file, c_mexapi_obj, ldflags, libs, cuda_libs, static_libs, out_file);
     end
 end

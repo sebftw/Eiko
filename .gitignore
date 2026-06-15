@@ -6,6 +6,10 @@ python/start_eiko.bat
 matlab/start_eiko.sh
 matlab/start_eiko.bat
 
+# Compiled byproducts
+*.exp
+*.lib
+*.so
 
 #####################################
 ##              MATLAB             ##
