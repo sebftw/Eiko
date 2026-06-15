@@ -10,8 +10,6 @@ function success = bootstrap(package_version, full_mex_path)
     %
     % Returns: true if binary is ready/downloaded, false if compilation fallback is needed.
 
-
-    
     success = false;
     
     % Strip the extension if the user provided one, so we have the raw base name

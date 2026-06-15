@@ -94,12 +94,30 @@ jobs:
           run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Download MATLAB Release Artifact
+      - name: Download MATLAB Source Zip
         uses: actions/download-artifact@v4
         # continue-on-error prevents the workflow from failing if a specific release doesn't include MATLAB updates
         continue-on-error: true
         with:
           name: eiko-matlab-release
+          path: artifacts
+          run-id: ${{ env.TARGET_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download Linux MEX Binaries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: eiko-linux-mex
+          path: artifacts
+          run-id: ${{ env.TARGET_RUN_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Download Windows MEX Binaries
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: eiko-windows-mex
           path: artifacts
           run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

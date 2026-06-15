@@ -23,7 +23,7 @@ classdef BuildConfig < handle
             [currentDir, ~, ~] = fileparts(classPath);
             
             % Define absolute paths for source code
-            obj.SourceDir = fullfile(currentDir, '+src');
+            obj.SourceDir = fullfile(currentDir, 'src');
             if exist(obj.SourceDir, 'dir') ~= 7
                 % Source is either in the matching directory or 3 levels up
                 obj.SourceDir = fullfile(currentDir, '..', '..', '..', 'src');
