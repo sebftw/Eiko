@@ -34,7 +34,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2018a'
+          release: 'R2021a'
           products: >
             Parallel_Computing_Toolbox
 
@@ -81,7 +81,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2018a'
+          release: 'R2021a'
           products: >
             Parallel_Computing_Toolbox
 
