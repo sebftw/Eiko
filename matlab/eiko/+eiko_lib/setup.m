@@ -27,6 +27,14 @@ function ver_out = setup(build_type)
     if ~is_release && eiko_lib.bootstrap(EIKO_VERSION, config.OutFile)
         return;
     end
+
+    % Determine the output file name
+    if is_release
+        ml_release = version('-release'); % e.g., '2021b'
+        target_name = sprintf('mex_bindings_R%s', ml_release);
+    else
+        target_name = 'mex_bindings';
+    end
     
     %% 1. CUDA Setup & Version Detection
     logMessage('Compiling MEX extension for MATLAB... (This may take a minute)');
@@ -104,7 +112,7 @@ function ver_out = setup(build_type)
             logMessage('NVCC compilation successful. Linking via direct system call...');
         
             % 2. Direct Linker Invocation
-            out_file = fullfile(config.OutDir, ['mex_bindings.', mexext]);
+            out_file = fullfile(config.OutDir, [target_name, '.', mexext]);
             link_err_msg = [];
             
             try
@@ -127,7 +135,7 @@ function ver_out = setup(build_type)
             end
             
             % 3. Verify Output
-            if exist(out_file, 'file') || (exist('eiko_lib.mex_bindings', 'file') == 3)
+           if exist(out_file, 'file') || (exist(['eiko_lib.', target_name], 'file') == 3)
                 success = true;
                 logMessage('Direct system linkage successful.');
             else
@@ -158,13 +166,17 @@ function ver_out = setup(build_type)
     if ~success
         try
             logMessage('Attempt %d: Compiling with MATLAB''s built-in CUDA (%s)...', attempt, arch_flag);
-            mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_specific, sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+            mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_specific, ...
+                sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, ...
+                '-output', target_name, config.SourceFile, fallback_libs{:});
             success = true;
         catch ME
             logMessage('Compilation failed: %s', ME.message);
             try
                 logMessage('Attempt %d: Compiling with built-in CUDA (default arch)...', attempt+1);
-                mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_fallback, sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, config.SourceFile, fallback_libs{:});
+                mexcuda('-R2018a', host_cflags, host_cxxflags, host_ldflags{:}, nvcc_arg_fallback, ...
+                    sprintf('-I"%s"', config.IncludeDir), '-outdir', config.OutDir, ...
+                    '-output', target_name, config.SourceFile, fallback_libs{:});
                 success = true;
             catch ME2
                 logMessage('Compilation failed.');

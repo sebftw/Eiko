@@ -32,9 +32,9 @@ jobs:
           apt-get install -y gcc-10 g++-10
 
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2021a'
+          release: 'R2018a'
           products: >
             Parallel_Computing_Toolbox
 
@@ -79,9 +79,9 @@ jobs:
           sub-packages: '["nvcc", "cudart", "thrust"]'
       
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2021b'
+          release: 'R2018a'
           products: >
             Parallel_Computing_Toolbox
 
