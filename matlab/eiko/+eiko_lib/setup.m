@@ -61,7 +61,7 @@ function ver_out = setup(build_type)
     base_flags = '-std=c++17 -DMATLAB_MEX_FILE --use_fast_math ';
     
     % OS-Specific Flags
-    [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(best_nvcc);
+    [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(best_nvcc, is_release);
     
     nvcc_arg_specific = ['NVCCFLAGS=', arch_flag, ' ', base_flags, os_flags];
     nvcc_arg_fallback = ['NVCCFLAGS=', base_flags, os_flags];
@@ -120,7 +120,7 @@ function ver_out = setup(build_type)
                 compileMexApi(c_mexapi_obj, ispc, vcvars_cmd);
                 
                 % Build the system linker command
-                link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, ispc, matlabroot, computer('arch'));
+                link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, ispc, matlabroot, computer('arch'), is_release);
                 
                 if ispc && ~isempty(vcvars_cmd)
                     link_cmd = sprintf('%s && %s', vcvars_cmd, link_cmd);
@@ -288,7 +288,7 @@ function [best_nvcc, max_ver] = findBestNVCC()
     end
 end
 
-function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(~)
+function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext, ccbin_flag] = getOSFlags(~, is_release)
     host_cflags = 'CFLAGS=$CFLAGS';
     if ispc
         os_flags = '-allow-unsupported-compiler -Xcompiler "/Zc:preprocessor" -Xcompiler "/std:c++17" -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH -DNOMINMAX ';
@@ -308,7 +308,12 @@ function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext,
     else
         os_flags = '';
         host_cxxflags = 'CXXFLAGS=$CXXFLAGS -std=c++17 ';
-        host_ldflags = {'LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++ -Wl,-s'};
+        
+        % Conditionally strip symbols for the mexcuda fallback
+        strip_ld = '';
+        if is_release, strip_ld = ' -Wl,-s'; end
+        host_ldflags = {['LDFLAGS=$LDFLAGS -static-libstdc++ -static-libgcc -Wl,--exclude-libs,libstdc++' strip_ld]};
+        
         obj_ext = '.o';
         
         if exist('/usr/bin/gcc-10', 'file') && exist('/usr/bin/g++-10', 'file')
@@ -423,7 +428,7 @@ function compileMexApi(c_mexapi_obj, is_pc, vcvars_cmd)
     end
 end
 
-function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, is_pc, ml_root, ml_arch)
+function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, is_pc, ml_root, ml_arch, is_release)
     % Constructs the raw CLI link string, bypassing the MATLAB mex function
     if is_pc
         ml_lib_dir = fullfile(ml_root, 'extern', 'lib', ml_arch, 'microsoft');
@@ -436,8 +441,12 @@ function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, bes
         if exist(fullfile(ml_lib_dir, 'mwgpu.lib'), 'file'), libs = [libs, sprintf('"%s\\mwgpu.lib" ', ml_lib_dir)]; end
         if exist(fullfile(ml_lib_dir, 'gpumexbinder.lib'), 'file'), libs = [libs, sprintf('"%s\\gpumexbinder.lib" ', ml_lib_dir)]; end
         
+        % Optimize and strip unreferenced symbols for release mode
+        strip_flag = '';
+        if is_release, strip_flag = '/RELEASE /OPT:REF /OPT:ICF '; end
+        
         % MSVC uses /EXPORT:mexFunction to expose the correct entrypoint to MATLAB
-        link_cmd = sprintf('link.exe /DLL /nologo /OUT:"%s" /EXPORT:mexFunction "%s" "%s" %s', out_file, obj_file, c_mexapi_obj, libs);
+        link_cmd = sprintf('link.exe /DLL /nologo %s/OUT:"%s" /EXPORT:mexFunction "%s" "%s" %s', strip_flag, out_file, obj_file, c_mexapi_obj, libs);
     else
         ml_bin = fullfile(ml_root, 'bin', ml_arch);
         ml_ext_bin = fullfile(ml_root, 'extern', 'bin', ml_arch);
@@ -459,10 +468,14 @@ function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, bes
         
         cuda_libs = sprintf('-L"%s" -lcudart_static -ldl -lrt ', cuda_lib_dir);
         
-        % Static glibc linking, mirroring your Makefile
+        % Static glibc linking
         static_libs = '-static-libstdc++ -static-libgcc ';
         
+        % Strip symbols for release mode
+        strip_flag = '';
+        if is_release, strip_flag = '-s '; end
+        
         % Use g++ explicitly
-        link_cmd = sprintf('g++ "%s" "%s" %s %s %s %s -o "%s"', obj_file, c_mexapi_obj, ldflags, libs, cuda_libs, static_libs, out_file);
+        link_cmd = sprintf('g++ %s"%s" "%s" %s %s %s %s -o "%s"', strip_flag, obj_file, c_mexapi_obj, ldflags, libs, cuda_libs, static_libs, out_file);
     end
 end
