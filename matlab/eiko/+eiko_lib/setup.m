@@ -395,12 +395,14 @@ end
 function compileMexApi(c_mexapi_obj, is_pc, vcvars_cmd)
     % Compiles MATLAB's required API version object file
     c_mexapi_src = fullfile(matlabroot, 'extern', 'version', 'c_mexapi_version.c');
+    ml_inc_dir = fullfile(matlabroot, 'extern', 'include');
     
     if is_pc
-        api_cmd = sprintf('cl.exe /c /nologo /MD /O2 /Fo"%s" "%s"', c_mexapi_obj, c_mexapi_src);
+        % Added /I"%s" to point to the MATLAB extern/include directory
+        api_cmd = sprintf('cl.exe /c /nologo /MD /O2 /I"%s" /Fo"%s" "%s"', ml_inc_dir, c_mexapi_obj, c_mexapi_src);
         if ~isempty(vcvars_cmd), api_cmd = sprintf('%s && %s', vcvars_cmd, api_cmd); end
     else
-        api_cmd = sprintf('gcc -c -fPIC "%s" -o "%s"', c_mexapi_src, c_mexapi_obj);
+        api_cmd = sprintf('gcc -c -fPIC -I"%s" "%s" -o "%s"', ml_inc_dir, c_mexapi_src, c_mexapi_obj);
     end
     
     [st, cmdout] = system(api_cmd);
