@@ -95,12 +95,10 @@ function ver_out = setup(build_type)
         
         if ispc
             vcvars_cmd = getMSVCEnvironment();
-            if ~isempty(vcvars_cmd)
-                logMessage('Activating MSVC environment.');
-                nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
-            end
-        else
-            vcvars_cmd = '';
+        end
+
+        if ~isempty(vcvars_cmd)
+            nvcc_cmd = sprintf('%s && %s', vcvars_cmd, nvcc_cmd);
         end
 
         try
@@ -122,7 +120,7 @@ function ver_out = setup(build_type)
                 % Build the system linker command
                 link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, best_nvcc, ispc, matlabroot, computer('arch'), is_release);
                 
-                if ispc && ~isempty(vcvars_cmd)
+                if ~isempty(vcvars_cmd)
                     link_cmd = sprintf('%s && %s', vcvars_cmd, link_cmd);
                 end
                 
@@ -297,12 +295,25 @@ function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext,
         pic_flag = '-Xcompiler "/MD"';
         obj_ext = '.obj';
         
-        msvc_root = getenv('VCToolsInstallDir');
         ccbin_flag = '';
-        if ~isempty(msvc_root)
-            cc_bin_dir = fullfile(msvc_root, 'bin', 'Hostx64', 'x64');
-            if exist(fullfile(cc_bin_dir, 'cl.exe'), 'file')
-                ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+        
+        % Try MATLAB's officially selected C++ compiler first
+        [cc_info, is_valid] = getValidCpp17Compiler();
+        if is_valid && ~isempty(cc_info(1).Details.CompilerExecutable)
+            cl_dir = fileparts(cc_info(1).Details.CompilerExecutable);
+            if ~isempty(cl_dir)
+                ccbin_flag = sprintf('-ccbin "%s"', cl_dir);
+            end
+        end
+        
+        % Fall back to Environment Variables if still empty
+        if isempty(ccbin_flag)
+            msvc_root = getenv('VCToolsInstallDir');
+            if ~isempty(msvc_root)
+                cc_bin_dir = fullfile(msvc_root, 'bin', 'Hostx64', 'x64');
+                if exist(fullfile(cc_bin_dir, 'cl.exe'), 'file')
+                    ccbin_flag = sprintf('-ccbin "%s"', cc_bin_dir);
+                end
             end
         end
     else
@@ -316,28 +327,76 @@ function [os_flags, host_cflags, host_cxxflags, host_ldflags, pic_flag, obj_ext,
         
         obj_ext = '.o';
         
-        if exist('/usr/bin/gcc-10', 'file') && exist('/usr/bin/g++-10', 'file')
+        % Try MATLAB's officially selected C++ compiler first
+        [cc_info, is_valid] = getValidCpp17Compiler();
+        if is_valid
+            cxx_path = cc_info(1).Details.CompilerExecutable;
+            cc_path = strrep(cxx_path, 'g++', 'gcc'); % Best guess for the C equivalent
+            
+            host_ldflags = [{sprintf('GCC="%s"', cc_path)}, {sprintf('G++="%s"', cxx_path)}, host_ldflags];
+            pic_flag = '-Xcompiler "-fPIC -static-libstdc++ -static-libgcc"'; 
+            ccbin_flag = sprintf('-ccbin "%s"', fileparts(cxx_path));
+            
+        % Fallback to hardcoded gcc-10 (Safe for R2021b/R2022a on Ubuntu)
+        elseif exist('/usr/bin/gcc-10', 'file') && exist('/usr/bin/g++-10', 'file')
             host_ldflags = [{'GCC=/usr/bin/gcc-10'}, {'G++=/usr/bin/g++-10'}, host_ldflags];
             pic_flag = '-ccbin "/usr/bin/g++-10" -Xcompiler "-fPIC -static-libstdc++ -static-libgcc"'; 
             ccbin_flag = '';
+            
+        % Ultimate Fallback (System default)
         else
             pic_flag = '-Xcompiler "-fPIC -static-libstdc++ -static-libgcc"'; 
-            
-            cc_info = mex.getCompilerConfigurations('C++', 'Selected');
-            if ~isempty(cc_info)
-                ccbin_flag = sprintf('-ccbin "%s"', fileparts(cc_info(1).Details.CompilerExecutable));
-            else
-                ccbin_flag = '';
-            end
+            ccbin_flag = '';
+        end
+    end
+end
+
+function [cc_info, is_valid] = getValidCpp17Compiler()
+    % Retrieves a MATLAB C++ compiler that supports C++17.
+    % First checks the 'Selected' compiler. If invalid, scans 'Installed' compilers.
+    
+    cc_info = [];
+    is_valid = false;
+    
+    % 1. Check the currently selected compiler
+    selected = mex.getCompilerConfigurations('C++', 'Selected');
+    if ~isempty(selected) && isCompilerValid(selected(1))
+        cc_info = selected(1);
+        is_valid = true;
+        return;
+    end
+    
+    % 2. If selected is invalid or missing, search all installed compilers
+    installed = mex.getCompilerConfigurations('C++', 'Installed');
+    for i = 1:length(installed)
+        if isCompilerValid(installed(i))
+            cc_info = installed(i);
+            is_valid = true;
+            % fprintf('[Eiko] Selected compiler too old/missing. Automatically routing to installed %s (v%s).\n', cc_info.Name, cc_info.Version);
+            return;
+        end
+    end
+end
+
+function valid = isCompilerValid(comp_obj)
+    % Evaluates if a given MATLAB compiler object supports C++17
+    valid = false;
+    tok = regexp(comp_obj.Version, '^(\d+)', 'tokens', 'once');
+    if ~isempty(tok)
+        major_ver = str2double(tok{1});
+        if ispc && (major_ver >= 15)
+            valid = true; % MSVC 15.0 (VS2017) or newer
+        elseif ~ispc && (major_ver >= 7)
+            valid = true; % GCC 7 or newer
         end
     end
 end
 
 function vcvars_cmd = getMSVCEnvironment()
     vcvars_cmd = '';
-    cc_info = mex.getCompilerConfigurations('C++', 'Selected');
+    [cc_info, is_valid] = getValidCpp17Compiler();
     
-    if ~isempty(cc_info)
+    if is_valid
         details = cc_info(1).Details;
 
         % Safe check for both older (struct) and newer (object) MATLAB versions
@@ -445,8 +504,19 @@ function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, bes
         strip_flag = '';
         if is_release, strip_flag = '/RELEASE /OPT:REF /OPT:ICF '; end
         
+        % Ask MATLAB for the correct linker executable
+        link_exec = 'link.exe';
+        [cc_info, is_valid] = getValidCpp17Compiler();
+        if is_valid && ~isempty(cc_info(1).Details.CompilerExecutable)
+            cl_path = cc_info(1).Details.CompilerExecutable;
+            link_path = fullfile(fileparts(cl_path), 'link.exe');
+            if exist(link_path, 'file')
+                link_exec = sprintf('"%s"', link_path);
+            end
+        end
+        
         % MSVC uses /EXPORT:mexFunction to expose the correct entrypoint to MATLAB
-        link_cmd = sprintf('link.exe /DLL /nologo %s/OUT:"%s" /EXPORT:mexFunction "%s" "%s" %s', strip_flag, out_file, obj_file, c_mexapi_obj, libs);
+        link_cmd = sprintf('%s /DLL /nologo %s/OUT:"%s" /EXPORT:mexFunction "%s" "%s" %s', link_exec, strip_flag, out_file, obj_file, c_mexapi_obj, libs);
     else
         ml_bin = fullfile(ml_root, 'bin', ml_arch);
         ml_ext_bin = fullfile(ml_root, 'extern', 'bin', ml_arch);
@@ -475,7 +545,14 @@ function link_cmd = buildDirectLinkCommand(obj_file, c_mexapi_obj, out_file, bes
         strip_flag = '';
         if is_release, strip_flag = '-s '; end
         
-        % Use g++ explicitly
-        link_cmd = sprintf('g++ %s"%s" "%s" %s %s %s %s -o "%s"', strip_flag, obj_file, c_mexapi_obj, ldflags, libs, cuda_libs, static_libs, out_file);
+        % Ask MATLAB for the correct linker executable
+        cxx_exec = 'g++';
+        [cc_info, is_valid] = getValidCpp17Compiler();
+        if is_valid
+            cxx_exec = sprintf('"%s"', cc_info(1).Details.CompilerExecutable);
+        end
+        
+        % Use the selected compiler explicitly to link the final binary
+        link_cmd = sprintf('%s %s"%s" "%s" %s %s %s %s -o "%s"', cxx_exec, strip_flag, obj_file, c_mexapi_obj, ldflags, libs, cuda_libs, static_libs, out_file);
     end
 end
