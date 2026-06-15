@@ -114,24 +114,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      # Download both Linux and Windows artifacts directly into the eiko directory
-      # This injects the compiled binaries alongside the source .m files
+      # Download MEX binaries to a TEMPORARY folder, NOT inside the eiko source tree
       - name: Download Linux MEX
         uses: actions/download-artifact@v4
         with:
           name: eiko-linux-mex
-          path: matlab/eiko/+eiko_lib/
+          path: temp_binaries/
           
       - name: Download Windows MEX
         uses: actions/download-artifact@v4
         with:
           name: eiko-windows-mex
-          path: matlab/eiko/+eiko_lib/
+          path: temp_binaries/
 
-      - name: Create Release Zip
+      - name: Generate MATLAB Registry
         run: |
+          # Ensure target directory exists in the source tree
+          mkdir -p matlab/eiko/+eiko_lib/
+          
+          python3 -c "
+          import os, json, hashlib, glob
+          repo, tag = '${{ github.repository }}', '${{ github.ref_name }}'
+          registry = {'version': tag, 'binaries': []}
+          
+          # Scan the temporary folder to build the registry map
+          for fpath in glob.glob('temp_binaries/*.mex*'):
+              fname = os.path.basename(fpath)
+              sha = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+              url = f'https://github.com/{repo}/releases/download/{tag}/{fname}'
+              registry['binaries'].append({'file': fname, 'url': url, 'sha256': sha})
+          
+          json.dump(registry, open('matlab/eiko/+eiko_lib/registry.json', 'w'), indent=2)
+          print(f'MATLAB registry generated with {len(registry[\"binaries\"])} binaries.')
+          "
+
+      - name: Create Pure Source Release Zip
+        run: |
+          # Copy the C++ source code into the MATLAB package structure
+          # This ensures setup() has the files it needs to compile locally
+          cp -r src matlab/eiko/+eiko_lib/
+
+          cp temp_binaries/*_R2021a.mexw64 matlab/eiko/+eiko_lib/mex_bindings.mexw64
+          cp temp_binaries/*_R2021a.mexa64 matlab/eiko/+eiko_lib/mex_bindings.mexa64
+          
+          # Zip the 'eiko' folder. It now contains source code and registry.json, but no binaries.
           cd matlab
-          # Zip the 'eiko' folder so when a user extracts it, they get a single directory
           zip -r eiko_matlab_release.zip eiko/
           
       - name: Upload Final ZIP Artifact

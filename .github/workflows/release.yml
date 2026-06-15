@@ -675,6 +675,9 @@ jobs:
           # This ensures setup() has the files it needs to compile locally
           cp -r src matlab/eiko/+eiko_lib/
 
+          cp temp_binaries/*_R2021a.mexw64 matlab/eiko/+eiko_lib/mex_bindings.mexw64
+          cp temp_binaries/*_R2021a.mexa64 matlab/eiko/+eiko_lib/mex_bindings.mexa64
+          
           # Zip the 'eiko' folder. It now contains source code and registry.json, but no binaries.
           cd matlab
           zip -r eiko_matlab_release.zip eiko/

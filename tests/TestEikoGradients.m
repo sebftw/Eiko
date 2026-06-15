@@ -117,7 +117,7 @@ classdef TestEikoGradients < matlab.unittest.TestCase
             % ==========================================
             % 4. Compare AD to Numerical
             % ==========================================
-            
+            tol = 1e-3;
             % We use 1e-3 tolerance since single precision finite differences 
             % naturally exhibit floating point drift compared to exact autodiff.
             
