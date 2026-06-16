@@ -24,8 +24,6 @@ function success = bootstrap(package_version, full_mex_path)
         return;
     end
 
-    fprintf('[Eiko] Downloading precompiled CUDA kernels... (This may take a minute)\n');
-
     %% 1. Load Local Registry
     script_dir = fileparts(mfilename('fullpath'));
     registry_path = fullfile(script_dir, 'registry.json');
@@ -75,6 +73,8 @@ function success = bootstrap(package_version, full_mex_path)
         fprintf('[Eiko] No precompiled binaries match OS: %s. Falling back to compilation.\n', os_name);
         return;
     end
+
+    fprintf('[Eiko] Downloading precompiled CUDA kernels... (This may take a few seconds)\n');
 
     %% 3. Multiprocessing & Context-Safe Atomic Download
     zip_url = matched_build.url;

@@ -529,7 +529,7 @@ jobs:
   # ==========================================
   build_matlab_linux:
     name: MATLAB Build (Linux, CUDA 12.8)
-    if: false
+    if: true
     runs-on: ubuntu-22.04
     container:
       # Use the devel image so it includes nvcc and the compiler toolchain
@@ -551,7 +551,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2022a'
+          release: 'R2021a'
           products: >
             Parallel_Computing_Toolbox
 
@@ -601,7 +601,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2022a'
+          release: 'R2021a'
           cache: true
           products: >
             Parallel_Computing_Toolbox
@@ -680,10 +680,10 @@ jobs:
           
           # Zip the 'eiko' folder. It now contains source code and registry.json, but no binaries.
           cd matlab
-          zip -r eiko_matlab_release.zip eiko/
+          zip -r eiko_matlab.zip eiko/
           
       - name: Upload Final ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
           name: eiko-matlab-release
-          path: matlab/eiko_matlab_release.zip
+          path: matlab/eiko_matlab.zip
