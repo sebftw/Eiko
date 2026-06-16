@@ -28,11 +28,6 @@ jobs:
       actions: read
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
-
       - name: Determine Target Tag
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -47,6 +42,11 @@ jobs:
           else
             echo "TAG=$REF_NAME" >> $GITHUB_ENV
           fi
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
 
       - name: Locate Build Run ID
         env:
