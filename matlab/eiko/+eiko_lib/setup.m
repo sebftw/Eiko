@@ -93,6 +93,7 @@ function ver_out = setup(build_type)
         nvcc_cmd = sprintf('"%s" %s -c "%s" -o "%s" %s %s %s %s %s %s -I"%s"', ...
             best_nvcc, ccbin_flag, config.SourceFile, obj_file, includes_str, cccl_flags, pic_flag, base_flags, os_flags, arch_flag, fullfile(cuda_root, 'include'));
         
+        vcvars_cmd = '';
         if ispc
             vcvars_cmd = getMSVCEnvironment();
         end
