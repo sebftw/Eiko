@@ -35,10 +35,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
-dependencies = [
-    "torch>=2.0.0",
-    "ninja"
-]
 
 [project.optional-dependencies]
 # Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
@@ -53,7 +49,7 @@ jax-local = [
 	"jaxlib",
     "pybind11"
 ]
-torch = ["torch>=2.4.0"]
+torch = ["torch>=2.4.0", "ninja"]
 # Dependencies require to run examples.
 examples = [
     "torch>=2.4.0",

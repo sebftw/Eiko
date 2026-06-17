@@ -333,7 +333,8 @@ def test_eiko2d_snells_law(msfm, backend):
     # Construct the analytical solution for the refracted plane wave in the bottom medium.
     # The total travel time is the time accumulated traveling through the bottom medium 
     # plus the specific entry time at the interface.
-    u_bottom_analytical = (X * sin_t2 + (Y - y_int) * cos_t2) / c2 + (X * sin_t1 + y_int * cos_t1) / c1
+    # u_bottom_analytical = (X * sin_t2 + (Y - y_int) * cos_t2) / c2 + (X * sin_t1 + y_int * cos_t1) / c1
+    u_bottom_analytical = (X * sin_t2 + (Y - y_int) * cos_t2) / c2 + (y_int * cos_t1) / c1
     
     error_map = np.abs(u_numerical_np - u_bottom_analytical)
     

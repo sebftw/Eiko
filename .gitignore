@@ -11,6 +11,9 @@ matlab/start_eiko.bat
 *.lib
 *.so
 
+# Moved C++ code
+python/eiko/src
+
 #####################################
 ##              MATLAB             ##
 #####################################
