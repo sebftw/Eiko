@@ -23,8 +23,9 @@ function ver_out = setup(build_type)
     is_release = strcmpi(build_type, 'release');
     config = eiko_lib.BuildConfig.getInstance();
     
-    % Download MEX if it already exists (skip for release mode)
-    if ~is_release && eiko_lib.bootstrap(EIKO_VERSION, config.OutFile)
+    % Check if MEX already exists (skip for release mode)
+    if ~is_release && exist(config.OutFile, 'file') 
+        % && eiko_lib.bootstrap(EIKO_VERSION, config.OutFile)
         return;
     end
 
