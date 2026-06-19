@@ -88,18 +88,21 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
-        '/permissive-', '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
-        '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX', '/wd3189'
+        '/permissive',
+        '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
+        '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX', '/wd3189',
+        '/D_ENABLE_EXTENDED_ALIGNED_STORAGE'
     ])
     NVCC_ARGS.extend([
         '-allow-unsupported-compiler', 
         '-Xcompiler', '/Zc:preprocessor', 
         '-Xcompiler', '/wd3189', 
-        '-Xcompiler', '/permissive-',
+        '-Xcompiler', '/permissive',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '-DTHRUST_FORCE_COMPATIBILITY',
         '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 
         '-DNOMINMAX',
+        '-D_ENABLE_EXTENDED_ALIGNED_STORAGE',
         '-Xcompiler', '/MD,/EHsc'
     ])
 else:
