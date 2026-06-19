@@ -6,14 +6,14 @@ from pathlib import Path
 # ------------------------------------------------------------------------
 # 1. Base Compiler Arguments
 # ------------------------------------------------------------------------
-NVCC_ARGS = ["-O3", "--use_fast_math"]
+NVCC_ARGS = ["-std=c++17", "-O3", "--use_fast_math"]
 
 if sys.platform == "win32":
     # Microsoft Visual C++ uses /O2 for maximum speed
-    CXX_ARGS = ["/O2"]
+    CXX_ARGS = ["/O2", "/std:c++17"]
 else:
     # GCC/Clang uses -O3
-    CXX_ARGS = ["-O3"]
+    CXX_ARGS = ["-O3", "-std=c++17"]
 
 # ------------------------------------------------------------------------
 # 2. Shared Binary Cache Directory
