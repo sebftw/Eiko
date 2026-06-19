@@ -1,10 +1,41 @@
-import torch
 import pytest
 from eiko import eiko, eiko3d
 import numpy as np
-import jax
-import jax.numpy as jnp
 import math
+
+
+# ==========================================
+# Backend Helper Functions
+# ==========================================
+
+def cast_to_backend(arrays, backend):
+    """
+    Converts a list of NumPy arrays to the specified computational backend.
+    Ensures that PyTorch tensors are placed on the GPU if available.
+    """
+    if backend == "torch":
+        torch = pytest.importorskip("torch")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        return [torch.tensor(arr, device=device) for arr in arrays]
+    elif backend == "jax":
+    	jax = pytest.importorskip("jax")
+    	import jax.numpy as jnp
+    	return [jnp.array(arr) for arr in arrays]
+    raise ValueError(f"Unknown backend: {backend}")
+
+def extract_to_numpy(tensor, backend):
+    """
+    Converts a framework-specific tensor back to a standard NumPy array 
+    to unify the final error calculation and validation logic.
+    """
+    if backend == "torch":
+    	torch = pytest.importorskip("torch")
+    	return tensor.detach().cpu().numpy()
+    elif backend == "jax":
+    	jax = pytest.importorskip("jax")
+    	return np.array(tensor)
+    raise ValueError(f"Unknown backend: {backend}")
+
 
 # ==========================================
 # 2D Solver Tests
@@ -14,94 +45,90 @@ import math
 # - (31, 31) is a standard 2D plane.
 # - (1, 31) and (31, 1) test the 2D solver's handling of 1D lines (singletons) 
 #   to ensure implicit matrix operations don't collapse size-1 dimensions.
-@pytest.mark.parametrize("spatial_shape", [(31, 31), (1, 31), (31, 1), (1, 1)])
 # Parameterize over None (Unbatched 2D), B=1 (Batched 3D, single item), and B=4 (Batched 3D)
+@pytest.mark.parametrize("spatial_shape", [(31, 31), (1, 31), (31, 1), (1, 1), (2, 1)])
 @pytest.mark.parametrize("batch_size", [None, 1, 4])
 @pytest.mark.parametrize("msfm", [True, False])
-def test_eiko2d_constant_speed_of_sound(spatial_shape, batch_size, msfm):
-    """Validates the 2D Eiko solver against an analytical point-source solution."""
+@pytest.mark.parametrize("backend", ["torch", "jax"])
+def test_eiko2d_constant_speed_of_sound(spatial_shape, batch_size, msfm, backend):
+    """Validates the 2D Eiko solver against an analytical point-source solution on multiple backends."""
     
-    # 1. Domain Setup
-    device = torch.device("cuda")
-    dx = 0.001          
+    # Backend-Specific Protection
+    if backend == "torch":
+        # Skip this specific test iteration if torch isn't installed
+        torch = pytest.importorskip("torch")
+    elif backend == "jax":
+    	jax = pytest.importorskip("jax")
+        
+    # Domain Setup (Using standard NumPy)
+    dx = 0.001         
     dim_0, dim_1 = spatial_shape
-    
-    # Determine the index of the point source (center of the domain)
     center_0, center_1 = dim_0 // 2, dim_1 // 2
     
-    # 2. Coordinate Grid Construction
-    # By subtracting (center * dx), we shift the coordinate system so the center 
-    # index lies precisely at physical coordinate 0.0.
-    coords_0 = torch.arange(dim_0, dtype=torch.float32, device=device) * dx - (center_0 * dx)
-    coords_1 = torch.arange(dim_1, dtype=torch.float32, device=device) * dx - (center_1 * dx)
+    coords_0 = np.arange(dim_0, dtype=np.float32) * dx - (center_0 * dx)
+    coords_1 = np.arange(dim_1, dtype=np.float32) * dx - (center_1 * dx)
     
-    # indexing='ij' ensures the meshgrid axes match the (dim_0, dim_1) array shapes, 
-    # rather than transposing to the Cartesian (x, y) default.
-    Grid_0, Grid_1 = torch.meshgrid(coords_0, coords_1, indexing='ij')
+    Grid_0, Grid_1 = np.meshgrid(coords_0, coords_1, indexing='ij')
+    R = np.sqrt(Grid_0**2 + Grid_1**2)
     
-    # Physical distance from the point source for every node in the grid.
-    R = torch.sqrt(Grid_0**2 + Grid_1**2)
-    
-    # 3. Input Initialization (Batched vs. Unbatched)
+    # Input Initialization
     if batch_size is not None:
-        # --- BATCHED CASE (3D: B x H x W) ---
-        # Provide varied speeds of sound to ensure batch slices aren't intermingling.
+        # --- BATCHED CASE ---
         if batch_size == 4:
-            c_values = torch.tensor([1400.0, 1500.0, 1540.0, 1600.0], dtype=torch.float32, device=device)
+            c_values = np.array([1400.0, 1500.0, 1540.0, 1600.0], dtype=np.float32)
         else: # batch_size == 1
-            c_values = torch.tensor([1540.0], dtype=torch.float32, device=device)
+            c_values = np.array([1540.0], dtype=np.float32)
         
-        # Reshape to (B, 1, 1) so PyTorch can broadcast the division over the spatial dims.
-        c_view = c_values.view(batch_size, 1, 1)
+        c_view = c_values.reshape(batch_size, 1, 1)
         
-        # Slowness field (f = 1/c). We expand it to explicitly form the (B, H, W) tensor.
-        f = 1.0 / c_view.expand(batch_size, dim_0, dim_1)
+        f_np = np.ones((batch_size, dim_0, dim_1), dtype=np.float32) / c_view
+        u_analytical = np.expand_dims(R, axis=0) / c_view
         
-        # Travel time = Distance / Speed.
-        # R is (H, W). R.unsqueeze(0) becomes (1, H, W). Divided by (B, 1, 1) -> (B, H, W).
-        u_analytical = R.unsqueeze(0) / c_view
-        
-        # Set all nodes to infinity except the point source (set to 0.0) across all batches.
-        u_init = torch.full((batch_size, dim_0, dim_1), float('inf'), dtype=torch.float32, device=device)
-        u_init[:, center_0, center_1] = 0.0
+        u_init_np = np.full((batch_size, dim_0, dim_1), np.inf, dtype=np.float32)
+        u_init_np[:, center_0, center_1] = 0.0
         
     else:
-        # --- UNBATCHED CASE (2D: H x W) ---
+        # --- UNBATCHED CASE ---
         c_val = 1540.0
-        c_values = torch.tensor([c_val], dtype=torch.float32, device=device)
+        c_values = np.array([c_val], dtype=np.float32)
         
-        f = torch.full((dim_0, dim_1), 1.0 / c_val, dtype=torch.float32, device=device)
+        f_np = np.full((dim_0, dim_1), 1.0 / c_val, dtype=np.float32)
         u_analytical = R / c_val
         
-        u_init = torch.full((dim_0, dim_1), float('inf'), dtype=torch.float32, device=device)
-        u_init[center_0, center_1] = 0.0
+        u_init_np = np.full((dim_0, dim_1), np.inf, dtype=np.float32)
+        u_init_np[center_0, center_1] = 0.0
 
-    # 4. Solver Execution
-    with torch.no_grad():
+    # Backend Casting & Execution
+    u_init, f = cast_to_backend([u_init_np, f_np], backend)
+    
+    if backend == "torch":
+        with torch.no_grad():
+            u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
+    elif backend == "jax":
         u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
         
-    # 5. Validation
-    error_map = torch.abs(u_numerical - u_analytical)
-    
-    # In a first-order scheme, the numerical error scales with the grid spacing (dx)
-    # and the slowness (1/c). The multiplier 1.5 safely bounds the expected error in 2D.
+    # Bring the results back to NumPy space
+    u_numerical_np = extract_to_numpy(u_numerical, backend)
+        
+    # Validation
+    error_map = np.abs(u_numerical_np - u_analytical)
     tolerances = 1.5 * (dx / c_values)
     
     if batch_size is not None:
-        # Evaluate errors per batch slice for exact debugging if a test fails.
         for i in range(batch_size):
-            max_error = torch.max(error_map[i]).item()
-            tol = tolerances[i].item()
+            max_error = np.max(error_map[i])
+            tol = tolerances[i]
             assert max_error <= tol, (
-                f"2D Shape {spatial_shape}, Batch {i} failed! Error {max_error:.4e} > {tol:.4e}"
+                f"2D Shape {spatial_shape}, Batch {i} failed on {backend}! "
+                f"Error {max_error:.4e} > {tol:.4e}"
             )
     else:
-        max_error = torch.max(error_map).item()
-        tol = tolerances[0].item()
+        max_error = np.max(error_map)
+        tol = tolerances[0]
         assert max_error <= tol, (
-            f"2D Shape {spatial_shape}, Unbatched failed! Error {max_error:.4e} > {tol:.4e}"
+            f"2D Shape {spatial_shape}, Unbatched failed on {backend}! "
+            f"Error {max_error:.4e} > {tol:.4e}"
         )
-
 
 # ==========================================
 # 3D Solver Tests
@@ -121,7 +148,7 @@ def test_eiko2d_constant_speed_of_sound(spatial_shape, batch_size, msfm):
 @pytest.mark.parametrize("msfm", [True, False])
 def test_eiko3d_constant_speed_of_sound(spatial_shape, batch_size, msfm):
     """Validates the 3D Eiko solver for standard 3D cubes and 2D singletons."""
-    
+    torch = pytest.importorskip("torch")
     device = torch.device("cuda")
     dx = 0.001          
     dim_0, dim_1, dim_2 = spatial_shape
@@ -179,6 +206,7 @@ def test_eiko3d_constant_speed_of_sound(spatial_shape, batch_size, msfm):
 
 def test_eiko2d_default_dx():
     """Tests that the 2D solver works correctly when dx is omitted (defaults to 1.0)."""
+    torch = pytest.importorskip("torch")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     N = 11  # Small grid for a quick test
     center = N // 2
@@ -206,6 +234,7 @@ def test_eiko2d_default_dx():
 
 def test_eiko3d_default_dx():
     """Tests that the 3D solver works correctly when dx is omitted (defaults to 1.0)."""
+    torch = pytest.importorskip("torch")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     N = 11
     center = N // 2
@@ -228,32 +257,6 @@ def test_eiko3d_default_dx():
     # Tolerance is 1.75 * (dx / c) = 1.75 * (1.0 / 1.0) = 1.75
     assert max_error <= 1.75, f"3D Default dx test failed! Max error: {max_error:.4e}"
 
-# ==========================================
-# Backend Helper Functions
-# ==========================================
-
-def cast_to_backend(arrays, backend):
-    """
-    Converts a list of NumPy arrays to the specified computational backend.
-    Ensures that PyTorch tensors are placed on the GPU if available.
-    """
-    if backend == "torch":
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return [torch.tensor(arr, device=device) for arr in arrays]
-    elif backend == "jax":
-        return [jnp.array(arr) for arr in arrays]
-    raise ValueError(f"Unknown backend: {backend}")
-
-def extract_to_numpy(tensor, backend):
-    """
-    Converts a framework-specific tensor back to a standard NumPy array 
-    to unify the final error calculation and validation logic.
-    """
-    if backend == "torch":
-        return tensor.detach().cpu().numpy()
-    elif backend == "jax":
-        return np.array(tensor)
-    raise ValueError(f"Unknown backend: {backend}")
 
 # ==========================================
 # Snell's Law Test
@@ -268,6 +271,11 @@ def test_eiko2d_snells_law(msfm, backend):
     horizontal interface into a bottom medium with a different speed of sound.
     The resulting wave angle in the bottom medium is compared against the analytical solution.
     """
+    if backend == "torch":
+   		torch = pytest.importorskip("torch")
+    elif backend == "jax":
+    	jax = pytest.importorskip("jax")
+   	
     # 1. Domain and Physics Setup
     dim_y, dim_x = 201, 201
     dx = 0.01
@@ -361,6 +369,7 @@ def test_eikonal_advection_plane_wave():
     Validates that a transversely varying v_init field is pulled 
     along the characteristics without diffusing across them.
     """
+    torch = pytest.importorskip("torch")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     N = 50
     dx_val = 0.1
@@ -405,6 +414,10 @@ def test_eikonal_analytical_gradients_1d(backend):
     Validates the analytical gradients of the 1D Eikonal solver for u_init, f, and dx.
     Ensures gradients correctly flow back through the upwind logic on both PyTorch and JAX.
     """
+    if backend == "torch":
+   		torch = pytest.importorskip("torch")
+    elif backend == "jax":
+	    jax = pytest.importorskip("jax")
     N = 10
     dx_val = 0.1
     f_val = 1.5

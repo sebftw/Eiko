@@ -41,7 +41,7 @@ fi
 
 echo -e "\nThis script will configure your system for the Eiko environment by performing the following actions:"
 echo -e "  1. Validate NVIDIA display driver compatibility."
-echo -e "  2. Install CUDA 13.0 or 12.6 based on your hardware."
+echo -e "  2. Install CUDA 12.4, 12.6, or 13.0 based on compatability."
 echo -e "  3. Install the appropriate C++ Build Tools."
 echo -e "  4. Install Python 3.12 (if necessary) and configure an isolated virtual environment at"
 echo -e "     -> ${CYAN}$VENV_PATH${NC}"
@@ -91,7 +91,7 @@ if [ "$VERSION_ID" == "20.04" ]; then
     TARGET_CUDA_VER="12.4"
     TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu124"
     TARGET_TORCH_VER="torch==2.4.1 torchvision"
-    TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89"
+    TARGET_JAX_VER="jax==0.4.13 jaxlib==0.4.13+cuda12.cudnn89 nvidia-cudnn-cu12~=8.9.0"
     MIN_PYTHON_VER=3.8
     MIN_DRIVER=550
 else
@@ -105,9 +105,10 @@ else
 	MIN_PYTHON_VER=3.9
 	MIN_DRIVER=575
 
-	# Only apply the "downgrade" if driver is in the specific range [560, 574]
+	# Only apply the "downgrade" to CUDA 12 if driver is in the specific range [560, 574]
 	if [ "$DRIVER_VER" -ge 560 ] && [ "$DRIVER_VER" -lt 575 ]; then
 		echo -e "${YELLOW} -> Driver is v${DRIVER_VER}. Using CUDA 12.6...${NC}"
+		# While CUDA 12.8 would be ideal to support the RTX 50-series, the latest Pytorch only supports 12.6 as a legacy fallback. This won't be an issue since users with RTX 50 GPUs do not have such an outdated driver.
 		TARGET_CUDA_PKG="cuda-toolkit-12-6"
 		TARGET_CUDA_VER="12.6"
 		TARGET_WHEEL_URL="https://download.pytorch.org/whl/cu126"
@@ -247,9 +248,9 @@ if command -v python3 >/dev/null 2>&1; then
     IS_CONDA=$(python3 -c 'import sys; print("conda" in sys.version.lower() or "anaconda" in sys.version.lower())' 2>/dev/null || echo "false")
     PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
     
-    # If it's a standard system python, check if it fits the 3.9 - 3.12 sweet spot
+    # If it's a standard system python, check if it fits the MIN_PYTHON_VER - 3.12 sweet spot
     if [ "$IS_CONDA" = "False" ] || [ "$IS_CONDA" = "false" ]; then
-        if [ "$(printf '%s\n' "3.9" "$PY_VER" | sort -V | head -n1)" = "3.9" ] && \
+        if [ "$(printf '%s\n' "$MIN_PYTHON_VER" "$PY_VER" | sort -V | head -n1)" = "$MIN_PYTHON_VER" ] && \
            [ "$(printf '%s\n' "$PY_VER" "3.12" | sort -V | head -n1)" = "$PY_VER" ]; then
             echo -e "${YELLOW}  -> Found suitable system Python $PY_VER. Skipping system installation.${NC}"
             INSTALL_PYTHON=false
@@ -324,10 +325,22 @@ run_pip_command() {
     return 0
 }
 
+uninstall_if_present() {
+    for package in "$@"; do
+        if pip show "$package" >/dev/null 2>&1; then
+            echo -e "${YELLOW}  -> Purging conflicting package: $package...${NC}"
+            pip uninstall -y "$package" >/dev/null 2>&1
+        fi
+    done
+}
+
 run_pip_command install --upgrade pip --no-input || safe_exit 1
 
-TORCH_VALID=false
-if python -c "
+PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+# Function to check if PyTorch is already valid
+is_torch_valid() {
+    python -c "
 import sys
 try:
     import torch
@@ -337,19 +350,39 @@ try:
 except ImportError:
     pass
 sys.exit(1)
-" 2>/dev/null; then
-    echo -e "${YELLOW}  -> Found valid PyTorch (CUDA enabled, v2.4+). Skipping installation.${NC}"
-    TORCH_VALID=true
-fi
+" 2>/dev/null
+}
 
-if [ "$TORCH_VALID" = false ]; then
-    echo -e "${MAGENTA}  -> Installing target PyTorch stack for CUDA ${TARGET_CUDA_VER}...${NC}"
-    run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
+if [ "$PY_VER" == "3.8" ]; then
+    echo -e "\n${YELLOW}[!] WARNING: Ubuntu 20.04 + Python 3.8 detected.${NC}"
+    echo -e "${YELLOW}    Library conflict: JAX (cuDNN 8.9) vs PyTorch 2.4+ (cuDNN 9.1).${NC}"
+    echo -e "${YELLOW}    You must choose ONE framework to install:${NC}"
+    echo -e "    1. Install JAX"
+    echo -e "    2. Install PyTorch"
+    
+    read -p "Select your preference (type 1 or 2 and press enter): " choice
+    
+    if [ "$choice" == "1" ]; then
+    	uninstall_if_present "torch" "torchvision" "torchaudio"
+        echo -e "${MAGENTA}  -> Installing JAX stack...${NC}"
+        run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
+        run_pip_command install "eiko[jax]" --no-input || safe_exit 1
+    elif [ "$choice" == "2" ]; then
+        if ! is_torch_valid; then
+            run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
+        fi
+        run_pip_command install "eiko" --no-input || safe_exit 1
+    else
+        echo -e "${RED}[!] Invalid choice.${NC}"; safe_exit 1
+    fi
+else
+    # Logic for modern Python: install everything
+    if ! is_torch_valid; then
+        run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
+    fi
+    run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
+    run_pip_command install "eiko[jax]" --no-input || safe_exit 1
 fi
-
-echo -e "${MAGENTA}  -> Installing Eiko dependencies...${NC}"
-run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
-run_pip_command install "eiko[jax]" --no-input || safe_exit 1
 
 # ---------------------------------------------------------
 # Verification & Handoff

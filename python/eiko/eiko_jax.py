@@ -226,6 +226,16 @@ for name, target in _fim_jax_impl.registrations().items():
 # =========================================================
 # 1. JAX PRIMITIVE DEFINITION & MLIR LOWERING
 # =========================================================
+class _OpWrapper:
+    """A lightweight wrapper to make legacy JAX helper outputs 
+    quack like a modern MLIR Operation node."""
+    def __init__(self, results):
+        self._results = results
+
+    @property
+    def results(self):
+        return self._results
+
 _fim_prim = core.Primitive("jax_fim_solve")
 _fim_prim.multiple_results = False
 _fim_prim.def_impl(partial(xla.apply_primitive, _fim_prim))
@@ -240,41 +250,49 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     """
     A custom call builder that checks for legacy wrappers 
     and falls back to raw MLIR node generation for modern JAX.
+    Maintains a uniform return type containing a `.results` attribute.
     """
     # 1. Try mid-era JAX wrapper (JAX >= 0.4.15 and < 0.4.30)
     try:
         from jaxlib.hlo_helpers import custom_call
-        return custom_call(
+        res = custom_call(
             call_target_name,
-            result_types=result_types,
+            out_types=result_types,
             operands=operands,
             operand_layouts=operand_layouts,
             result_layouts=result_layouts,
             backend_config=backend_config
         )
+        return res if hasattr(res, "results") else _OpWrapper(res)
     except ImportError:
         pass
         
     # 2. Try legacy JAX wrapper (JAX < 0.4.15)
     try:
         from jax.interpreters.mlir import custom_call
-        return custom_call(
+        res = custom_call(
             call_target_name,
-            result_types=result_types,
+            out_types=result_types,
             operands=operands,
             operand_layouts=operand_layouts,
             result_layouts=result_layouts,
             backend_config=backend_config
         )
+        return res if hasattr(res, "results") else _OpWrapper(res)
     except (ImportError, AttributeError):
         pass
         
     # 3. Modern JAX (>= 0.4.30) where helpers are completely removed.
     import jaxlib.mlir.ir as ir
+    
+    # EDGE CASE 2: Handle StableHLO migration
     try:
-        from jaxlib.mlir.dialects import mhlo as hlo
+        from jaxlib.mlir.dialects import stablehlo as hlo
     except ImportError:
-        from jaxlib.mlir.dialects import hlo
+        try:
+            from jaxlib.mlir.dialects import mhlo as hlo
+        except ImportError:
+            from jaxlib.mlir.dialects import hlo
 
     def _layout_attr(layouts):
         if layouts is None: 
@@ -283,17 +301,10 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
         attr_list = []
         for layout in layouts:
             arr = np.array(layout, dtype=np.int64)
-            
-            # Define the element type as MLIR's 'index' type.
             index_type = ir.IndexType.get()
-            
-            # Define the 1D tensor shape explicitly using the index type.
             tensor_type = ir.RankedTensorType.get(arr.shape, index_type)
-            
-            # Create the attribute with the enforced tensor type.
             attr = ir.DenseIntElementsAttr.get(arr, type=tensor_type)
             attr_list.append(attr)
-            
         return ir.ArrayAttr.get(attr_list)
 
     kwargs = {
@@ -303,7 +314,10 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
         "called_computations": ir.ArrayAttr.get([]),
     }
     
+    # EDGE CASE 3: Handle bytes in backend_config
     if backend_config is not None:
+        if isinstance(backend_config, bytes):
+            backend_config = backend_config.decode("utf-8")
         kwargs["backend_config"] = ir.StringAttr.get(backend_config)
 
     if operand_layouts is not None:
@@ -312,6 +326,7 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     if result_layouts is not None:
         kwargs["result_layouts"] = _layout_attr(result_layouts)
 
+    # Return the raw operation node so the caller can unpack it
     return hlo.CustomCallOp(result_types, operands, **kwargs)
 
 # MLIR lowering rule: The bridge between JAX's Python graph and XLA C++.

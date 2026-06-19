@@ -54,8 +54,9 @@ def eiko2d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
         from .eiko_jax import eiko2d as jax_eiko2d
         return jax_eiko2d(u_init, f, v_init, dx, msfm, gated)
     else:
+        import torch
         from .eiko_torch import eiko2d as pt_eiko2d
-        return pt_eiko2d(u_init, f, v_init, dx, msfm, gated)
+        return pt_eiko2d(torch.as_tensor(u_init), torch.as_tensor(f), v_init, dx, msfm, gated)
 
 def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
     """

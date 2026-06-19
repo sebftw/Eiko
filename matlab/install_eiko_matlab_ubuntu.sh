@@ -44,7 +44,7 @@ echo -e "\nThis script will configure your system for Eiko by performing the fol
 echo -e "  1. Validate your NVIDIA display driver compatibility."
 echo -e "  2. Identify MATLAB's native C++ compiler (GCC) requirements."
 echo -e "  3. Install the appropriate GNU C++ Build Tools."
-echo -e "  4. Deploy or verify the NVIDIA CUDA Toolkit (v12.4)."
+echo -e "  4. Deploy or verify the NVIDIA CUDA Toolkit (v12.8)."
 echo -e "  5. Execute system verification to confirm successful environment integration."
 
 echo -e "\n${YELLOW}[!] DISCLAIMER: This script requires sudo privileges and modifies system packages."
@@ -71,7 +71,7 @@ sudo apt-get update -qq
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[1/5] Checking NVIDIA Driver Compatibility...${NC}"
 
-MIN_DRIVER=550 
+MIN_DRIVER=570 
 UPDATE_DRIVER=false
 IS_WSL=false
 
@@ -85,7 +85,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then
     echo -e "  -> Found active NVIDIA driver: v${DRIVER_VER}"
     
     if [ "$DRIVER_VER" -lt "$MIN_DRIVER" ]; then
-        echo -e "${YELLOW}  -> Driver is too old for CUDA 12.4 (Requires v${MIN_DRIVER}+).${NC}"
+        echo -e "${YELLOW}  -> Driver is too old for CUDA 12.8 (Requires v${MIN_DRIVER}+).${NC}"
         
         if [ "$IS_WSL" = true ]; then
             echo -e "\n${RED}====================================================${NC}"
@@ -200,10 +200,10 @@ if [ "$TARGET_GCC_VER" != "10" ]; then
 fi
 
 # ---------------------------------------------------------
-# Step 4: Check and Install Pinned CUDA Toolkit (12.4)
+# Step 4: Check and Install Pinned CUDA Toolkit (12.8)
 # ---------------------------------------------------------
-TARGET_CUDA_PKG="cuda-toolkit-12-4"
-TARGET_CUDA_VER="12.4"
+TARGET_CUDA_PKG="cuda-toolkit-12-8"
+TARGET_CUDA_VER="12.8"
 source /etc/os-release
 
 echo -e "\n${CYAN}[4/5] Checking CUDA installation (Target: ${TARGET_CUDA_VER})...${NC}"
