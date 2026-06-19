@@ -9,7 +9,7 @@ on:
 jobs:
   build_ubuntu_wheels:
     name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    if: true
+    if: false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -529,7 +529,7 @@ jobs:
   # ==========================================
   build_matlab_linux:
     name: MATLAB Build (Linux, CUDA 12.8)
-    if: true
+    if: false
     runs-on: ubuntu-22.04
     container:
       # Use the devel image so it includes nvcc and the compiler toolchain
@@ -577,6 +577,7 @@ jobs:
   build_matlab_windows:
     name: MATLAB Build (Windows, CUDA 12.8)
     runs-on: windows-latest
+    if: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
