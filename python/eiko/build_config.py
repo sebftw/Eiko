@@ -88,6 +88,7 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
+        '/std:c++17',
         '/permissive',
         '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX', '/wd3189',
@@ -95,6 +96,7 @@ if sys.platform == "win32":
     ])
     NVCC_ARGS.extend([
         '-allow-unsupported-compiler', 
+        '-std=c++17',
         '-Xcompiler', '/Zc:preprocessor', 
         '-Xcompiler', '/wd3189', 
         '-Xcompiler', '/permissive',

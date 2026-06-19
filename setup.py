@@ -107,6 +107,17 @@ if IS_CI_BUILD:
                 print(f"[Eiko] Compiling JAX extension via raw nvcc...\nCMD: {' '.join(cmd)}")
                 subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             else:
+                # Force C++17 for PyTorch bindings
+                def remove_cxx_20_flag(compiler_args):
+                    bad_flags = ['-std=c++20', '/std:c++20', '-std=c++14', '/std:c++14']
+                    return [arg for arg in compiler_args if arg not in bad_flags]
+
+                if hasattr(ext, 'extra_compile_args') and isinstance(ext.extra_compile_args, dict):
+                    if 'cxx' in ext.extra_compile_args:
+                        ext.extra_compile_args['cxx'] = remove_cxx_20_flag(ext.extra_compile_args['cxx'])
+                    if 'nvcc' in ext.extra_compile_args:
+                        ext.extra_compile_args['nvcc'] = remove_cxx_20_flag(ext.extra_compile_args['nvcc'])
+                
                 # Fall back to standard PyTorch BuildExtension logic for eiko_torch_impl
                 super().build_extension(ext)
 
