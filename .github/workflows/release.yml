@@ -157,6 +157,7 @@ jobs:
       
       # Straightforward compilation step (No bash loops, no mid-job cleanup required)
       - name: Compile Wheel
+        if: ${{ !(matrix.platform.os_version == '20.04' && matrix.python_version == '3.8') }}
         env:
           FORCE_CUDA: "1"
           TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX" 
@@ -233,7 +234,114 @@ jobs:
             exit 1
           else
             echo "Success: No heavy external runtimes were bundled inside the wheel."
-          fi          
+          fi
+      
+      # ==========================================
+      # EDGE CASE PATH (Ubuntu 20.04 + Python 3.8)
+      # ==========================================
+      - name: Compile Wheels (Isolated venv & Merge)
+        if: ${{ matrix.platform.os_version == '20.04' && matrix.python_version == '3.8' }}
+        env:
+          FORCE_CUDA: "1"
+          TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
+          PIP_ROOT_USER_ACTION: "ignore"
+          EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
+        run: |
+          echo "Handling PyTorch/JAX collision. Building separately and merging..."
+          
+          # ---------------------------------------------------------
+          # 1. BUILD PYTORCH WHEEL
+          # ---------------------------------------------------------
+          python${{ matrix.python_version }} -m venv /tmp/venv_pt
+          export PATH="/tmp/venv_pt/bin:$PATH"
+          
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14" pybind11
+          python -m pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          
+          # Output PyTorch wheel to a temporary directory
+          python -m build --wheel --no-isolation --outdir /tmp/wheel_pt
+          
+          # ---------------------------------------------------------
+          # 2. BUILD JAX WHEEL
+          # ---------------------------------------------------------
+          # Reset path to system python, then create JAX venv
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" 
+          python${{ matrix.python_version }} -m venv /tmp/venv_jax
+          export PATH="/tmp/venv_jax/bin:$PATH"
+          
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14" pybind11
+          python -m pip install jax jaxlib -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          # Output JAX wheel to a separate temporary directory
+          python -m build --wheel --no-isolation --outdir /tmp/wheel_jax
+          
+          # ---------------------------------------------------------
+          # 3. MERGE THE BINARIES INTO A SINGLE WHEEL
+          # ---------------------------------------------------------
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          python${{ matrix.python_version }} -m pip install wheel
+          
+          mkdir -p /tmp/merge_area/pt
+          mkdir -p /tmp/merge_area/jax
+          
+          # Unpack both wheels into directories
+          python${{ matrix.python_version }} -m wheel unpack /tmp/wheel_pt/*.whl -d /tmp/merge_area/pt
+          python${{ matrix.python_version }} -m wheel unpack /tmp/wheel_jax/*.whl -d /tmp/merge_area/jax
+          
+          # Get the unzipped folder name (e.g., eiko-0.8.5)
+          WHEEL_DIR=$(ls /tmp/merge_area/pt)
+          
+          # Copy only the compiled JAX .so binaries into the PyTorch wheel structure
+          # Using -n ensures we don't accidentally overwrite any shared python files
+          cp -n /tmp/merge_area/jax/$WHEEL_DIR/eiko/*.so /tmp/merge_area/pt/$WHEEL_DIR/eiko/ || true
+          
+          # Repack the merged directory into your standard 'dist/' folder
+          mkdir -p dist
+          python${{ matrix.python_version }} -m wheel pack /tmp/merge_area/pt/$WHEEL_DIR -d dist/
+          
+          # ---------------------------------------------------------
+          # 4. REPAIR THE MERGED WHEEL
+          # ---------------------------------------------------------
+          echo "Repairing merged wheel with auditwheel..."
+          python${{ matrix.python_version }} -m auditwheel repair dist/*.whl \
+            --plat $PLAT \
+            --exclude libtorch.so \
+            --exclude libtorch_cpu.so \
+            --exclude libtorch_cuda.so \
+            --exclude libtorch_python.so \
+            --exclude libc10.so \
+            --exclude libc10_cuda.so \
+            --exclude libbackend_with_compiler.so \
+            --exclude libjitbackend_test.so \
+            --exclude libcudart.so \
+            --exclude libcudart.so.11.0 \
+            --exclude libcudart.so.12 \
+            --exclude libcudart.so.12.0 \
+            --exclude libcudart.so.13 \
+            --exclude libcudart.so.13.2 \
+            --exclude _xla.so \
+            --exclude xla_extension.so \
+            --exclude libjax_cuda_plugin.so \
+            --exclude libjax_cuda_pjrt.so \
+            --exclude libnvrtc.so \
+            --exclude libnvidia-ml.so \
+            --exclude libnccl.so \
+            --exclude libgomp.so.1 \
+            --exclude libcublas.so \
+            --exclude libcublasLt.so \
+            -w repaired_dist/
+            
+          echo "Stripping redundant platform tags..."
+          cd repaired_dist
+          python${{ matrix.python_version }} -m wheel tags --platform-tag $PLAT *.whl --remove
+          cd ..
+          
+          # Replace original unpacked wheel with the repaired many-linux wheel
+          rm dist/*.whl
+          mv repaired_dist/*.whl dist/
       
       # 5. Upload artifacts (Ensure names are unique per Python version)
       - name: Upload Wheel Artifacts
