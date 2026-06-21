@@ -257,7 +257,8 @@ jobs:
           # ---------------------------------------------------------
           python${{ matrix.python_version }} -m venv /tmp/venv_pt
           export PATH="/tmp/venv_pt/bin:$PATH"
-          
+
+          python -m pip install "typing-extensions==4.7.1"   # Fixes error from PyTorch installation due to incompatibility with Python 3.8
           python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14" pybind11
           python -m pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           
