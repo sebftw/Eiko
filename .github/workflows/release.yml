@@ -26,7 +26,7 @@ jobs:
 
           # --- Next-Gen Tier (CUDA 13+) ---
           # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -353,7 +353,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: true
+    if: false
     strategy:
       fail-fast: false
       matrix:
