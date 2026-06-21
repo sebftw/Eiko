@@ -428,7 +428,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-          toolset: '14.40' # Forces a CUDA 12.6-compatible compiler version
+          toolset: '14.4' # Forces a CUDA 12.6-compatible compiler version
           vsversion: '2022' # Forces it to look in VS 2022 instead of VS 2019
           
       # --- PYTHON 3.9 BUILD ---
