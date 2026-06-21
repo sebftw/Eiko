@@ -26,7 +26,7 @@ jobs:
 
           # --- Next-Gen Tier (CUDA 13+) ---
           # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -359,7 +359,7 @@ jobs:
       matrix:
         platform:
           # --- Legacy Baseline (Broad Hardware Support) ---
-          # - { torch: '2.4.0', cuda: '12.1.1' }
+          - { torch: '2.4.0', cuda: '12.1.1' }
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
@@ -370,7 +370,7 @@ jobs:
           - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           # - { torch: '2.12.0', cuda: '13.0.3' }
-          # - { torch: '2.12.0', cuda: '13.2.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
