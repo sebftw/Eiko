@@ -9,7 +9,7 @@ on:
 jobs:
   build_ubuntu_wheels:
     name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    if: true
+    if: false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -366,7 +366,7 @@ jobs:
       matrix:
         platform:
           # --- Legacy Baseline (Broad Hardware Support) ---
-          # - { torch: '2.4.0', cuda: '12.1.1' }
+          # - { torch: '2.4.0', cuda: '12.4.1' }
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
@@ -424,19 +424,25 @@ jobs:
           python-version: '3.9'
           architecture: 'x64'
 
-      - name: Install MSVC v144 Toolset
+      - name: Install MSVC v14.40 Toolset
         run: |
-          # Use VSLocator / vswhere or the VS Installer CLI to add the VS 2022 build tools component
+          # Dynamically locate the VS 2022 installation path
+          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -version "[17.0,18.0)" -products * -property installationPath
+          
+          echo "Found Visual Studio 2022 at: $vsPath"
+          
+          # Modify that specific installation
           & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-           --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
-           --passive --norestart --includeRecommended
+            --installPath "$vsPath" `
+            --add Microsoft.VisualStudio.Component.VC.14.40.17.10.x86.x64 `
+            --passive --norestart --wait
             
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
           toolset: '14.40' # Forces a CUDA 12.6-compatible compiler version
-          vsversion: '2022' # Forces it to look in VS 2022 instead of VS 18
+          vsversion: '2022' # Forces it to look in VS 2022 instead of VS 2019
           
       # --- PYTHON 3.9 BUILD ---
       - name: Build 3.9 Wheel
