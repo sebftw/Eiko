@@ -158,13 +158,12 @@ jobs:
 
             ***
 
-      - name: Publish to PyPI/TestPyPI
-        env:
-          TWINE_USERNAME: __token__
-          # You can use the official gh-action-pypi-publish here as well
-        run: |
-          if [[ "${{ env.TAG }}" == *"-test"* ]]; then
-            echo "Publishing to TestPyPI..."
-          else
-            echo "Publishing to PyPI..."
-          fi
+      - name: Publish to PyPI
+        if: ${{ !contains(github.ref_name, '-test') }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Publish to TestPyPI
+        if: ${{ contains(github.ref_name, '-test') }}
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
