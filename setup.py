@@ -20,6 +20,7 @@ from eiko.build_config import (
     IS_RELEASE_BUILD,
     get_full_version,
     get_jax_includes,
+    diagnose_build_failure,
     compile_raw_nvcc_shared_lib
 )
 
