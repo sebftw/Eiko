@@ -4,6 +4,7 @@ import sys
 import glob
 import uuid
 import shutil
+import platform
 import subprocess
 from pathlib import Path
 
@@ -223,7 +224,7 @@ else:
 # ------------------------------------------------------------------------
 # Version Resolution
 def get_full_version() -> str:
-    init_path = os.path.join(BASE_DIR, "eiko", "__init__.py")
+    init_path = os.path.join(BASE_DIR, "__init__.py")
     base_version = "0.0.0"
     with open(init_path, "r") as f:
         match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.M)
@@ -260,7 +261,6 @@ def compile_raw_nvcc_shared_lib(src_file: str, output_path: str, include_dirs: l
     cmd += [f"-Xcompiler={arg}" for arg in cxx_pic]
     cmd += inc_flags
 
-    print(f"[Eiko Build] Executing raw nvcc compilation:\n  $ {' '.join(cmd)}\n")
     # Capturing stderr to PIPE ensures the diagnostic helper below can parse compiler crashes
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
@@ -268,22 +268,30 @@ def compile_raw_nvcc_shared_lib(src_file: str, output_path: str, include_dirs: l
         try:
             os.replace(target_out, output_path)
         except PermissionError:
-            # Another process locked the file (e.g., multi-GPU parallel imports on Windows)
+            # Another process locked the file. Verify the other process actually finished building it.
+            if not os.path.exists(output_path):
+                raise RuntimeError(f"Race condition failure: {output_path} is missing and temp file could not be renamed.")
+            
             if os.path.exists(target_out):
-                os.remove(target_out)
+                try:
+                    os.remove(target_out)
+                except OSError:
+                    pass # Windows file handles can be stubborn; safe to ignore if output_path exists
 
 def diagnose_build_failure(error: Exception, framework: str, framework_version: str):
     """Parses C++/CUDA compilation errors and prints a structured, user-friendly diagnosis."""
-    import platform
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
     os_name = platform.system()
 
-    if isinstance(error, subprocess.CalledProcessError) and error.stderr:
-        error_msg = error.stderr.decode('utf-8', errors='replace').lower()
-        raw_error = error.stderr.decode('utf-8', errors='replace')
+    # Safely extract the raw error, combining stdout and stderr
+    if isinstance(error, subprocess.CalledProcessError):
+        out = error.stdout.decode('utf-8', errors='replace') if error.stdout else ""
+        err = error.stderr.decode('utf-8', errors='replace') if error.stderr else ""
+        raw_error = f"{out}\n{err}".strip()
     else:
-        error_msg = str(error).lower()
         raw_error = str(error)
+
+    error_msg = raw_error.lower()
 
     print("\n" + "="*75)
     print(f"[Eiko] FATAL ERROR: Local C++/CUDA compilation for {framework} failed.")
@@ -291,26 +299,29 @@ def diagnose_build_failure(error: Exception, framework: str, framework_version: 
     print("1. We could not find a compatible precompiled wheel for your exact system.")
     print(f"2. We attempted to compile the {framework} extension from source, but it failed.\n")
     
+    # Always print the raw error first
+    print("--- RAW COMPILER OUTPUT ---")
+    print(raw_error if raw_error else "<No output captured>")
+    print("---------------------------\n")
+
     # --- DIAGNOSIS ROUTINES ---
+    print("--- AUTOMATED DIAGNOSIS ---")
     if sys.platform == "win32" and ("cl.exe" in error_msg or "['where', 'cl']" in error_msg or "compiler" in error_msg):
         print("DIAGNOSIS: Microsoft Visual Studio C++ compiler ('cl.exe') was not found.")
         print("FIX: 1) Install the 'Desktop development with C++' workload via the Visual Studio Installer.")
         print("     2) Ensure you run Python inside the 'x64 Native Tools Command Prompt for VS'.")
-    elif sys.platform != "win32" and ("['which', 'c++']" in error_msg or "['which', 'g++']" in error_msg or "gcc" in error_msg or "g++" in error_msg or "c++" in error_msg):
+    elif sys.platform != "win32" and any(x in error_msg for x in ["['which', 'c++']", "['which', 'g++']", "gcc", "g++", "c++"]):
         print("DIAGNOSIS: A C++ host compiler (like GCC or G++) was not found.")
         print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
     elif "nvcc" in error_msg or isinstance(error, FileNotFoundError):
         print("DIAGNOSIS: The NVIDIA CUDA compiler ('nvcc') was not found on your system path.")
         print("FIX: Ensure the NVIDIA CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
         print("🔗 Download CUDA here: https://developer.nvidia.com/cuda-downloads")
-    elif "sm_" in error_msg or "compute_" in error_msg or "compatibility" in error_msg or "undefined symbol" in error_msg:
+    elif any(x in error_msg for x in ["sm_", "compute_", "compatibility", "undefined symbol"]):
         print("DIAGNOSIS: Hardware/Software architecture compatibility mismatch.")
         print("The compilation failed because your framework or CUDA driver doesn't align with your GPU capability.")
-        print("\nCOMPILER OUTPUT SNIPPET:")
-        print(raw_error)
     else:
-        print("COMPILER OUTPUT:")
-        print(raw_error)
+        print("DIAGNOSIS: Unknown compilation error. See the raw output above.")
         
     if framework.lower() == "pytorch":
         print("\n" + "-"*75)
@@ -319,6 +330,9 @@ def diagnose_build_failure(error: Exception, framework: str, framework_version: 
         print("Updating PyTorch to the latest version will likely bypass this compilation step entirely.")
         print("👉 https://pytorch.org/get-started/")
 
+    # Grab the last 15 lines of the error for the issue template to keep it concise
+    error_snippet = "\n".join(raw_error.splitlines()[-15:]) if raw_error else "N/A"
+
     print("\n" + "-"*75)
     print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
     print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
@@ -326,8 +340,10 @@ def diagnose_build_failure(error: Exception, framework: str, framework_version: 
     print("```text")
     print(f"OS:      {os_name}")
     print(f"Python:  {py_ver}")
-    print(f"{framework}: {framework_version}")
+    print(f"Target:  {framework} {framework_version}")
+    print("\n--- Error Snippet ---")
+    print(error_snippet)
     print("```")
     print("="*75 + "\n")
     
-    raise RuntimeError(f"Eiko {framework} initialization failed due to missing C++ build tools.") from None
+    raise RuntimeError(f"Eiko {framework} initialization failed due to compilation errors.") from None
