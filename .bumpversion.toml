@@ -2,7 +2,6 @@
 current_version = "0.8.5"
 commit = true
 tag = false # Let GitHub Actions handle tagging or do it manually later
-ignore_missing_version = true
 
 [[tool.bumpversion.files]]
 filename = "python/eiko/__init__.py"
