@@ -200,7 +200,6 @@ if sys.platform == "win32":
         '-allow-unsupported-compiler', 
         '-D_WIN32=1', '-DUSE_CUDA=1',
         '-Xcompiler', '/Zc:preprocessor', 
-        '-Xcudafe', '--diag_suppress=3189',   # Suppress warning about "module" keyword (new keyword introduced in C++20).
         '-Xcompiler', '/permissive',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '-DTHRUST_FORCE_COMPATIBILITY',
@@ -221,8 +220,30 @@ else:
     CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-fPIC', '-fvisibility=hidden'])
     NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC', '-Xcompiler', '-Wno-deprecated-declarations'])
 
+# Handle release/debug configurations and warning suppressions
 if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')
+    
+    if sys.platform == "win32":
+        # MSVC-specific warning suppression
+        CXX_ARGS.extend(['/wd4101'])  # Unused variable
+        
+        # NVCC on Windows
+        NVCC_ARGS.extend([
+            '-Xcudafe', '--diag_suppress=3189',  # "module" keyword
+            '-Xcudafe', '--diag_suppress=177',   # Unused variable
+            '-Xcompiler', '/wd4101'              # Pass unused variable to host compiler
+        ])
+    else:
+        # GCC/Clang specific warning suppression
+        CXX_ARGS.extend(['-Wno-unused-variable'])
+        
+        # NVCC on Linux/macOS
+        NVCC_ARGS.extend([
+            '-Xcompiler', '-Wno-deprecated-declarations',
+            '-Xcompiler', '-Wno-unused-variable',
+            '-Xcudafe', '--diag_suppress=177'    # Unused variable in CUDA files
+        ])
 else:
     NVCC_ARGS.append('-arch=native')
 
