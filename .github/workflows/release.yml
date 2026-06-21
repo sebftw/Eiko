@@ -442,7 +442,7 @@ jobs:
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install "jax" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0" "numpy>=2.0.0"
           
           $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
@@ -478,7 +478,7 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
-          pip install "jax" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0" "numpy>=2.0.0"
           
           $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
@@ -511,7 +511,7 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
-          pip install "jax" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0" "numpy>=2.0.0"
           
           $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
@@ -550,7 +550,7 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
-          pip install "jax" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0" "numpy>=2.0.0"
           
           $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
