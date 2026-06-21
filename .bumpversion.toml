@@ -5,8 +5,8 @@ tag = false # Let GitHub Actions handle tagging or do it manually later
 
 [[tool.bumpversion.files]]
 filename = "python/eiko/__init__.py"
-search = "__version__ = '{current_version}'"
-replace = "__version__ = '{new_version}'"
+search = '__version__ = "{current_version}"'
+replace = '__version__ = "{new_version}"'
 
 [[tool.bumpversion.files]]
 filename = "CITATION.cff"
