@@ -9,7 +9,7 @@ on:
 jobs:
   build_ubuntu_wheels:
     name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    if: false
+    if: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -244,7 +244,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: false
+    if: true
     strategy:
       fail-fast: false
       matrix:
