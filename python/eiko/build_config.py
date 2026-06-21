@@ -232,6 +232,7 @@ if IS_RELEASE_BUILD:
         NVCC_ARGS.extend([
             '-Xcudafe', '--diag_suppress=3189',  # "module" keyword
             '-Xcudafe', '--diag_suppress=177',   # Unused variable
+            '-Xcudafe', '--diag_suppress=550',   # Variable was set but never used
             '-Xcompiler', '/wd4101'              # Pass unused variable to host compiler
         ])
     else:
@@ -242,6 +243,7 @@ if IS_RELEASE_BUILD:
         NVCC_ARGS.extend([
             '-Xcompiler', '-Wno-deprecated-declarations',
             '-Xcompiler', '-Wno-unused-variable',
+            '-Xcudafe', '--diag_suppress=550',    # Variable was set but never used in CUDA files
             '-Xcudafe', '--diag_suppress=177'    # Unused variable in CUDA files
         ])
 else:
