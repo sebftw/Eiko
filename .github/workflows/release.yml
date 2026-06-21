@@ -454,6 +454,8 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -491,6 +493,8 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -520,13 +524,12 @@ jobs:
       - name: Build 3.11 Wheel
         env: *build_env
         run: |
-          echo "Using compiler at $env:CUDAHOSTCXX"
-          where cl.exe
-          cl.exe # This will print the MSVC compiler banner showing the target architecture
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -557,6 +560,8 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -593,6 +598,8 @@ jobs:
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
           pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
