@@ -4,6 +4,7 @@ import shutil
 import glob
 from setuptools import setup, Extension
 from setuptools.command.build_py import build_py
+from setuptools.command.build_ext import build_ext
 
 # ------------------------------------------------------------------------
 # 1. Bootstrapping Build Config
@@ -63,12 +64,14 @@ cmdclass_dict = {"build_py": CustomBuildPy}
 # If false, pip will install a pure-Python package (relies on JIT at runtime).
 # If true, it triggers Ahead-of-Time (AOT) C++ compilation for the wheel.
 if IS_RELEASE_BUILD:
+    BaseBuildExt = build_ext
     try:
         import torch
         from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+        BaseBuildExt = BuildExtension
         
         # Define PyTorch Extension
-        # We use PyTorch's native CUDAExtension because it perfectly handles 
+        # We use PyTorch's native CUDAExtension because it handles 
         # the complexities of linking libtorch and libtorch_python.
         ext_modules.append(
             CUDAExtension(
@@ -95,7 +98,7 @@ if IS_RELEASE_BUILD:
     except ImportError:
         print("\n[WARNING] JAX could not be found. Skipping JAX Eiko extension compilation.", file=sys.stderr)
 
-    class MixedBuildExt(BuildExtension):
+    class MixedBuildExt(BaseBuildExt):
         """
         A traffic-cop build class. It routes extensions to different compilers
         based on their name, preventing dependency cross-contamination.
