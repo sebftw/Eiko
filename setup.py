@@ -63,31 +63,37 @@ cmdclass_dict = {"build_py": CustomBuildPy}
 # If false, pip will install a pure-Python package (relies on JIT at runtime).
 # If true, it triggers Ahead-of-Time (AOT) C++ compilation for the wheel.
 if IS_RELEASE_BUILD:
-    import torch
-    from torch.utils.cpp_extension import BuildExtension, CUDAExtension
-    
-    # 1. Define PyTorch Extension
-    # We use PyTorch's native CUDAExtension because it perfectly handles 
-    # the complexities of linking libtorch and libtorch_python.
-    ext_modules.append(
-        CUDAExtension(
-            name="eiko.eiko_torch_impl",
-            sources=["src/bindings/torch_bindings.cu"],
-            extra_compile_args={"cxx": CXX_ARGS, "nvcc": NVCC_ARGS},
-            include_dirs=EXTRA_INCLUDE_PATHS,
+    try:
+        import torch
+        from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+        
+        # Define PyTorch Extension
+        # We use PyTorch's native CUDAExtension because it perfectly handles 
+        # the complexities of linking libtorch and libtorch_python.
+        ext_modules.append(
+            CUDAExtension(
+                name="eiko.eiko_torch_impl",
+                sources=["src/bindings/torch_bindings.cu"],
+                extra_compile_args={"cxx": CXX_ARGS, "nvcc": NVCC_ARGS},
+                include_dirs=EXTRA_INCLUDE_PATHS,
+            )
         )
-    )
-    
-    # 2. Define JAX Extension
-    # We define this as a standard setuptools Extension, but we will hijack 
-    # its build process below so PyTorch doesn't try to link libtorch to it.
-    ext_modules.append(
-        Extension(
-            name="eiko.eiko_jax_impl",
-            sources=["src/bindings/jax_bindings.cu"],
-            include_dirs=get_jax_includes(),
+    except ImportError:
+        print("\n[WARNING] PyTorch could not be found. Skipping PyTorch Eiko extension compilation.", file=sys.stderr)
+
+    try:
+        # Define JAX Extension
+        # We define this as a standard setuptools Extension, but we will hijack 
+        # its build process below so PyTorch doesn't try to link libtorch to it.
+        ext_modules.append(
+            Extension(
+                name="eiko.eiko_jax_impl",
+                sources=["src/bindings/jax_bindings.cu"],
+                include_dirs=get_jax_includes(),
+            )
         )
-    )
+    except ImportError:
+        print("\n[WARNING] JAX could not be found. Skipping JAX Eiko extension compilation.", file=sys.stderr)
 
     class MixedBuildExt(BuildExtension):
         """
