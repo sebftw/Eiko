@@ -17,16 +17,16 @@ jobs:
         platform:
           # --- Legacy Floor (Max Backwards Compatibility) ---
           - { torch: '2.4.0', cuda: '12.4.1', os_version: '20.04' }
-          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
-          # - { torch: '2.4.0', cuda: '12.4.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
-          # - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
+          - { torch: '2.4.0', cuda: '12.4.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
+          - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
           - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }  # Legacy support version
 
           # --- Next-Gen Tier (CUDA 13+) ---
-          # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -312,17 +312,17 @@ jobs:
         platform:
           # --- Legacy Baseline (Broad Hardware Support) ---
           - { torch: '2.4.0', cuda: '12.4.1' }
-          # - { torch: '2.7.0', cuda: '12.6.3' }
+          - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
-          # - { torch: '2.10.0', cuda: '12.8.1' }
+          - { torch: '2.10.0', cuda: '12.8.1' }
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
-          # - { torch: '2.12.0', cuda: '12.6.0' }
+          - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           - { torch: '2.12.0', cuda: '13.0.0' }
-          # - { torch: '2.12.0', cuda: '13.2.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
@@ -620,7 +620,7 @@ jobs:
   # ==========================================
   build_matlab_linux:
     name: MATLAB Build (Linux, CUDA 12.8)
-    if: false
+    if: true
     runs-on: ubuntu-22.04
     container:
       # Use the devel image so it includes nvcc and the compiler toolchain
@@ -668,7 +668,7 @@ jobs:
   build_matlab_windows:
     name: MATLAB Build (Windows, CUDA 12.8)
     runs-on: windows-latest
-    if: false
+    if: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
