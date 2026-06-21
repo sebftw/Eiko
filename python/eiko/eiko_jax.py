@@ -7,6 +7,13 @@ import sysconfig
 import subprocess
 from functools import partial
 
+link_emoji = ""  # Fallback for older Windows terminals/CP1252
+try:
+    "\U0001f517".encode(sys.stdout.encoding or "utf-8")
+    link_emoji = "\U0001f517"
+except UnicodeEncodeError:
+    pass
+
 try:
     import jax
     import pybind11
@@ -22,9 +29,9 @@ try:
             "Eiko strictly requires a GPU-enabled version of JAX to run.\n\n"
             "HOW TO FIX:\n"
             "1. If you have the CPU-only version, uninstall it first:\n"
-            "   👉 pip uninstall jax jaxlib\n"
+            f"   {link_emoji} pip uninstall jax jaxlib\n"
             "2. Install the CUDA-enabled version of JAX (e.g., for CUDA 12):\n"
-            "   👉 pip install -U \"jax[cuda12]\"\n"
+            f"   {link_emoji} pip install -U \"jax[cuda12]\"\n"
             "3. Ensure your NVIDIA drivers are correctly installed and visible to Python.\n\n"
             "For full installation details, visit:\n"
             "https://jax.readthedocs.io/en/latest/installation.html\n"
