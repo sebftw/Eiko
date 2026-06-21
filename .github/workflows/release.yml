@@ -16,8 +16,8 @@ jobs:
       matrix:
         platform:
           # --- Legacy Floor (Max Backwards Compatibility) ---
-          - { torch: '2.4.0', cuda: '12.4.1', os_version: '20.04' }
-          # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
+          # - { torch: '2.4.0', cuda: '12.4.1', os_version: '20.04' }
+          - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
           # - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
@@ -437,6 +437,7 @@ jobs:
         with:
           arch: x64
           toolset: '14.40' # Forces a CUDA 12.6-compatible compiler version
+          vsversion: '2022' # Forces it to look in VS 2022 instead of VS 18
           
       # --- PYTHON 3.9 BUILD ---
       - name: Build 3.9 Wheel
