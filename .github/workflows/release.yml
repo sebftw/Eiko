@@ -353,13 +353,13 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-latest
-    if: false
+    if: true
     strategy:
       fail-fast: false
       matrix:
         platform:
           # --- Legacy Baseline (Broad Hardware Support) ---
-          - { torch: '2.4.0', cuda: '12.1.1' }
+          # - { torch: '2.4.0', cuda: '12.1.1' }
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
@@ -370,7 +370,7 @@ jobs:
           - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           # - { torch: '2.12.0', cuda: '13.0.3' }
-          - { torch: '2.12.0', cuda: '13.2.0' }
+          # - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
