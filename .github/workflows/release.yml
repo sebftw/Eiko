@@ -378,11 +378,6 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
-      - name: Set up MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
         id: cuda-toolkit
@@ -405,14 +400,12 @@ jobs:
           echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
           echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin" >> $GITHUB_PATH
           
-
       - name: Verify CUDA_HOME
         run: |
           echo "The CUDA_HOME variable is currently set to: $env:CUDA_HOME"
           echo "Testing if nvcc is accessible:"
           nvcc --version
 
-      
       # ==========================================
       # PYTHON 3.9 BUILD
       # Excluded for PyTorch 2.10+ (Requires 3.10+)
@@ -422,13 +415,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
+          architecture: 'x64'
 
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          
       # --- PYTHON 3.9 BUILD ---
       - name: Build 3.9 Wheel
         if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         env: &build_env
-          DISTUTILS_USE_SDK: "1" 
-          FORCE_CUDA: "1"        
+          DISTUTILS_USE_SDK: "1"
+          MSSdk: "1"
+          # Force 64-bit targeting for setuptools/distutils
+          TARGET_ARCH: "x64"
+          VSCMD_ARG_TGT_ARCH: "x64"
+          FORCE_CUDA: "1"
           TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX"
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
@@ -436,6 +439,8 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} 
           EIKO_RELEASE_BUILD: "1"
         run: |
+          where cl.exe
+          cl.exe # This will print the MSVC compiler banner showing the target architecture
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -466,6 +471,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          architecture: 'x64'
           
       - name: Build 3.10 Wheel
         # CHANGE: Uncommented the condition below to align with setup inclusion rules
@@ -500,6 +506,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          architecture: 'x64'
           
       - name: Build 3.11 Wheel
         env: *build_env
@@ -529,6 +536,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          architecture: 'x64'
           
       - name: Build 3.12 Wheel
         env: *build_env
@@ -562,6 +570,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          architecture: 'x64'
           
       - name: Build 3.13 Wheel
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
