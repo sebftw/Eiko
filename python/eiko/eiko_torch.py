@@ -2,6 +2,13 @@ import os
 import sys
 import math
 
+# Check if the terminal's encoding can handle the link emoji
+try:
+    "\U0001f517".encode(sys.stdout.encoding or "utf-8")
+    link_emoji = "\U0001f517"
+except UnicodeEncodeError:
+    link_emoji = "-"  # Fallback for older Windows terminals/CP1252
+
 try:
     import torch
     # Immediately trap CPU-only installations before doing anything else
@@ -14,7 +21,7 @@ try:
             "Eiko strictly requires a GPU-enabled (CUDA) version of PyTorch.\n\n"
             "HOW TO FIX:\n"
             "1. Uninstall your current version:  pip uninstall torch\n"
-            "2. Get the correct GPU command at:  👉 https://pytorch.org/get-started/\n"
+            f"2. Get the correct GPU command at:  {link_emoji} https://pytorch.org/get-started/\n"
             + "="*75 + "\n"
         )
 except ImportError as e:
@@ -25,7 +32,7 @@ except ImportError as e:
         "Eiko requires a GPU-enabled version of PyTorch.\n"
         "A standard 'pip install torch' installs a CPU-only version. \n\n"
         "To get the correct GPU (CUDA) installation, visit:\n"
-        "👉 https://pytorch.org/get-started/\n"
+        f"{link_emoji} https://pytorch.org/get-started/\n"
         + "="*65 + "\n"
     ) from e
 
