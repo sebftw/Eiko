@@ -306,7 +306,8 @@ jobs:
           # 4. REPAIR THE MERGED WHEEL
           # ---------------------------------------------------------
           echo "Repairing merged wheel with auditwheel..."
-          python${{ matrix.python_version }} -m auditwheel repair dist/*.whl \
+          # Use the venv Python that already has auditwheel and patchelf ready
+          /tmp/venv_jax/bin/python -m auditwheel repair dist/*.whl \
             --plat $PLAT \
             --exclude libtorch.so \
             --exclude libtorch_cpu.so \
@@ -336,7 +337,9 @@ jobs:
             
           echo "Stripping redundant platform tags..."
           cd repaired_dist
-          python${{ matrix.python_version }} -m wheel tags --platform-tag $PLAT *.whl --remove
+          # python${{ matrix.python_version }} -m wheel tags --platform-tag $PLAT *.whl --remove
+          # Use the venv python here as well to ensure wheel is available
+          /tmp/venv_jax/bin/python -m wheel tags --platform-tag $PLAT *.whl --remove
           cd ..
           
           # Replace original unpacked wheel with the repaired many-linux wheel
