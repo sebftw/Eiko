@@ -8,6 +8,13 @@ import platform
 import subprocess
 from pathlib import Path
 
+link_emoji = ""  # Fallback for older Windows terminals/CP1252
+try:
+    "\U0001f517".encode(sys.stdout.encoding or "utf-8")
+    link_emoji = "\U0001f517"
+except UnicodeEncodeError:
+    pass
+
 # ------------------------------------------------------------------------
 # 1. Base Compiler Arguments
 # ------------------------------------------------------------------------
@@ -328,7 +335,7 @@ def diagnose_build_failure(error: Exception, framework: str, framework_version: 
         print("FASTEST FIX: UPDATE PYTORCH")
         print("Eiko provides precompiled wheels for the newest PyTorch releases.")
         print("Updating PyTorch to the latest version will likely bypass this compilation step entirely.")
-        print("👉 https://pytorch.org/get-started/")
+        print(f"{link_emoji} https://pytorch.org/get-started/")
 
     # Grab the last 15 lines of the error for the issue template to keep it concise
     error_snippet = "\n".join(raw_error.splitlines()[-15:]) if raw_error else "N/A"
