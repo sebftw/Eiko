@@ -18,8 +18,6 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
     existing_binaries = [f for f in os.listdir(target_dir) if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))]
     if existing_binaries:
         return True
-
-    print(f"[Eiko] Downloading precompiled CUDA kernels for you... (This may take a minute)")
     
     # 1. Load Local Registry
     try:
@@ -28,12 +26,12 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         with open(registry_path, "r", encoding="utf-8") as f:
             registry = json.load(f)
     except FileNotFoundError:
-        print("[Eiko] Local registry.json not found. Falling back to JIT.")
+        # print("[Eiko] Local registry.json not found. Falling back to JIT.")
         return False
     except Exception as e:
         print(f"[Eiko] Failed to parse local registry ({e}). Falling back to JIT.")
         return False
-
+    
     # 2. Match Environment
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
     os_name = "windows" if platform.system().lower() == "windows" else "linux"
@@ -64,6 +62,7 @@ def fetch_precompiled_wheel(package_version, torch_version, cuda_version, target
         matched_build = max(valid_builds, key=get_cuda_score)
 
     # 4. Multiprocessing-Safe Download & Extract
+    print(f"[Eiko] Downloading precompiled CUDA kernels for you...")
     wheel_url = matched_build["url"]
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     os.makedirs(eiko_tmp_dir, exist_ok=True)

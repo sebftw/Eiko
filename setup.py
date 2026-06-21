@@ -2,22 +2,39 @@ import sys
 import os
 import shutil
 import glob
-import subprocess
-import sysconfig
 from setuptools import setup, Extension
 from setuptools.command.build_py import build_py
 
-# Add 'python' to sys.path so we can import 'eiko.build_config'
+# ------------------------------------------------------------------------
+# 1. Bootstrapping Build Config
+# ------------------------------------------------------------------------
+# Add the local 'python' directory to the path so we can import our 
+# build machinery from build_config.py without installing first.
 sys.path.append(os.path.join(os.path.dirname(__file__), 'python'))
 
-from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS
+from eiko.build_config import (
+    CXX_ARGS, 
+    NVCC_ARGS, 
+    EXTRA_INCLUDE_PATHS,
+    IS_RELEASE_BUILD,
+    get_full_version,
+    get_jax_includes,
+    compile_raw_nvcc_shared_lib
+)
 
+# ------------------------------------------------------------------------
+# 2. Package Data Staging
+# ------------------------------------------------------------------------
 class CustomBuildPy(build_py):
-    """Custom build step to copy necessary CUDA source files into the package."""
+    """
+    Custom build step to copy necessary C++/CUDA source files into the 
+    Python package staging area before building the wheel. This ensures 
+    local JIT fallback environments have access to the raw headers.
+    """
     def run(self):
         # Run the standard build_py first to set up the build_lib directory
         super().run()
-
+        
         base_dir = os.path.dirname(os.path.abspath(__file__))
         src_dir = os.path.join(base_dir, 'src')
         
@@ -25,128 +42,95 @@ class CustomBuildPy(build_py):
         dest_dir = os.path.join(self.build_lib, 'eiko', 'src')
         dest_bindings_dir = os.path.join(dest_dir, 'bindings')
 
-        # Ensure destination directories exist in the build tree
         os.makedirs(dest_bindings_dir, exist_ok=True)
 
-        # Copy src/*.cuh
+        # Copy all raw header files needed for JIT compiling
         for cuh_file in glob.glob(os.path.join(src_dir, '*.cuh')):
             shutil.copy(cuh_file, dest_dir)
 
-        # Copy specific binding files
-        binding_files = ['torch_bindings.cu', 'jax_bindings.cu']
-        for b_file in binding_files:
+        # Copy the binding entrypoints
+        for b_file in ['torch_bindings.cu', 'jax_bindings.cu']:
             src_file = os.path.join(src_dir, 'bindings', b_file)
             if os.path.exists(src_file):
                 shutil.copy(src_file, dest_bindings_dir)
 
-# 1. Determine Build Mode
-local_version = os.environ.get("EIKO_LOCAL_VERSION", "")
-IS_CI_BUILD = bool(local_version)
 
+# ------------------------------------------------------------------------
+# 3. Extension Definitions & Routing
+# ------------------------------------------------------------------------
 ext_modules = []
 cmdclass_dict = {"build_py": CustomBuildPy}
-
-if IS_CI_BUILD:
+# If false, pip will install a pure-Python package (relies on JIT at runtime).
+# If true, it triggers Ahead-of-Time (AOT) C++ compilation for the wheel.
+if IS_RELEASE_BUILD:
+    import torch
     from torch.utils.cpp_extension import BuildExtension, CUDAExtension
-    print(f"\n[Eiko setup.py] CI environment detected (Suffix: {local_version}).")
-    print("[Eiko setup.py] Compiling PyTorch and JAX AOT extensions...\n")
     
-    # Mandate JAX and pybind11 availability for CI builds
-    import jax
-    import pybind11
-    
-    # Define PyTorch Extension (Leaves PyTorch dependency intact for Torch users)
+    # 1. Define PyTorch Extension
+    # We use PyTorch's native CUDAExtension because it perfectly handles 
+    # the complexities of linking libtorch and libtorch_python.
     ext_modules.append(
         CUDAExtension(
             name="eiko.eiko_torch_impl",
             sources=["src/bindings/torch_bindings.cu"],
-            extra_compile_args={
-                "cxx": CXX_ARGS,
-                "nvcc": NVCC_ARGS,
-            },
+            extra_compile_args={"cxx": CXX_ARGS, "nvcc": NVCC_ARGS},
             include_dirs=EXTRA_INCLUDE_PATHS,
         )
     )
     
-    # Define JAX Extension as a STANDARD setuptools Extension
-    jax_includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
+    # 2. Define JAX Extension
+    # We define this as a standard setuptools Extension, but we will hijack 
+    # its build process below so PyTorch doesn't try to link libtorch to it.
     ext_modules.append(
         Extension(
             name="eiko.eiko_jax_impl",
             sources=["src/bindings/jax_bindings.cu"],
-            include_dirs=jax_includes,
+            include_dirs=get_jax_includes(),
         )
     )
 
-    # Custom Build class to route compiling logic based on the extension name
     class MixedBuildExt(BuildExtension):
-        # TODO: Also use this class inside eiko.eiko_jax.
+        """
+        A traffic-cop build class. It routes extensions to different compilers
+        based on their name, preventing dependency cross-contamination.
+        """
         def build_extension(self, ext):
             if ext.name == "eiko.eiko_jax_impl":
-                # Bypass PyTorch completely and use raw NVCC (adapted from your JIT script)
-                ext_path = self.get_ext_fullpath(ext.name)
-                os.makedirs(os.path.dirname(ext_path), exist_ok=True)
-                
-                nvcc_path = shutil.which("nvcc")
-                if not nvcc_path:
-                    fallback_path = "/usr/local/cuda/bin/nvcc"
-                    if os.path.exists(fallback_path):
-                        nvcc_path = fallback_path
-                    else:
-                        raise FileNotFoundError("nvcc not found in PATH for JAX compilation.")
-
-                # Force -fPIC for shared library compilation
-                cxx_args_pic = CXX_ARGS + ["-fPIC"] if "-fPIC" not in CXX_ARGS else CXX_ARGS
-                include_flags = [f"-I{path}" for path in ext.include_dirs if os.path.exists(path)]
-
-                cmd = [nvcc_path, "-shared", "-std=c++17", ext.sources[0], "-o", ext_path]
-                cmd += NVCC_ARGS
-                cmd += [f"-Xcompiler={arg}" for arg in cxx_args_pic]
-                cmd += include_flags
-
-                print(f"[Eiko] Compiling JAX extension via raw nvcc...\nCMD: {' '.join(cmd)}")
-                subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                try:
+                    # Intercept the JAX extension and compile it directly via raw NVCC
+                    # in a subprocess, completely bypassing PyTorch's build machinery.
+                    ext_path = self.get_ext_fullpath(ext.name)
+                    compile_raw_nvcc_shared_lib(ext.sources[0], ext_path, ext.include_dirs)
+                except Exception as e:
+                    jax_ver = "unknown"
+                    try:
+                        import jax
+                        jax_ver = jax.__version__
+                    except ImportError:
+                        pass
+                    diagnose_build_failure(e, framework="JAX (AOT Wheel Build)", framework_version=jax_ver)
             else:
-                # Force C++17 for PyTorch bindings
-                def remove_cxx_20_flag(compiler_args):
-                    bad_flags = ['-std=c++20', '/std:c++20', '-std=c++14', '/std:c++14']
-                    return [arg for arg in compiler_args if arg not in bad_flags]
-
-                if hasattr(ext, 'extra_compile_args') and isinstance(ext.extra_compile_args, dict):
-                    if 'cxx' in ext.extra_compile_args:
-                        ext.extra_compile_args['cxx'] = remove_cxx_20_flag(ext.extra_compile_args['cxx'])
-                    if 'nvcc' in ext.extra_compile_args:
-                        ext.extra_compile_args['nvcc'] = remove_cxx_20_flag(ext.extra_compile_args['nvcc'])
-                
-                # Fall back to standard PyTorch BuildExtension logic for eiko_torch_impl
-                super().build_extension(ext)
+                try:
+                    # Fall back to PyTorch's standard build logic for the torch extension
+                    super().build_extension(ext)
+                except Exception as e:
+                    diagnose_build_failure(e, framework="PyTorch (AOT Wheel Build)", framework_version=torch.__version__)
 
     cmdclass_dict["build_ext"] = MixedBuildExt
 
-# 2. Process Dynamic Version
-def get_base_version():
-    import re
-    init_path = os.path.join(os.path.dirname(__file__), "python", "eiko", "__init__.py")
-    with open(init_path, "r") as f:
-        match = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]', f.read(), re.M)
-        if match:
-            return match.group(1)
-    return "0.0.0"
-
-base_version = get_base_version()
-full_version = f"{base_version}{local_version}"
-
-# 3. Execute setup
+# ------------------------------------------------------------------------
+# 4. Final Setup Execution
+# ------------------------------------------------------------------------
 setup(
-    version=full_version,
+    version=get_full_version(),
     ext_modules=ext_modules,
     license="BSD-3-Clause",
     cmdclass=cmdclass_dict,
+    # Ensure standard setuptools knows to bundle these files in the final wheel
     package_data={
         "eiko": [
             "src/*.cuh", 
-            "src/bindings/torch_bindings.cu", 
-            "src/bindings/jax_bindings.cu"
+            "src/bindings/*.cu"
         ],
     }
 )

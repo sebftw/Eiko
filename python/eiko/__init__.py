@@ -25,11 +25,6 @@ if BIN_CACHE_DIR not in sys.path:
 if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
     try:
         os.add_dll_directory(BIN_CACHE_DIR)
-        # Also ensure PyTorch's own lib directory is discoverable for c10.dll/torch.dll
-        import torch
-        torch_lib_path = os.path.join(os.path.dirname(torch.__file__), 'lib')
-        if os.path.exists(torch_lib_path):
-            os.add_dll_directory(torch_lib_path)
     except Exception:
         pass
 
@@ -54,8 +49,8 @@ def eiko2d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
         from .eiko_jax import eiko2d as jax_eiko2d
         return jax_eiko2d(u_init, f, v_init, dx, msfm, gated)
     else:
-        import torch
         from .eiko_torch import eiko2d as pt_eiko2d
+        import torch
         return pt_eiko2d(torch.as_tensor(u_init), torch.as_tensor(f), v_init, dx, msfm, gated)
 
 def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
@@ -70,7 +65,8 @@ def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
         return jax_eiko3d(u_init, f, v_init, dx, msfm, gated)
     else:
         from .eiko_torch import eiko3d as pt_eiko3d
-        return pt_eiko3d(u_init, f, v_init, dx, msfm, gated)
+        import torch
+        return pt_eiko3d(torch.as_tensor(u_init), torch.as_tensor(f), v_init, dx, msfm, gated)
 
 # Alias default 2D solver
 eiko = eiko2d

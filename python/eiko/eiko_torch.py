@@ -30,8 +30,21 @@ except ImportError as e:
     ) from e
 
 from torch.utils.cpp_extension import load
-from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
+from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR, cuda_home
 from eiko import SRC_DIR, __version__
+
+# ------------------------------------------------------------------------
+# Windows DLL Registration
+# ------------------------------------------------------------------------
+if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
+    try:
+        os.add_dll_directory(BIN_CACHE_DIR)
+        # Ensure PyTorch's own lib directory is discoverable for c10.dll/torch_python.dll
+        torch_lib_path = os.path.join(os.path.dirname(torch.__file__), 'lib')
+        if os.path.exists(torch_lib_path):
+            os.add_dll_directory(torch_lib_path)
+    except Exception:
+        pass
 
 try:
     # Try loading the AOT compiled version from the pip-installed wheel
@@ -51,9 +64,11 @@ except ImportError:
         is_loaded = False
 
         torch_v = torch.__version__
-        cuda_v = torch.version.cuda or "cpu."
-        if cuda_v != "cpu":
+        cuda_v = torch.version.cuda
+        if cuda_v is not None:
             cuda_v = f"cu{cuda_v.replace('.', '')}"
+        else:
+            cuda_v = "cpu"
 
         if fetch_precompiled_wheel(__version__, torch_v, cuda_v, BIN_CACHE_DIR, target_impl="eiko_torch_impl"):
             # Force Python to rescan sys.path directories, so it sees the new file
@@ -78,8 +93,8 @@ except ImportError:
             sys.stdout.flush()
 
             torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')
-            if not os.environ.get("CUDA_HOME") and os.path.exists("/usr/local/cuda"):
-                os.environ["CUDA_HOME"] = "/usr/local/cuda"
+            if not os.environ.get("CUDA_HOME") and cuda_home:
+                os.environ["CUDA_HOME"] = cuda_home
             
             try:
                 _fim_cuda_impl = load(
