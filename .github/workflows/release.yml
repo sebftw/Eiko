@@ -359,7 +359,7 @@ jobs:
 
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: true
     strategy:
       fail-fast: false
@@ -423,19 +423,6 @@ jobs:
         with:
           python-version: '3.9'
           architecture: 'x64'
-
-      - name: Install MSVC v14.40 Toolset
-        run: |
-          # Dynamically locate the VS 2022 installation path
-          $vsPath = & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -version "[17.0,18.0)" -products * -property installationPath
-          
-          echo "Found Visual Studio 2022 at: $vsPath"
-          
-          # Modify that specific installation
-          & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-            --installPath "$vsPath" `
-            --add Microsoft.VisualStudio.Component.VC.14.40.17.10.x86.x64 `
-            --passive --norestart --wait
             
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
