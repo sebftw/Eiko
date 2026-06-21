@@ -450,9 +450,6 @@ jobs:
           CUDA_HOME: ${{ env.CUDA_PATH }} 
           EIKO_RELEASE_BUILD: "1"
         run: |
-          echo "Using compiler at $env:CUDAHOSTCXX"
-          where cl.exe
-          cl.exe # This will print the MSVC compiler banner showing the target architecture
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
@@ -523,6 +520,9 @@ jobs:
       - name: Build 3.11 Wheel
         env: *build_env
         run: |
+          echo "Using compiler at $env:CUDAHOSTCXX"
+          where cl.exe
+          cl.exe # This will print the MSVC compiler banner showing the target architecture
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
