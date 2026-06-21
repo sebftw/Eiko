@@ -43,7 +43,7 @@ Write-Host "====================================================" -ForegroundCol
 
 Write-Host "`nThis script will install all the requirements for Eiko by performing the following actions:" -ForegroundColor Gray
 Write-Host "  1. Check if your NVIDIA graphics drivers are up to date." -ForegroundColor Gray
-Write-Host "  2. Set up the correct NVIDIA CUDA tools (v12.4.1) for GPU computing." -ForegroundColor Gray
+Write-Host "  2. Set up the correct NVIDIA CUDA tools (v12.8.2) for GPU computing." -ForegroundColor Gray
 Write-Host "  3. Detect which C++ compiler your specific MATLAB version needs." -ForegroundColor Gray
 Write-Host "  4. Download and install the necessary Microsoft C++ Build Tools." -ForegroundColor Gray
 Write-Host "  5. Run a final test in MATLAB to ensure everything is working." -ForegroundColor Gray
@@ -87,8 +87,8 @@ function Refresh-EnvPath {
 # ---------------------------------------------------------
 Write-Host "`n[1/5] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
 
-# CUDA 12.4 requires driver >= 550.52
-$minDriver = 550
+# CUDA 12.8 requires driver >= 570.00
+$minDriver = 570
 $driverValid = $false
 $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
 
@@ -99,7 +99,7 @@ if ($nvidiaSmi) {
         Write-Host "  -> Found active NVIDIA driver: v$driverVer" -ForegroundColor DarkGray
         
         if ($driverVer -lt $minDriver) {
-            Write-Host "  -> Driver is too old for CUDA 12.4 (Requires v$minDriver+)." -ForegroundColor Yellow
+            Write-Host "  -> Driver is too old for CUDA 12.8 (Requires v$minDriver+)." -ForegroundColor Yellow
             $driverValid = $false
         } else {
             $driverValid = $true
@@ -118,19 +118,19 @@ if (-not $driverValid) {
 }
 
 # ---------------------------------------------------------
-# Step 1: Check and Install Targeted CUDA (Pinned to 12.4.1)
+# Step 1: Check and Install Targeted CUDA (Pinned to 12.8.2)
 # ---------------------------------------------------------
-Write-Host "`n[2/5] Checking CUDA installation (Target: 12.4.1)..." -ForegroundColor Cyan
+Write-Host "`n[2/5] Checking CUDA installation (Target: 12.8.2)..." -ForegroundColor Cyan
 
 $installCuda = $true
-$targetCuda = "12.4.1"
+$targetCuda = "12.8.2"
 $cudaCheck = Get-Command nvcc -ErrorAction SilentlyContinue
 
 if ($cudaCheck) {
     $nvccOutput = nvcc --version | Out-String
     if ($nvccOutput -match "release (\d+\.\d+)") {
         $cudaVer = [version]$matches[1]
-        if ($cudaVer -ge [version]"12.4") {
+        if ($cudaVer -ge [version]"12.8") {
             Write-Host "  -> Found CUDA $cudaVer. Skipping installation." -ForegroundColor Yellow
             $installCuda = $false
         }

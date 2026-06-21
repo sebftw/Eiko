@@ -118,14 +118,15 @@ The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that whe
 The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{init}$).
 
 ### Gradient w.r.t. slowness ($f$)
-Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication.
+Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication based on the local wave geometry.
 
-Mathematically, because discrete Eikonal solvers typically use the squared formulation of the equation ($\|\nabla u\|^2 = f^2$), the gradient is extracted via the optimality condition:
+Because discrete Eikonal solvers typically use a squared finite-difference formulation to approximate the PDE (e.g., $\sum (\Delta T)^2 = f^2 \Delta x^2$), the discrete gradient is extracted via the optimality condition:
 
-$$\frac{dL}{df} = \Delta V * \lambda(x) * f(x)$$
+$$\frac{dL}{df} = \tilde{\lambda}(x) * f(x) * \Delta x^2$$
 
 **Where**:
-* $\Delta V$ is the pixel area, so $\Delta V=(\Delta x)^2$ in 2D and $\Delta V=(\Delta x)^3$ in 3D.
+* $\tilde{\lambda}(x)$ is the discrete adjoint variable divided by the geometric normalizer (the time-of-flight difference between nodes).
+* $\Delta x^2$ is the squared grid spacing. Note that this is always squared regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from the Pythagorean approximation of the gradient, not a volumetric integral.
 
 #### In human terms
 If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta V$ to correctly account for the physical size of the grid cells during the discrete integration.

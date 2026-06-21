@@ -148,6 +148,7 @@ classdef TestEiko < matlab.unittest.TestCase
         % ==========================================
         % Snell's Law Test
         % ==========================================
+        %% 
         function test_eiko2d_snells_law(testCase, msfm)
             dim_x = 201;
             dim_y = 201;
@@ -182,8 +183,9 @@ classdef TestEiko < matlab.unittest.TestCase
             
             u_numerical = eiko(u_init, f, dx, 'msfm', msfm);
             
-            u_bottom_analytical = (X .* sin_t2 + (Y - y_int) .* cos_t2) / c2 + ...
-                                  (X .* sin_t1 + y_int .* cos_t1) / c1;
+            %u_bottom_analytical = (X .* sin_t2 + (Y - y_int) .* cos_t2) / c2 + ...
+            %                      (X .* sin_t1 + y_int .* cos_t1) / c1;
+            u_bottom_analytical = (X .* sin_t2 + (Y - y_int) .* cos_t2) / c2 + (y_int .* cos_t1) / c1;
             
             error_map = abs(u_numerical - u_bottom_analytical);
             

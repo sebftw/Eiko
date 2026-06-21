@@ -35,25 +35,19 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics"
 ]
-dependencies = [
-    "torch>=2.0.0",
-    "ninja"
-]
 
 [project.optional-dependencies]
 # Allow additional dependencies to be installed with, e.g., "pip install eiko[jax]".
 # Dependencies required for JAX.
 jax = [
     "jax[cuda12]>=0.4.13",       # Installs the GPU-enabled JAX backend via pip.
-    "jaxlib",
 	"pybind11"
 ]
 jax-local = [
     "jax[cuda12-local]>=0.4.13",  # This is only for HPC users ("modules load cuda/12.0").
-	"jaxlib",
     "pybind11"
 ]
-torch = ["torch>=2.4.0"]
+torch = ["torch>=2.4.0", "ninja"]
 # Dependencies require to run examples.
 examples = [
     "torch>=2.4.0",
@@ -72,7 +66,10 @@ test = [
     "pytest>=7.0.0",
     "pytest-cov",  # Code coverage report.
     "tox>=4.0.0",
-    "vermin"
+    "vermin",
+    "jax[cuda12]>=0.4.13",
+    "pybind11",
+    "torch>=2.4.0"
 ]
 
 [project.urls]

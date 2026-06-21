@@ -10,8 +10,6 @@ function success = bootstrap(package_version, full_mex_path)
     %
     % Returns: true if binary is ready/downloaded, false if compilation fallback is needed.
 
-
-    
     success = false;
     
     % Strip the extension if the user provided one, so we have the raw base name
@@ -25,8 +23,6 @@ function success = bootstrap(package_version, full_mex_path)
         success = true;
         return;
     end
-
-    fprintf('[Eiko] Downloading precompiled CUDA kernels... (This may take a minute)\n');
 
     %% 1. Load Local Registry
     script_dir = fileparts(mfilename('fullpath'));
@@ -77,6 +73,8 @@ function success = bootstrap(package_version, full_mex_path)
         fprintf('[Eiko] No precompiled binaries match OS: %s. Falling back to compilation.\n', os_name);
         return;
     end
+
+    fprintf('[Eiko] Downloading precompiled CUDA kernels... (This may take a few seconds)\n');
 
     %% 3. Multiprocessing & Context-Safe Atomic Download
     zip_url = matched_build.url;

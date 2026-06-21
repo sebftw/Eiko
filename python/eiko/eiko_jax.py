@@ -1,13 +1,24 @@
 import os
 import sys
+import math
+import struct
+import shutil
+import sysconfig
 import subprocess
 from functools import partial
+
+link_emoji = ""  # Fallback for older Windows terminals/CP1252
+try:
+    "\U0001f517".encode(sys.stdout.encoding or "utf-8")
+    link_emoji = "\U0001f517"
+except UnicodeEncodeError:
+    pass
 
 try:
     import jax
     import pybind11
     import jaxlib
-
+    
     # Immediately trap CPU-only installations or missing GPU hardware
     if jax.default_backend() == "cpu":
         raise RuntimeError(
@@ -18,18 +29,20 @@ try:
             "Eiko strictly requires a GPU-enabled version of JAX to run.\n\n"
             "HOW TO FIX:\n"
             "1. If you have the CPU-only version, uninstall it first:\n"
-            "   👉 pip uninstall jax jaxlib\n"
+            f"   {link_emoji} pip uninstall jax jaxlib\n"
             "2. Install the CUDA-enabled version of JAX (e.g., for CUDA 12):\n"
-            "   👉 pip install -U \"jax[cuda12]\"\n"
+            f"   {link_emoji} pip install -U \"jax[cuda12]\"\n"
             "3. Ensure your NVIDIA drivers are correctly installed and visible to Python.\n\n"
             "For full installation details, visit:\n"
             "https://jax.readthedocs.io/en/latest/installation.html\n"
             + "="*75 + "\n"
         )
 except ImportError as e:
+    missing_pkg = getattr(e, 'name', 'a required dependency')
     raise ImportError(
-        f"\n[Eiko] JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
-        f" Please install via: pip install \"eiko[jax]\"\n"
+        f"\n[Eiko] ERROR: Failed to import '{missing_pkg}'.\n"
+        f"JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
+        f"Please install via: pip install \"eiko[jax]\"\n"
     ) from e
 
 import jax.numpy as jnp
@@ -45,148 +58,73 @@ try:
 except ImportError:
     from jax.lib import xla_client
 
-# 1. Import our centralized configuration
-from eiko.build_config import CXX_ARGS, NVCC_ARGS, EXTRA_INCLUDE_PATHS, BIN_CACHE_DIR
+# Import ONLY the centralized execution and diagnostic machinery
+from eiko.build_config import (
+    BIN_CACHE_DIR, 
+    compile_raw_nvcc_shared_lib, 
+    get_jax_includes, 
+    diagnose_build_failure
+)
 from eiko import SRC_DIR, __version__
 
 try:
-    # --------------------------------------------------------------------
-    # 2. The Fastest Path (Cached Import)
-    # (sys.path is already handled by __init__.py)
-    # --------------------------------------------------------------------
-    import eiko_jax_impl as _fim_jax_impl
-
+    # 1. Try loading the AOT compiled version from the pip-installed wheel
+    from eiko import eiko_jax_impl as _fim_jax_impl
 except ImportError:
-    ext = ".pyd" if sys.platform == "win32" else ".so"
-
-    # Ensure the shared cache directory exists
-    os.makedirs(BIN_CACHE_DIR, exist_ok=True)
-    
-    # --------------------------------------------------------------------
-    # 3. Runtime Download Fallback
-    # --------------------------------------------------------------------
-    from eiko.bootstrap import fetch_precompiled_wheel
-    is_loaded = False
-
-    # Download into BIN_CACHE_DIR so both backends share the same folder
-    if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
-        try:
-            import eiko_jax_impl as _fim_jax_impl
-            is_loaded = True
-        except ImportError as e:
-            print(f"[Eiko] Downloaded JAX binary failed to load natively ({e}).")
-            print(f"[Eiko] Falling back to local compilation.")
-
-    # --------------------------------------------------------------------
-    # 4. Pure JIT Compilation Fallback via NVCC
-    # --------------------------------------------------------------------
-    if not is_loaded:
-        print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc... (This might take a minute)")
-        sys.stdout.flush()
-
-        import sysconfig
-        import uuid # Added for atomic naming
-        import platform
-        import subprocess
+    try:
+        # 2. Try loading the JIT compiled version from the user's cache dir
+        import eiko_jax_impl as _fim_jax_impl
+    except ImportError:
+        os.makedirs(BIN_CACHE_DIR, exist_ok=True)
         
-        jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
+        # --------------------------------------------------------------------
+        # 3. Runtime Download Fallback
+        # --------------------------------------------------------------------
+        from eiko.bootstrap import fetch_precompiled_wheel
+        is_loaded = False
         
-        # FIX: Changed build_dir to BIN_CACHE_DIR
-        final_output_lib = os.path.join(BIN_CACHE_DIR, f"eiko_jax_impl{ext}")
-        tmp_suffix = f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
-        tmp_output_lib = final_output_lib + tmp_suffix
-        
-        includes = EXTRA_INCLUDE_PATHS + [pybind11.get_include(), sysconfig.get_path("include")]
-        include_flags = [f"-I{path}" for path in includes if os.path.exists(path)]
-        
-        # Point nvcc output directly to the temporary file
-        cmd = ["nvcc", "-shared", "-std=c++17", jax_source, "-o", tmp_output_lib]
-        cmd += NVCC_ARGS
-        cmd += [f"-Xcompiler={arg}" for arg in CXX_ARGS]
-        cmd += include_flags
-
-        try:
-            # Compile atomically to the unique temp file
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            
-            # Atomically swap it into the active path
-            os.replace(tmp_output_lib, final_output_lib)
-            
-            # Flush Python's directory and import caches
-            import importlib
-            importlib.invalidate_caches()
-            
-            import eiko_jax_impl as _fim_jax_impl
-            print("[Eiko] Compilation complete. JAX bindings are ready! :)")
-            
-        except Exception as e:
-            # Clean up the temporary file if compilation crashed
-            if os.path.exists(tmp_output_lib):
-                os.remove(tmp_output_lib)
-                
-            # Extract output depending on whether the process failed to start or failed to compile
-            if isinstance(e, subprocess.CalledProcessError):
-                error_msg = e.stderr.decode('utf-8', errors='replace').lower()
-                raw_error = e.stderr.decode('utf-8', errors='replace')
-            else:
-                error_msg = str(e).lower()
-                raw_error = str(e)
-
-            # System diagnostics for the GitHub template
-            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-            os_name = platform.system()
+        if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
             try:
-                import jax
-                j_ver = jax.__version__
-            except ImportError:
-                j_ver = "unknown"
-                
-            print("\n" + "="*75)
-            print("[Eiko] FATAL ERROR: Local C++/CUDA compilation for JAX failed.")
-            print("="*75)
-            print("1. We could not find a compatible precompiled wheel for your exact system.")
-            print("2. We attempted to compile the JAX extension via nvcc, but it failed.\n")
+                import eiko_jax_impl as _fim_jax_impl
+                is_loaded = True
+            except ImportError as e:
+                print(f"[Eiko] Downloaded JAX binary failed to load natively ({e}).")
+                print(f"[Eiko] Falling back to local compilation.")
+
+        # --------------------------------------------------------------------
+        # 4. Pure JIT Compilation Fallback via NVCC
+        # --------------------------------------------------------------------
+        if not is_loaded:
+            print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc... (This might take a minute)")
+            sys.stdout.flush()
+
+            jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
             
-            # --- DIAGNOSIS ROUTINES ---
-            # 1. NVCC Missing (Caught via FileNotFoundError usually)
-            if isinstance(e, FileNotFoundError) or "nvcc" in error_msg:
-                print("DIAGNOSIS: The NVIDIA CUDA Toolkit compiler ('nvcc') was not found.")
-                print("FIX: Ensure the CUDA Toolkit is installed and 'nvcc' is in your system PATH.")
-                print("🔗 Download CUDA: https://developer.nvidia.com/cuda-downloads")
-                
-            # 2. MSVC Missing (Windows)
-            elif sys.platform == "win32" and ("cl.exe" in error_msg or "compiler" in error_msg):
-                print("DIAGNOSIS: Microsoft Visual Studio C++ compiler ('cl.exe') was not found by nvcc.")
-                print("FIX: 1) Install the 'Desktop development with C++' workload via the Visual Studio Installer.")
-                print("     2) Ensure you run Python inside the 'x64 Native Tools Command Prompt for VS'.")
+            ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
+            if not ext_suffix:
+                ext_suffix = ".pyd" if os.name == "nt" else ".so"
             
-            # 3. GCC/G++ Missing (Linux)
-            elif sys.platform != "win32" and ("g++" in error_msg or "gcc" in error_msg or "c++" in error_msg):
-                print("DIAGNOSIS: A C++ host compiler (like GCC or G++) was not found by nvcc.")
-                print("FIX: Install build tools on your system (e.g., run 'sudo apt install build-essential').")
+            final_output_lib = os.path.join(BIN_CACHE_DIR, f"eiko_jax_impl{ext_suffix}")
+
+            try:
+                # Trigger the centralized compilation logic with atomic JIT swapping enabled
+                compile_raw_nvcc_shared_lib(
+                    src_file=jax_source, 
+                    output_path=final_output_lib, 
+                    include_dirs=get_jax_includes(),
+                    is_jit=True
+                )
                 
-            # 4. Generic Compilation Failure
-            else:
-                print("COMPILER OUTPUT:")
-                print(raw_error)
+                # Flush Python's directory and import caches
+                import importlib
+                importlib.invalidate_caches()
                 
-            # --- GITHUB ISSUE TEMPLATE ---
-            py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-            os_name = platform.system()
-            j_ver = jax.__version__
-            print("\n" + "-"*75)
-            print("STILL STUCK? REQUEST A PRECOMPILED WHEEL:")
-            print("Open an issue here: 🔗 https://github.com/sebftw/Eiko/issues")
-            print("Please copy and paste the following system information into your issue description:\n")
-            print("```text")
-            print(f"OS:      {os_name}")
-            print(f"Python:  {py_ver}")
-            print(f"JAX:     {j_ver}")
-            print("```")
-            print("="*75 + "\n")
-            
-            # Suppress the massive traceback and raise a clean error
-            raise RuntimeError("Eiko JAX initialization failed due to missing C++ build tools.") from None
+                import eiko_jax_impl as _fim_jax_impl
+                print("[Eiko] Compilation complete. JAX bindings are ready! :)")
+                
+            except Exception as e:
+                # One single line routes the entire diagnostic breakdown and issue template!
+                diagnose_build_failure(e, framework="JAX", framework_version=jax.__version__)
 
 # ------------------------------------------------------------------------
 # 5. XLA Custom Call Registration
@@ -197,6 +135,16 @@ for name, target in _fim_jax_impl.registrations().items():
 # =========================================================
 # 1. JAX PRIMITIVE DEFINITION & MLIR LOWERING
 # =========================================================
+class _OpWrapper:
+    """A lightweight wrapper to make legacy JAX helper outputs 
+    quack like a modern MLIR Operation node."""
+    def __init__(self, results):
+        self._results = results
+
+    @property
+    def results(self):
+        return self._results
+
 _fim_prim = core.Primitive("jax_fim_solve")
 _fim_prim.multiple_results = False
 _fim_prim.def_impl(partial(xla.apply_primitive, _fim_prim))
@@ -211,41 +159,49 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     """
     A custom call builder that checks for legacy wrappers 
     and falls back to raw MLIR node generation for modern JAX.
+    Maintains a uniform return type containing a `.results` attribute.
     """
     # 1. Try mid-era JAX wrapper (JAX >= 0.4.15 and < 0.4.30)
     try:
         from jaxlib.hlo_helpers import custom_call
-        return custom_call(
+        res = custom_call(
             call_target_name,
-            result_types=result_types,
+            out_types=result_types,
             operands=operands,
             operand_layouts=operand_layouts,
             result_layouts=result_layouts,
             backend_config=backend_config
         )
+        return res if hasattr(res, "results") else _OpWrapper(res)
     except ImportError:
         pass
         
     # 2. Try legacy JAX wrapper (JAX < 0.4.15)
     try:
         from jax.interpreters.mlir import custom_call
-        return custom_call(
+        res = custom_call(
             call_target_name,
-            result_types=result_types,
+            out_types=result_types,
             operands=operands,
             operand_layouts=operand_layouts,
             result_layouts=result_layouts,
             backend_config=backend_config
         )
+        return res if hasattr(res, "results") else _OpWrapper(res)
     except (ImportError, AttributeError):
         pass
         
     # 3. Modern JAX (>= 0.4.30) where helpers are completely removed.
     import jaxlib.mlir.ir as ir
+    
+    # EDGE CASE 2: Handle StableHLO migration
     try:
-        from jaxlib.mlir.dialects import mhlo as hlo
+        from jaxlib.mlir.dialects import stablehlo as hlo
     except ImportError:
-        from jaxlib.mlir.dialects import hlo
+        try:
+            from jaxlib.mlir.dialects import mhlo as hlo
+        except ImportError:
+            from jaxlib.mlir.dialects import hlo
 
     def _layout_attr(layouts):
         if layouts is None: 
@@ -254,17 +210,10 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
         attr_list = []
         for layout in layouts:
             arr = np.array(layout, dtype=np.int64)
-            
-            # Define the element type as MLIR's 'index' type.
             index_type = ir.IndexType.get()
-            
-            # Define the 1D tensor shape explicitly using the index type.
             tensor_type = ir.RankedTensorType.get(arr.shape, index_type)
-            
-            # Create the attribute with the enforced tensor type.
             attr = ir.DenseIntElementsAttr.get(arr, type=tensor_type)
             attr_list.append(attr)
-            
         return ir.ArrayAttr.get(attr_list)
 
     kwargs = {
@@ -274,7 +223,10 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
         "called_computations": ir.ArrayAttr.get([]),
     }
     
+    # EDGE CASE 3: Handle bytes in backend_config
     if backend_config is not None:
+        if isinstance(backend_config, bytes):
+            backend_config = backend_config.decode("utf-8")
         kwargs["backend_config"] = ir.StringAttr.get(backend_config)
 
     if operand_layouts is not None:
@@ -283,6 +235,7 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     if result_layouts is not None:
         kwargs["result_layouts"] = _layout_attr(result_layouts)
 
+    # Return the raw operation node so the caller can unpack it
     return hlo.CustomCallOp(result_types, operands, **kwargs)
 
 # MLIR lowering rule: The bridge between JAX's Python graph and XLA C++.
@@ -318,12 +271,28 @@ def _fim_batch_rule(batched_args, batch_dims, *, opaque_data, out_shape, out_dty
     # Unpack original configuration.
     unpacked = list(struct.unpack('=iiiifiiiiiii', opaque_data))
     
-    # Find the new batch size. batched_args[0] is u_init.
+    # batched_args[0] is u_init, batched_args[1] is f
+    u_init_arg = batched_args[0]
+    f_arg = batched_args[1]
+    
     bdim = batch_dims[0] if batch_dims[0] is not None else 0
-    new_batch_axis_size = batched_args[0].shape[bdim]
+    new_batch_axis_size = u_init_arg.shape[bdim]
     
     # Update the batch_size (index 3 in our struct)
     unpacked[3] = unpacked[3] * new_batch_axis_size
+    
+    # Dynamically recalculate broadcast_f (index 9)
+    # The new u_init will have new_out_shape, which is 1 dimension higher.
+    new_u_ndim = len(out_shape) + 1  
+    
+    if f_arg.ndim == new_u_ndim - 1:
+        new_broadcast_f = 1
+    else:
+        new_broadcast_f = int(f_arg.shape[0] == 1 and unpacked[3] > 1)
+        
+    unpacked[9] = new_broadcast_f
+    
+    # Pack the updated config
     new_opaque_data = struct.pack('=iiiifiiiiiii', *unpacked)
     
     # Push the batch dimension to axis 0 for all batched arguments.
@@ -341,9 +310,9 @@ def _fim_batch_rule(batched_args, batch_dims, *, opaque_data, out_shape, out_dty
         out_shape=new_out_shape, 
         out_dtype=out_dtype
     )
-    
     # Tell JAX that the batched dimension of the output is at axis 0.
     return out, 0
+
 
 batching.primitive_batchers[_fim_prim] = _fim_batch_rule
 
@@ -365,18 +334,25 @@ def _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward, tof=No
     if is_backward and has_tof:
         tof = jnp.asarray(tof)
         operands.append(tof)
-
-    batch_size = u_init.shape[0]
+    
+    # Calculate the flattened batch size using math.prod
     if is_3d:
         depth, height, width = u_init.shape[-3:]
+        # Multiplies all dimensions before the last 3. If empty, math.prod returns 1.
+        batch_size = math.prod(u_init.shape[:-3]) 
     else:
         depth = 1
         height, width = u_init.shape[-2:]
+        # Multiplies all dimensions before the last 2. If empty, math.prod returns 1.
+        batch_size = math.prod(u_init.shape[:-2])
     
+    # Check broadcasting against the flattened batch logic
     if f.ndim == u_init.ndim - 1:
         broadcast_f = True
     else:
-        broadcast_f = (f.shape[0] == 1 and batch_size > 1)
+        # If f has leading dimensions, calculate its flattened batch size too
+        f_batch_size = math.prod(f.shape[:-3]) if is_3d else math.prod(f.shape[:-2])
+        broadcast_f = (f_batch_size == 1 and batch_size > 1)
     
     opaque_data = struct.pack(
         '=iiiifiiiiiii', 

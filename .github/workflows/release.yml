@@ -20,11 +20,12 @@ jobs:
           # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
-          # - { torch: '2.4.0', cuda: '12.1.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
+          # - { torch: '2.4.0', cuda: '12.4.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
           # - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
-          # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }
+          - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }  # Legacy support version
 
           # --- Next-Gen Tier (CUDA 13+) ---
+          # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
           # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
@@ -135,13 +136,16 @@ jobs:
           curl -sS $PIP_URL -o get-pip.py
           python${{ matrix.python_version }} get-pip.py
 
-      - name: Format CUDA version for PyTorch
+      - name: Format CUDA version for PyTorch & JAX
         id: format-cuda
         run: |
           CUDA_SHORT=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
+          
+          CUDA_MAJOR=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1)
+          echo "cuda_major=$CUDA_MAJOR" >> $GITHUB_ENV
 
-      - name: Determine Target manylinux Platform
+      - name: Determine Target Manylinux Platform
         id: set-plat
         run: |
           if [ "${{ matrix.platform.os_version }}" = "20.04" ]; then
@@ -154,8 +158,11 @@ jobs:
             echo "PLAT=linux_x86_64" >> $GITHUB_ENV # Fallback
           fi
       
-      # Straightforward compilation step (No bash loops, no mid-job cleanup required)
-      - name: Compile Wheel
+      # ==========================================
+      # BUILD PATH A: STANDARD
+      # ==========================================
+      - name: Compile Wheel (Standard)
+        if: ${{ !(matrix.platform.os_version == '20.04' && matrix.python_version == '3.8') }}
         env:
           FORCE_CUDA: "1"
           TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX" 
@@ -166,20 +173,77 @@ jobs:
           PIP_NO_CACHE_DIR: "1"
           PIP_BREAK_SYSTEM_PACKAGES: 1
         run: |
-          echo "Building for Python ${{ matrix.python_version }}..."
+          echo "Building for Python ${{ matrix.python_version }} (CUDA Major: ${{ env.cuda_major }})..."
           
           python${{ matrix.python_version }} -m pip install --upgrade pip
-          python${{ matrix.python_version }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja auditwheel "patchelf>=0.14"
+          python${{ matrix.python_version }} -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
           
-          # Install PyTorch from the explicit wheel index, along with JAX
-          python${{ matrix.python_version }} -m pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          python${{ matrix.python_version }} -m pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python${{ matrix.python_version }} -m pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          python${{ matrix.python_version }} -m pip install jax pybind11
+          # python${{ matrix.python_version }} -m pip install pip install "jax" "pybind11>=2.12.0"# "jax[cuda${{ env.cuda_major }}]" pybind11
           
-          # Build the wheel 
+          # Outputs raw wheel directly to dist/
           python${{ matrix.python_version }} -m build --wheel --no-isolation
 
-          # Repair the wheel for cross-distro compatibility (excluding PyTorch binaries)
-          echo "Repairing wheel with auditwheel..."
+      # ==========================================
+      # BUILD PATH B: EDGE CASE (20.04 + Py 3.8)
+      # ==========================================
+      - name: Compile Wheels (Isolated venv & Merge)
+        if: ${{ matrix.platform.os_version == '20.04' && matrix.python_version == '3.8' }}
+        env:
+          FORCE_CUDA: "1"
+          TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX" 
+          MAX_JOBS: 2
+          EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
+          PIP_ROOT_USER_ACTION: "ignore"
+          EIKO_RELEASE_BUILD: "1"
+          PIP_NO_CACHE_DIR: "1"
+        run: |
+          echo "Handling PyTorch/JAX collision. Building separately and merging..."
+          
+          # 1. BUILD PYTORCH WHEEL
+          python${{ matrix.python_version }} -m venv /tmp/venv_pt
+          export PATH="/tmp/venv_pt/bin:$PATH"
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja pybind11
+          python -m pip install "typing-extensions>=4.8.0,<4.9.0" torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          python -m build --wheel --no-isolation --outdir /tmp/wheel_pt
+          
+          # 2. BUILD JAX WHEEL
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" 
+          python${{ matrix.python_version }} -m venv /tmp/venv_jax
+          export PATH="/tmp/venv_jax/bin:$PATH"
+          python -m pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja pybind11
+          python -m pip install "jax==0.4.13" "jaxlib==0.4.13+cuda12.cudnn89" "nvidia-cudnn-cu12~=8.9.0" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          python -m build --wheel --no-isolation --outdir /tmp/wheel_jax
+          
+          # 3. MERGE BINARIES
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          python${{ matrix.python_version }} -m pip install wheel
+          
+          mkdir -p /tmp/merge_area/pt /tmp/merge_area/jax
+          python${{ matrix.python_version }} -m wheel unpack /tmp/wheel_pt/*.whl -d /tmp/merge_area/pt
+          python${{ matrix.python_version }} -m wheel unpack /tmp/wheel_jax/*.whl -d /tmp/merge_area/jax
+          
+          WHEEL_DIR=$(ls /tmp/merge_area/pt)
+          cp -n /tmp/merge_area/jax/$WHEEL_DIR/eiko/*.so /tmp/merge_area/pt/$WHEEL_DIR/eiko/ || true
+          
+          # Outputs raw merged wheel directly to dist/
+          mkdir -p dist
+          python${{ matrix.python_version }} -m wheel pack /tmp/merge_area/pt/$WHEEL_DIR -d dist/
+
+      # ==========================================
+      # SHARED POST-PROCESSING
+      # ==========================================
+      - name: Repair and Verify Wheel
+        env:
+          # Bypasses PEP 668 inside the container environment
+          PIP_BREAK_SYSTEM_PACKAGES: "1"
+          PIP_ROOT_USER_ACTION: "ignore"
+        run: |
+          echo "Guaranteeing global repair dependencies..."
+          python${{ matrix.python_version }} -m pip install auditwheel "patchelf>=0.14" wheel
+
+          echo "Repairing wheel with dynamic SONAME auditwheel..."
           python${{ matrix.python_version }} -m auditwheel repair dist/*.whl \
             --plat $PLAT \
             --exclude libtorch.so \
@@ -191,6 +255,8 @@ jobs:
             --exclude libbackend_with_compiler.so \
             --exclude libjitbackend_test.so \
             --exclude libcudart.so \
+            --exclude libcudart.so.${{ env.cuda_major }} \
+            --exclude libcudart.so.${{ env.cuda_major }}.0 \
             --exclude libcudart.so.11.0 \
             --exclude libcudart.so.12 \
             --exclude libcudart.so.12.0 \
@@ -201,40 +267,35 @@ jobs:
             --exclude libjax_cuda_plugin.so \
             --exclude libjax_cuda_pjrt.so \
             --exclude libnvrtc.so \
+            --exclude libnvrtc.so.${{ env.cuda_major }} \
             --exclude libnvidia-ml.so \
             --exclude libnccl.so \
             --exclude libgomp.so.1 \
             --exclude libcublas.so \
+            --exclude libcublas.so.${{ env.cuda_major }} \
             --exclude libcublasLt.so \
+            --exclude libcublasLt.so.${{ env.cuda_major }} \
             -w repaired_dist/
 
-          # Safely rewrite the tags to ONLY use the requested $PLAT
           echo "Stripping redundant platform tags..."
           cd repaired_dist
           python${{ matrix.python_version }} -m wheel tags --platform-tag $PLAT *.whl --remove
           cd ..
           
-          # Replace original wheel with the repaired many-linux wheel
           rm dist/*.whl
           mv repaired_dist/*.whl dist/
 
-          # --- VERIFICATION STEP ---
-          echo "Verifying Wheel Contents..."          
-          
-          # List files and look for the vendored .libs directory auditwheel creates
+          echo "Verifying Hermetic Wheel Contents..."          
           WHEEL_FILES=$(unzip -l dist/*.whl)
-          echo "$WHEEL_FILES"
           
-          # Check if any forbidden libraries leaked into the wheel
           if echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)" > /dev/null; then
-            echo "ERROR: Auditwheel accidentally bundled PyTorch/JAX or CUDA libraries!"
+            echo "ERROR: Auditwheel accidentally bundled forbidden runtimes!"
             echo "$WHEEL_FILES" | grep -E "eiko\.libs/(lib(torch|c10|cuda|jax|nvrtc|nvidia|nccl|gomp|cublas)|_xla|xla_)"
             exit 1
           else
-            echo "Success: No heavy external runtimes were bundled inside the wheel."
-          fi          
-      
-      # 5. Upload artifacts (Ensure names are unique per Python version)
+            echo "Success: Hermetic build passed."
+          fi
+
       - name: Upload Wheel Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -243,14 +304,14 @@ jobs:
 
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    runs-on: windows-latest
+    runs-on: windows-2022
     if: true
     strategy:
       fail-fast: false
       matrix:
         platform:
           # --- Legacy Baseline (Broad Hardware Support) ---
-          # - { torch: '2.4.0', cuda: '12.1.1' }
+          - { torch: '2.4.0', cuda: '12.4.1' }
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
@@ -258,8 +319,9 @@ jobs:
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
-          - { torch: '2.12.0', cuda: '12.6.0' }
+          # - { torch: '2.12.0', cuda: '12.6.0' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
+          - { torch: '2.12.0', cuda: '13.0.0' }
           # - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
@@ -267,11 +329,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}
-
-      - name: Set up MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
 
       - name: Install CUDA Toolkit
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -290,19 +347,21 @@ jobs:
           CUDA_SHORT=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1,2 | tr -d '.')
           echo "cu_version=cu$CUDA_SHORT" >> $GITHUB_ENV
 
+          # Extract Major Version for JAX (e.g., '12' or '13')
+          CUDA_MAJOR=$(echo ${{ matrix.platform.cuda }} | cut -d'.' -f1)
+          echo "cuda_major=$CUDA_MAJOR" >> $GITHUB_ENV
+
           # Set CUDA PATHs
           echo "CUDA_HOME=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
           echo "CUDA_PATH=${{ steps.cuda-toolkit.outputs.CUDA_PATH }}" >> $GITHUB_ENV
           echo "${{ steps.cuda-toolkit.outputs.CUDA_PATH }}/bin" >> $GITHUB_PATH
           
-
       - name: Verify CUDA_HOME
         run: |
           echo "The CUDA_HOME variable is currently set to: $env:CUDA_HOME"
           echo "Testing if nvcc is accessible:"
           nvcc --version
 
-      
       # ==========================================
       # PYTHON 3.9 BUILD
       # Excluded for PyTorch 2.10+ (Requires 3.10+)
@@ -312,13 +371,27 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
-
+          architecture: 'x64'
+            
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+          toolset: '14.4' # Forces a CUDA 12.6-compatible compiler version
+          vsversion: '2022' # Forces it to look in VS 2022 instead of VS 2019
+          
       # --- PYTHON 3.9 BUILD ---
       - name: Build 3.9 Wheel
         if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         env: &build_env
-          DISTUTILS_USE_SDK: "1" 
-          FORCE_CUDA: "1"        
+          DISTUTILS_USE_SDK: "1"
+          MSSdk: "1"
+          # Force 64-bit targeting for setuptools/distutils
+          TARGET_ARCH: "x64"
+          VSCMD_ARG_TGT_ARCH: "x64"
+          PYTHONUTF8: "1"
+          CUDAHOSTCXX: "${{ env.VCINSTALLDIR }}Tools/MSVC/${{ env.VCToolsVersion }}/bin/Hostx64/x64/cl.exe"
+          FORCE_CUDA: "1"
           TORCH_CUDA_ARCH_LIST: "6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0;12.0+PTX"
           MAX_JOBS: 2
           EIKO_LOCAL_VERSION: "+pt${{ matrix.platform.torch }}${{ env.cu_version }}"
@@ -328,8 +401,11 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          # pip install "jax[cuda${{ env.cuda_major }}]" "numpy<2.0.0" "pybind11<2.12.0"
+          pip install jax "numpy<2.0.0" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -356,6 +432,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          architecture: 'x64'
           
       - name: Build 3.10 Wheel
         # CHANGE: Uncommented the condition below to align with setup inclusion rules
@@ -364,8 +441,10 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          pip install "jax" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -390,14 +469,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          architecture: 'x64'
           
       - name: Build 3.11 Wheel
         env: *build_env
         run: |
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -419,14 +502,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          architecture: 'x64'
           
       - name: Build 3.12 Wheel
         env: *build_env
         run: |
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -452,6 +539,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          architecture: 'x64'
           
       - name: Build 3.13 Wheel
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
@@ -460,8 +548,11 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
-          pip install torch==${{ matrix.platform.torch }} torchvision --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
-          pip install jax jaxlib pybind11 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
           python -m build --wheel --no-isolation
           pip uninstall torch jax -y
 
@@ -529,7 +620,7 @@ jobs:
   # ==========================================
   build_matlab_linux:
     name: MATLAB Build (Linux, CUDA 12.8)
-    if: true
+    if: false
     runs-on: ubuntu-22.04
     container:
       # Use the devel image so it includes nvcc and the compiler toolchain
@@ -549,14 +640,14 @@ jobs:
           apt-get install -y gcc-10 g++-10
 
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
           release: 'R2021a'
           products: >
             Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
-        uses: matlab-actions/run-command@v2
+        uses: matlab-actions/run-command@v3
         env:
           # Inside the NVIDIA container, nvcc is reliably located here:
           MW_NVCC_PATH: /usr/local/cuda/bin/nvcc
@@ -577,12 +668,14 @@ jobs:
   build_matlab_windows:
     name: MATLAB Build (Windows, CUDA 12.8)
     runs-on: windows-latest
+    if: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       #- name: Install Visual Studio 2019 Build Tools
       #  run: choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --norestart" -y
+      
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
         with:
@@ -598,14 +691,15 @@ jobs:
           sub-packages: '["nvcc", "cudart", "thrust"]'
       
       - name: Set up MATLAB
-        uses: matlab-actions/setup-matlab@v2
+        uses: matlab-actions/setup-matlab@v3
         with:
-          release: 'R2021b'
+          release: 'R2021a'
+          cache: true
           products: >
             Parallel_Computing_Toolbox
 
       - name: Run MATLAB Setup Script
-        uses: matlab-actions/run-command@v2
+        uses: matlab-actions/run-command@v3
         env:
           MW_NVCC_PATH: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}\bin\nvcc.exe
           CUDA_HOME: ${{ steps.cuda-toolkit.outputs.CUDA_PATH }}
@@ -633,28 +727,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      # Download both Linux and Windows artifacts directly into the eiko directory
-      # This injects the compiled binaries alongside the source .m files
+      # Download MEX binaries to a TEMPORARY folder, NOT inside the eiko source tree
       - name: Download Linux MEX
         uses: actions/download-artifact@v4
         with:
           name: eiko-linux-mex
-          path: matlab/eiko/+eiko_lib/
+          path: temp_binaries/
           
       - name: Download Windows MEX
         uses: actions/download-artifact@v4
         with:
           name: eiko-windows-mex
-          path: matlab/eiko/+eiko_lib/
+          path: temp_binaries/
 
-      - name: Create Release Zip
+      - name: Create Pure Source Release Zip
         run: |
+          # Copy the C++ source code into the MATLAB package structure
+          # This ensures setup() has the files it needs to compile locally
+          cp -r src matlab/eiko/+eiko_lib/
+
+          cp temp_binaries/*_R2021a.mexw64 matlab/eiko/+eiko_lib/mex_bindings.mexw64
+          cp temp_binaries/*_R2021a.mexa64 matlab/eiko/+eiko_lib/mex_bindings.mexa64
+          
           cd matlab
-          # Zip the 'eiko' folder so when a user extracts it, they get a single directory
-          zip -r eiko_matlab_release.zip eiko/
+          zip -r eiko_matlab.zip eiko/
           
       - name: Upload Final ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
           name: eiko-matlab-release
-          path: matlab/eiko_matlab_release.zip
+          path: matlab/eiko_matlab.zip
