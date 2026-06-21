@@ -8,7 +8,7 @@ import tempfile
 # ---------------------------------------------------------
 # This acts as the single source of truth for the package version.
 # It is placed at the very top so internal submodules can safely import it.
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 
 # ---------------------------------------------------------
 # PATH & ENVIRONMENT INITIALIZATION
