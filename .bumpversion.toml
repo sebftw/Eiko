@@ -2,24 +2,25 @@
 current_version = "0.8.5"
 commit = true
 tag = false # Let GitHub Actions handle tagging or do it manually later
+ignore_missing_version = true
 
 [[tool.bumpversion.files]]
-file = "python/eiko/__init__.py"
+filename = "python/eiko/__init__.py"
 search = "__version__ = '{current_version}'"
 replace = "__version__ = '{new_version}'"
 
 [[tool.bumpversion.files]]
-file = "CITATION.cff"
+filename = "CITATION.cff"
 search = "version: {current_version}"
 replace = "version: {new_version}"
 
 [[tool.bumpversion.files]]
-file = "CITATION.cff"
+filename = "CITATION.cff"
 regex = true
 search = 'date-released: \d{4}-\d{2}-\d{2}'
 replace = "date-released: {now:%Y-%m-%d}"
 
 [[tool.bumpversion.files]]
-file = "matlab/eiko/+eiko_lib/setup.m"
+filename = "matlab/eiko/+eiko_lib/setup.m"
 search = "EIKO_VERSION = '{current_version}'"
 replace = "EIKO_VERSION = '{new_version}'"
