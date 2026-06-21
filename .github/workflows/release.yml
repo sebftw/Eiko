@@ -428,7 +428,6 @@ jobs:
         run: |
           # Use VSLocator / vswhere or the VS Installer CLI to add the VS 2022 build tools component
           & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify `
-           --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" `
            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
            --passive --norestart --includeRecommended
             
