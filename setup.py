@@ -115,7 +115,7 @@ if IS_RELEASE_BUILD:
                     except ImportError:
                         pass
                     diagnose_build_failure(e, framework="JAX (AOT Wheel Build)", framework_version=jax_ver)
-            else:
+            elif ext.name == "eiko.eiko_torch_impl":
                 try:
                     # Fall back to PyTorch's standard build logic for the torch extension
                     super().build_extension(ext)
