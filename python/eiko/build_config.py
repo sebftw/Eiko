@@ -212,7 +212,7 @@ else:
         abi_val = "0"
 
     CXX_ARGS.extend([f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-fPIC', '-fvisibility=hidden'])
-    NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC'])
+    NVCC_ARGS.extend(['-Xcompiler', f'-D_GLIBCXX_USE_CXX11_ABI={abi_val}', '-Xcompiler', '-fPIC', '-Xcompiler', '-Wno-deprecated-declarations'])
 
 if IS_RELEASE_BUILD:
     NVCC_ARGS.append('-arch=all-major')
