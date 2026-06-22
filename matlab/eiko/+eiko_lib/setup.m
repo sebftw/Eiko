@@ -13,7 +13,7 @@ function ver_out = setup(build_type)
         build_type = validatestring(lower(build_type), {'native', 'release', 'version'});
     end
     
-    EIKO_VERSION = '0.8.3';
+    EIKO_VERSION = '0.8.4';
     
     if strcmpi(build_type, 'version')
         ver_out = EIKO_VERSION;
