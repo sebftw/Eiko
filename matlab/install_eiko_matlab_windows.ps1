@@ -322,7 +322,7 @@ Write-Host " EIKO ENVIRONMENT INSTALLED SUCCESSFULLY" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
 Write-Host "`n[!] How to use Eiko:" -ForegroundColor Yellow
-Write-Host "    Inside MATLAB, navigate to this folder and run: " -NoNewline -ForegroundColor Gray
+Write-Host "    Inside MATLAB, run: " -NoNewline -ForegroundColor Gray
 Write-Host "start_eiko`n" -ForegroundColor Cyan
 Write-Host "    (This will add Eiko to your path for the current session)`n" -ForegroundColor DarkGray
 
