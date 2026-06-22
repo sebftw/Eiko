@@ -321,10 +321,15 @@ Write-Host "`n====================================================" -ForegroundC
 Write-Host " EIKO ENVIRONMENT INSTALLED SUCCESSFULLY" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 
+# Make the path MATLAB-safe by swapping backslashes for forward slashes
+$matlabSafeRoot = $PSScriptRoot -replace '\\', '/'
+
 Write-Host "`n[!] How to use Eiko:" -ForegroundColor Yellow
-Write-Host "    Inside MATLAB, run: " -NoNewline -ForegroundColor Gray
-Write-Host "start_eiko`n" -ForegroundColor Cyan
-Write-Host "    (This will add Eiko to your path for the current session)`n" -ForegroundColor DarkGray
+Write-Host "    1. Inside MATLAB, navigate to the installation folder by running:" -ForegroundColor Gray
+Write-Host "       cd('$matlabSafeRoot')" -ForegroundColor Cyan
+Write-Host "    2. Then, run the initialization script:" -ForegroundColor Gray
+Write-Host "       start_eiko" -ForegroundColor Cyan
+Write-Host "       (This will add Eiko to your path for the current session)`n" -ForegroundColor DarkGray
 
 # Explicitly hold the window open for the instructions
 Write-Host "Installation process complete. Press any key to close this setup window..." -ForegroundColor Cyan
