@@ -363,7 +363,7 @@ if [ "$PY_VER" == "3.8" ]; then
     read -p "Select your preference (type 1 or 2 and press enter): " choice
     
     if [ "$choice" == "1" ]; then
-    	uninstall_if_present "torch" "torchvision" "torchaudio"
+        uninstall_if_present "torch" "torchvision" "torchaudio"
         echo -e "${MAGENTA}  -> Installing JAX stack...${NC}"
         run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
         run_pip_command install "eiko[jax]" --no-input || safe_exit 1
@@ -393,12 +393,40 @@ echo -e "${GREEN}====================================================${NC}"
 
 export TORCH_CUDA_ARCH_LIST=$(python3 -c "import torch; cap = torch.cuda.get_device_capability(); print(f'{cap[0]}.{cap[1]}+PTX')" 2>/dev/null || echo "8.6+PTX")
 
-if ! python3 -c "import eiko.eiko_torch; import eiko.eiko_jax; print('Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!')"; then
-    echo -e "\n${RED}[!] Verification failed. Runtime environment setup is broken.${NC}"
+# Run robust, dual-backend verification
+python3 - << 'EOF'
+import sys
+
+torch_ok = False
+jax_ok = False
+
+try:
+    import eiko.eiko_torch
+    torch_ok = True
+except ImportError:
+    pass
+
+try:
+    import eiko.eiko_jax
+    jax_ok = True
+except ImportError:
+    pass
+
+# Fail only if neither backend is available
+if not torch_ok and not jax_ok:
+    sys.exit(1)
+
+print(f"\n  -> PyTorch backend: {'[ OPERATIONAL ]' if torch_ok else '[ SKIPPED ]'}")
+print(f"  -> JAX backend:     {'[ OPERATIONAL ]' if jax_ok else '[ SKIPPED ]'}")
+EOF
+
+if [ $? -ne 0 ]; then
+    echo -e "\n${RED}[!] Verification failed. Neither Eiko backend is functional. Runtime environment setup may be broken.${NC}"
     safe_exit 1
 else
-    echo -e "\n${GREEN} -> Success: Eiko, PyTorch, and JAX CUDA layers are fully operational!${NC}"
+    echo -e "\n${GREEN}[*] Success: Eiko runtime is ready!${NC}"
 fi
+
 if [[ -n "${BASH_SOURCE[0]}" ]]; then
     SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 else
