@@ -41,11 +41,11 @@ echo -e "${CYAN}====================================================${NC}"
 # Step 0: Explanation and User Confirmation
 # ---------------------------------------------------------
 echo -e "\nThis script will configure your system for Eiko by performing the following actions:"
-echo -e "  1. Validate your NVIDIA display driver compatibility."
-echo -e "  2. Identify MATLAB's native C++ compiler (GCC) requirements."
+echo -e "  1. Detect MATLAB and probe for compiler/CUDA requirements."
+echo -e "  2. Validate your NVIDIA display driver compatibility."
 echo -e "  3. Install the appropriate GNU C++ Build Tools."
-echo -e "  4. Deploy or verify the NVIDIA CUDA Toolkit (v12.8)."
-echo -e "  5. Execute system verification to confirm successful environment integration."
+echo -e "  4. Deploy the NVIDIA CUDA Toolkit (if not built into MATLAB)."
+echo -e "  5. Execute system verification and generate a launcher script."
 
 echo -e "\n${YELLOW}[!] DISCLAIMER: This script requires sudo privileges and modifies system packages."
 echo -e "    It is provided 'as-is' without any express or implied warranties. Run at your own risk.${NC}"
@@ -67,9 +67,43 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 sudo apt-get update -qq
 
 # ---------------------------------------------------------
-# Step 1: Check NVIDIA Driver Version
+# Step 1: Locating MATLAB & Probing System Requirements
 # ---------------------------------------------------------
-echo -e "\n${CYAN}[1/5] Checking NVIDIA Driver Compatibility...${NC}"
+echo -e "\n${CYAN}[1/5] Locating MATLAB and Probing System Requirements...${NC}"
+
+if ! command -v matlab >/dev/null 2>&1; then
+    echo -e "${RED}[!] 'matlab' command not found in your system PATH.${NC}"
+    echo -e "${YELLOW}Please ensure MATLAB is installed and correctly added to your environment variables.${NC}"
+    safe_exit 1
+fi
+
+echo -e "  -> MATLAB found. Starting headless probe for system requirements (~10-20 seconds)..."
+
+# Headless probe script: extracts MATLAB release version and native GCC requirements.
+PROBE_SCRIPT="cc=mex.getCompilerConfigurations('C++','Supported'); gcc_found=false; for i=1:length(cc), if ~isempty(strfind(lower(cc(i).Manufacturer), 'gnu')), m=regexp(cc(i).Version, '^(\d+)', 'tokens', 'once'); if ~isempty(m), fprintf('GCC_MAJOR:%s\n', m{1}); gcc_found=true; break; end; end; end; if ~gcc_found, fprintf('GCC_MAJOR:UNKNOWN\n'); end; fprintf('MATLAB_RELEASE:%s\n', version('-release')); exit;"
+MATLAB_OUT=$(matlab -batch "$PROBE_SCRIPT" 2>&1)
+
+TARGET_GCC_VER="10" # Safe default for older LTS systems
+MATLAB_RELEASE="UNKNOWN"
+MATLAB_YEAR=0
+
+if [[ "$MATLAB_OUT" =~ MATLAB_RELEASE:([0-9]{4}[ab]) ]]; then
+    MATLAB_RELEASE="${BASH_REMATCH[1]}"
+    MATLAB_YEAR="${MATLAB_RELEASE:0:4}"
+    echo -e "${GREEN}  -> MATLAB Release R${MATLAB_RELEASE} detected.${NC}"
+fi
+
+if [[ "$MATLAB_OUT" =~ GCC_MAJOR:([0-9]+) ]]; then
+    TARGET_GCC_VER="${BASH_REMATCH[1]}"
+    echo -e "${GREEN}  -> MATLAB requested GCC ${TARGET_GCC_VER}.${NC}"
+else
+    echo -e "${YELLOW}  -> MATLAB compiler query failed or returned unrecognized output. Defaulting to GCC 10.${NC}"
+fi
+
+# ---------------------------------------------------------
+# Step 2: Check NVIDIA Driver Version
+# ---------------------------------------------------------
+echo -e "\n${CYAN}[2/5] Checking NVIDIA Driver Compatibility...${NC}"
 
 MIN_DRIVER=570 
 UPDATE_DRIVER=false
@@ -102,7 +136,7 @@ if command -v nvidia-smi >/dev/null 2>&1; then
         fi
     else
         # SUCCESS CASE
-        echo -e "${GREEN}  -> [OK] NVIDIA driver v${DRIVER_VER} detected (Meets v${MIN_DRIVER}+ requirement for CUDA 12.8).${NC}"
+        echo -e "${GREEN}  -> [OK] NVIDIA driver v${DRIVER_VER} detected (Meets v${MIN_DRIVER}+ requirement).${NC}"
         echo -e "  -> GPU environment is ready for Eiko installation."
     fi
 else
@@ -145,31 +179,6 @@ if [ "$UPDATE_DRIVER" = true ]; then
 fi
 
 # ---------------------------------------------------------
-# Step 2: Locating MATLAB & Probing GCC Requirements
-# ---------------------------------------------------------
-echo -e "\n${CYAN}[2/5] Locating MATLAB and Probing Compiler Requirements...${NC}"
-
-if ! command -v matlab >/dev/null 2>&1; then
-    echo -e "${RED}[!] 'matlab' command not found in your system PATH.${NC}"
-    echo -e "${YELLOW}Please ensure MATLAB is installed and correctly added to your environment variables.${NC}"
-    safe_exit 1
-fi
-
-echo -e "  -> MATLAB found. Starting MATLAB in headless mode to query supported C++ compilers..."
-
-# Headless probe script: iterates over supported C++ compilers, looks for GNU, and extracts the major version number.
-PROBE_SCRIPT="cc=mex.getCompilerConfigurations('C++','Supported'); for i=1:length(cc), if ~isempty(strfind(lower(cc(i).Manufacturer), 'gnu')), m=regexp(cc(i).Version, '^(\d+)', 'tokens', 'once'); if ~isempty(m), fprintf('GCC_MAJOR:%s\n', m{1}); exit; end; end; end; fprintf('GCC_MAJOR:UNKNOWN\n'); exit;"
-MATLAB_OUT=$(matlab -batch "$PROBE_SCRIPT" 2>&1)
-
-if [[ "$MATLAB_OUT" =~ GCC_MAJOR:([0-9]+) ]]; then
-    TARGET_GCC_VER="${BASH_REMATCH[1]}"
-    echo -e "${GREEN}  -> MATLAB requested GCC ${TARGET_GCC_VER}.${NC}"
-else
-    TARGET_GCC_VER="10" # Safe default for older LTS systems
-    echo -e "${YELLOW}  -> MATLAB compiler query failed or returned unrecognized output. Defaulting to GCC 10.${NC}"
-fi
-
-# ---------------------------------------------------------
 # Step 3: Check and Install C++ Build Tools
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[3/5] Checking Required GCC Build Tools...${NC}"
@@ -202,31 +211,36 @@ if [ "$TARGET_GCC_VER" != "10" ]; then
 fi
 
 # ---------------------------------------------------------
-# Step 4: Check and Install Pinned CUDA Toolkit (12.8)
+# Step 4: Check and Install Pinned CUDA Toolkit
 # ---------------------------------------------------------
 TARGET_CUDA_PKG="cuda-toolkit-12-8"
 TARGET_CUDA_VER="12.8"
 source /etc/os-release
 
-echo -e "\n${CYAN}[4/5] Checking CUDA installation (Target: ${TARGET_CUDA_VER})...${NC}"
+echo -e "\n${CYAN}[4/5] Checking system CUDA requirements...${NC}"
 
 INSTALL_CUDA=true
-NVCC_CMD=""
 
-if command -v nvcc >/dev/null 2>&1; then
-    NVCC_CMD="nvcc"
+if [ "$MATLAB_YEAR" -ge 2026 ]; then
+    echo -e "${GREEN}  -> Built-in CUDA detected (MATLAB R${MATLAB_RELEASE}). Skipping system CUDA installation.${NC}"
+    INSTALL_CUDA=false
 else
-    FALLBACK_PATH=$(ls -1d /usr/local/cuda*/bin/nvcc 2>/dev/null | sort -V -r | head -n 1 || true)
-    if [ -n "$FALLBACK_PATH" ] && [ -x "$FALLBACK_PATH" ]; then
-        NVCC_CMD="$FALLBACK_PATH"
+    NVCC_CMD=""
+    if command -v nvcc >/dev/null 2>&1; then
+        NVCC_CMD="nvcc"
+    else
+        FALLBACK_PATH=$(ls -1d /usr/local/cuda*/bin/nvcc 2>/dev/null | sort -V -r | head -n 1 || true)
+        if [ -n "$FALLBACK_PATH" ] && [ -x "$FALLBACK_PATH" ]; then
+            NVCC_CMD="$FALLBACK_PATH"
+        fi
     fi
-fi
 
-if [ -n "$NVCC_CMD" ]; then
-    CUDA_VER=$("$NVCC_CMD" --version | grep -oP 'release \K[0-9]+\.[0-9]+')
-    if [ "$(printf '%s\n' "$TARGET_CUDA_VER" "$CUDA_VER" | sort -V | head -n1)" = "$TARGET_CUDA_VER" ]; then
-        echo -e "${YELLOW}  -> Found CUDA $CUDA_VER. Skipping installation.${NC}"
-        INSTALL_CUDA=false
+    if [ -n "$NVCC_CMD" ]; then
+        CUDA_VER=$("$NVCC_CMD" --version | grep -oP 'release \K[0-9]+\.[0-9]+')
+        if [ "$(printf '%s\n' "$TARGET_CUDA_VER" "$CUDA_VER" | sort -V | head -n1)" = "$TARGET_CUDA_VER" ]; then
+            echo -e "${YELLOW}  -> Found CUDA $CUDA_VER. Skipping installation.${NC}"
+            INSTALL_CUDA=false
+        fi
     fi
 fi
 
@@ -245,15 +259,15 @@ if [ "$INSTALL_CUDA" = true ]; then
         echo -e "${RED}[!] Failed to download CUDA GPG keys.${NC}"
         safe_exit 1
     fi
+    
+    export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+    export CUDA_HOME=/usr/local/cuda
+    export CUDA_PATH=/usr/local/cuda
 fi
 
-export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
-export CUDA_HOME=/usr/local/cuda
-export CUDA_PATH=/usr/local/cuda
-
 # ---------------------------------------------------------
-# Step 5: Execute setup.m
+# Step 5: Execute setup.m & Generate Initialization Script
 # ---------------------------------------------------------
 echo -e "\n${CYAN}[5/5] Verifying Eiko via setup.m...${NC}"
 
@@ -272,9 +286,6 @@ else
     safe_exit 1
 fi
 
-# ---------------------------------------------------------
-# Step 6: Generate MATLAB Initialization Script
-# ---------------------------------------------------------
 LAUNCHER_PATH="$SCRIPT_DIR/start_eiko.m"
 cat << EOF > "$LAUNCHER_PATH"
 % Eiko Initialization Script
@@ -291,7 +302,7 @@ DARK_GRAY='\033[1;30m'
 
 echo -e "\n${YELLOW}[!] How to use Eiko:${NC}"
 echo -e -n "${GRAY}    Inside MATLAB, navigate to this folder and run: ${NC}"
-echo -e -n "${CYAN}start_eiko.m${NC}\n"
+echo -e -n "${CYAN}start_eiko${NC}\n"
 echo -e "${DARK_GRAY}    (This will add Eiko to your path for the current session)\n${NC}"
 
 safe_exit 0
