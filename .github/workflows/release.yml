@@ -16,7 +16,7 @@ jobs:
       matrix:
         platform:
           # --- Legacy Floor (Max Backwards Compatibility) ---
-          - { torch: '2.4.1', cuda: '12.4.1', os_version: '20.04' }
+          # - { torch: '2.4.1', cuda: '12.4.1', os_version: '20.04' }
           # - { torch: '2.7.0', cuda: '12.6.3', os_version: '20.04' }
 
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
@@ -315,14 +315,14 @@ jobs:
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
-          # - { torch: '2.10.0', cuda: '12.8.1' }
+          - { torch: '2.10.0', cuda: '12.8.1' }
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
           # - { torch: '2.12.0', cuda: '12.6.3' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           # - { torch: '2.12.0', cuda: '13.0.0' }
-          - { torch: '2.12.0', cuda: '13.2.0' }
+          # - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
