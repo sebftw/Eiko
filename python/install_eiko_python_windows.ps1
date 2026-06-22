@@ -319,6 +319,7 @@ if ($LASTEXITCODE -eq 0) {
 } else {
     Write-Host "  -> Installing default ML target stack (CUDA 13.0)..." -ForegroundColor Magenta
     Run-PipCommand "install", "torch", "torchvision", "--index-url", "https://download.pytorch.org/whl/cu130"
+    Run-PipCommand "install", "ninja"
 }
 
 Write-Host "  -> Installing Eiko..." -ForegroundColor Magenta
