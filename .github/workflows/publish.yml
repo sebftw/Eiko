@@ -233,44 +233,52 @@ jobs:
           generate_release_notes: true
           body: |
             ## Installation Instructions
-
+            
             ### 🐍 Python
             
-            **Quick Install:**
-            ```bash
-            pip install eiko
-            ```
-
-            ⚠️ **Prerequisite:** `eiko` requires either **PyTorch** or **JAX** to be installed in your Python environment. For example:
+            **Automated Installer (Recommended):**
+            If you are new to Python, use the automated installer to set up your environment:
             
-            **For PyTorch:**
+            1. Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat):
+            2. Run it:
+              * **Windows:** Double-click the `install_eiko_matlab.bat` file.
+              * **Linux:** Open a terminal and run `bash install_eiko_python.bat`
+            
+            **Manual Install:**
+            `eiko` requires either PyTorch or JAX as a backend. We strongly recommend doing this inside a virtual environment (e.g., `venv` or `conda`).
+            
+            **1. Install a GPU-enabled backend:**
+            **PyTorch:**
             ```bash
             pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
             ```
-            
-            **Or for JAX:**
+            **Or JAX:**
             ```bash
             pip install jax[cuda13]
             ```
             
-            **Guided Install (Recommended if you are new to Python):**
-            If you need assistance setting up Python, creating a virtual environment, installing PyTorch/JAX, or updating your drivers, download and run our smart installer:
-            * Download and run [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat) *(Compatible with Windows & Ubuntu)*
-
+            **2. Install Eiko:**
+            ```bash
+            pip install eiko
+            ```
+            
             ---
-
+            
             ### 🧮 MATLAB
             
-            **Quick Install:**
+            **Automated Installer (Recommended):**
+            To automatically configure your path and check GPU driver compatibility, use the installer:
+            
+            1. Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat):
+            2. Run it:
+              * **Windows:** Double-click the `install_eiko_matlab.bat` file.
+              * **Linux:** Open a terminal and run `bash install_eiko_matlab.bat`
+            
+            **Manual Install:**
             1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
             2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
             
             💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
-
-            **Guided Install:**
-            If you need help checking your MATLAB environment or ensuring you have the correct drivers configured, use the smart installer:
-            * Download and run [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) *(Compatible with Windows & Ubuntu)*
-            ***
 
       - name: Publish to PyPI
         if: ${{ !contains(github.ref_name, '-test') }}
