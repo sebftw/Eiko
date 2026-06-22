@@ -108,12 +108,10 @@ jobs:
     
           repo = '${{ github.repository }}'
           raw_tag = '${{ env.TAG }}'
-          # 'v0.8.5+pt2.3' -> '0.8.5' (Guarantees the JSON top-level key is pure semver)
           version_key = raw_tag.lstrip('v').split('+')[0]
     
           registry = {'versions': {version_key: []}}
     
-          # recursive=True reaches inside the matrix download sub-folders
           for fpath in glob.glob('artifacts/**/*.whl', recursive=True):
               if 'any.whl' in fpath: 
                   continue
@@ -122,7 +120,7 @@ jobs:
               parent_dir = os.path.basename(os.path.dirname(fpath))
               sha = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
               
-              # 1. OS & Python (Always derived from standard wheel naming)
+              # 1. OS & Python
               os_name = 'unknown'
               fname_low = fname.lower()
               if any(w in fname_low for w in ['linux', 'manylinux', 'musllinux']):
@@ -135,11 +133,10 @@ jobs:
               py_match = re.search(r'cp(\d)(\d{1,2})', fname)
               py_ver = f'{py_match.group(1)}.{py_match.group(2)}' if py_match else 'unknown'
     
-              # 2. Extract the PEP 440 '+local_tag' block from the filename
+              # 2. Extract metadata
               local_block_match = re.search(r'\+([^-]+)-', fname)
               local_block = local_block_match.group(1) if local_block_match else ''
     
-              # Tier 1: Look inside the filename's local block
               cuda_match = re.search(r'(cu\d+)', local_block, re.I)
               cuda_ver = cuda_match.group(1).lower() if cuda_match else ''
     
@@ -149,18 +146,15 @@ jobs:
               jax_match = re.search(r'jax([\d\.]*)', local_block, re.I)
               jax_ver = ''
               if jax_match:
-                  # If tag was +jaxcu121, version is 'any'. If +jax0.4.28cu121, version is '0.4.28'
                   jax_ver = jax_match.group(1).rstrip('.') or 'any'
     
-              # Tier 2 Fallback: If local block missed something, check the parent folder name
+              # Fallbacks
               if not cuda_ver:
                   p_cu = re.search(r'-(cu\d+)', parent_dir, re.I)
                   if p_cu: cuda_ver = p_cu.group(1).lower()
-    
               if not torch_ver:
                   p_pt = re.search(r'-(?:pt|torch)([\d\.]+)', parent_dir, re.I)
                   if p_pt: torch_ver = p_pt.group(1).rstrip('.')
-    
               if not jax_ver and 'jax' in parent_dir.lower():
                   p_jax = re.search(r'-jax([\d\.]*)', parent_dir, re.I)
                   jax_ver = (p_jax.group(1).rstrip('.') if p_jax else '') or 'any'
@@ -179,9 +173,18 @@ jobs:
           with open('registry.json', 'w') as f:
               json.dump(registry, f, indent=2)
           "
-          python3 -m pip install --upgrade wheel
           
+          # 1. Flatten the directory FIRST so wildcards work
+          mkdir -p flat_artifacts
+          find artifacts/ -name "*.whl" -exec cp {} flat_artifacts/ \;
+          rm -rf artifacts/*
+          cp flat_artifacts/* artifacts/
+          
+          # 2. Now the wildcard will successfully find the pure-python wheel
+          python3 -m pip install --upgrade wheel
           wheel unpack artifacts/*-any.whl -d unpacked
+          
+          # 3. Inject registry and repack
           P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
           cp registry.json "$P_DIR/"
           
@@ -189,11 +192,8 @@ jobs:
           W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
           wheel pack "$W_DIR" -d dist/
     
-          # Flatten all the nested matrix artifact folders into a single root directory for GitHub Release
-          mkdir -p flat_artifacts
-          find artifacts/ -name "*.whl" -exec cp {} flat_artifacts/ \;
-          rm -rf artifacts/*
-          cp flat_artifacts/* artifacts/
+          # 4. Swap the old pure wheel for the injected one
+          rm artifacts/*-any.whl
           cp dist/*-any.whl artifacts/
 
       - name: Create GitHub Release
