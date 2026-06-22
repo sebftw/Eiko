@@ -233,48 +233,38 @@ jobs:
           generate_release_notes: true
           body: |
             ## Installation Instructions
-            
+
             ### 🐍 Python
             
-            **Automated Installer (Recommended):**
+            **Automated Installer (Recommended)**<br>
             If you are new to Python, use the automated installer to set up your environment:
             
-            1. Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat):
-            2. Run it:
-              * **Windows:** Double-click the `install_eiko_matlab.bat` file.
-              * **Linux:** Open a terminal and run `bash install_eiko_python.bat`
+            * **Windows:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat) and double-click the file.
+            * **Linux:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
             
-            **Manual Install:**
-            `eiko` requires either PyTorch or JAX as a backend. We strongly recommend doing this inside a virtual environment (e.g., `venv` or `conda`).
-            
-            **1. Install a GPU-enabled backend:**
-            **PyTorch:**
-            ```bash
-            pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
-            ```
-            **Or JAX:**
-            ```bash
-            pip install jax[cuda13]
-            ```
-            
-            **2. Install Eiko:**
+            **Manual Installation**<br>
+            To install Eiko manually, run
             ```bash
             pip install eiko
             ```
+            It requires PyTorch or JAX as a backend, so also run one of the following lines:
+            * **PyTorch:** `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130`
+            * or **JAX:** `pip install jax[cuda13]`.
+            
+            We strongly recommend installing inside a virtual environment (`venv` or `conda`).
             
             ---
             
             ### 🧮 MATLAB
             
-            **Automated Installer (Recommended):**
-            To automatically configure your path and check GPU driver compatibility, use the installer:
+            **Automated Installer (Recommended)**<br>
+            To automatically configure your system for Eiko, use the installer:
             
-            1. Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat):
-            2. Run it:
-              * **Windows:** Double-click the `install_eiko_matlab.bat` file.
-              * **Linux:** Open a terminal and run `bash install_eiko_matlab.bat`
+            * **Windows:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
+            * **Linux:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
             
-            **Manual Install:**
+            
+            **Manual Installation**
             1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
             2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
             
