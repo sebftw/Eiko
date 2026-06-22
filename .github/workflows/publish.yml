@@ -176,7 +176,7 @@ jobs:
           
           # 1. Flatten the directory FIRST so wildcards work
           mkdir -p flat_artifacts
-          find artifacts/ -name "*.whl" -exec cp {} flat_artifacts/ \;
+          find artifacts/ -type f \( -name "*.whl" -o -name "*.zip" \) -exec cp {} flat_artifacts/ \;
           rm -rf artifacts/*
           cp flat_artifacts/* artifacts/
           
@@ -196,6 +196,14 @@ jobs:
           rm artifacts/*-any.whl
           cp dist/*-any.whl artifacts/
 
+          # 5. Zip the MATLAB folder into the exact asset name expected by users
+          if [ -d "artifacts/eiko-matlab-release" ]; then
+            cd artifacts/eiko-matlab-release
+            zip -r ../eiko_matlab.zip .
+            cd ../..
+            rm -rf artifacts/eiko-matlab-release
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -204,21 +212,19 @@ jobs:
           prerelease: ${{ contains(env.TAG, '-test') }}
           generate_release_notes: true
           body: |
-            ## 🚀 Installation
+            ## Installation Instructions
 
             ### 🐍 Python
+            Run
             ```bash
             pip install eiko
             ```
 
-            ***
-
             ### 🧮 MATLAB
-            1. Scroll to the **Assets** section at the very bottom of these release notes.
-            2. Download **`eiko_matlab.zip`** (do *not* use the generic "Source code" zips).
-            3. Extract the folder to your local machine.
-            4. Inside MATLAB, right-click the extracted folder and select **Add to Path &rarr; Selected Folders and Subfolders**.
-
+            1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
+            2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folders and Subfolders**.
+            
+            💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath(genpath('/path/to/eiko'))` to your `startup.m` file.
             ***
 
       - name: Publish to PyPI
