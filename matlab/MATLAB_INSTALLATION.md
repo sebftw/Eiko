@@ -12,7 +12,7 @@ Before continuing, ensure you have MATLAB installed along with the following too
 * Deep Learning Toolbox (Required for differentiable operations)
 
 ## Automated Installer (Recommended)
-The easiest way to configure your system for Eiko is to use our automated installation script. It will automatically check your NVIDIA drivers, download the correct C++ build tools and CUDA toolkit.
+The easiest way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and CUDA toolkit.
 
 * **Windows:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat) and double-click the file.
 * **Linux:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_python.bat`.
