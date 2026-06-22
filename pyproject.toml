@@ -50,9 +50,7 @@ jax-local = [
 torch = ["torch>=2.4.0", "ninja"]
 # Dependencies require to run examples.
 examples = [
-    "torch>=2.4.0",
     "matplotlib>=3.5.0", 
-    "jax[cuda12]>=0.4.30",
     "pybind11",
     "optax",
     "scipy>=1.7.0",
