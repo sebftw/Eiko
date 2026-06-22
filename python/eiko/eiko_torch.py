@@ -20,8 +20,11 @@ try:
             "You have a CPU-only version of PyTorch.\n"
             "Eiko strictly requires a GPU-enabled (CUDA) version of PyTorch.\n\n"
             "HOW TO FIX:\n"
-            "1. Uninstall your current version:  pip uninstall torch\n"
-            f"2. Get the correct GPU command at:  {link_emoji} https://pytorch.org/get-started/\n"
+            "1. Uninstall your current version:\n"
+            f"  {link_emoji} pip uninstall torch torchvision\n"
+            "2. Install a GPU-enabled version (e.g., for CUDA 13.0):\n"
+            f"  {link_emoji} pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130\n\n"
+            f"For other CUDA versions, visit: https://pytorch.org/get-started/\n"
             + "="*75 + "\n"
         )
 except ImportError as e:
@@ -29,10 +32,11 @@ except ImportError as e:
         "\n" + "="*65 + "\n"
         f"[Eiko] PyTorch bindings require 'torch' to be installed.\n"
         + "="*65 + "\n"
-        "Eiko requires a GPU-enabled version of PyTorch.\n"
         "A standard 'pip install torch' installs a CPU-only version. \n\n"
-        "To get the correct GPU (CUDA) installation, visit:\n"
-        f"{link_emoji} https://pytorch.org/get-started/\n"
+        "HOW TO FIX:\n"
+        "Install a GPU-enabled PyTorch version (e.g., for CUDA 13.0):\n"
+        f"  {link_emoji} pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130\n\n"
+        f"For other CUDA versions, visit: https://pytorch.org/get-started/\n"
         + "="*65 + "\n"
     ) from e
 
