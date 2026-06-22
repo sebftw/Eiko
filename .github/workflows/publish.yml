@@ -101,77 +101,78 @@ jobs:
       # ---------------------------------------------------------
       # REGISTRY INJECTION & RELEASE
       # ---------------------------------------------------------
-      - name: Generate Registry, Rename Wheels, and Inject
+      - name: Generate Registry and Inject
         run: |
           python3 -c "
-          import os, json, hashlib, glob, re, shutil
+          import os, json, hashlib, glob, re
     
           repo = '${{ github.repository }}'
           raw_tag = '${{ env.TAG }}'
-          version_key = raw_tag.lstrip('v')
+          # 'v0.8.5+pt2.3' -> '0.8.5' (Guarantees the JSON top-level key is pure semver)
+          version_key = raw_tag.lstrip('v').split('+')[0]
     
           registry = {'versions': {version_key: []}}
-          os.makedirs('staged_wheels', exist_ok=True)
     
-          # recursive=True is critical to peek inside the downloaded artifact sub-folders
+          # recursive=True reaches inside the matrix download sub-folders
           for fpath in glob.glob('artifacts/**/*.whl', recursive=True):
               if 'any.whl' in fpath: 
                   continue
-              
-              # Grab the container folder name (e.g., 'wheels-ubuntu22.04-pt2.3.0-cu121-py3.10')
+                  
+              fname = os.path.basename(fpath)
               parent_dir = os.path.basename(os.path.dirname(fpath))
-              orig_fname = os.path.basename(fpath)
-    
-              # 1. Parse Python & OS from the actual wheel filename
-              py_match = re.search(r'cp(\d)(\d{1,2})', orig_fname)
-              py_ver = f'{py_match.group(1)}.{py_match.group(2)}' if py_match else 'unknown'
-    
+              sha = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+              
+              # 1. OS & Python (Always derived from standard wheel naming)
               os_name = 'unknown'
-              if any(w in orig_fname.lower() for w in ['linux', 'manylinux', 'musllinux']):
+              fname_low = fname.lower()
+              if any(w in fname_low for w in ['linux', 'manylinux', 'musllinux']):
                   os_name = 'linux'
-              elif 'win' in orig_fname.lower():
+              elif 'win' in fname_low:
                   os_name = 'windows'
-              elif 'mac' in orig_fname.lower():
+              elif 'mac' in fname_low:
                   os_name = 'macos'
     
-              # 2. Extract Frameworks & CUDA from the PARENT folder name
-              cu_match = re.search(r'-(cu\d+)', parent_dir)
-              cuda_ver = cu_match.group(1) if cu_match else ''
+              py_match = re.search(r'cp(\d)(\d{1,2})', fname)
+              py_ver = f'{py_match.group(1)}.{py_match.group(2)}' if py_match else 'unknown'
     
-              pt_match = re.search(r'-(?:pt|torch)([\d\.]+)', parent_dir)
+              # 2. Extract the PEP 440 '+local_tag' block from the filename
+              local_block_match = re.search(r'\+([^-]+)-', fname)
+              local_block = local_block_match.group(1) if local_block_match else ''
+    
+              # Tier 1: Look inside the filename's local block
+              cuda_match = re.search(r'(cu\d+)', local_block, re.I)
+              cuda_ver = cuda_match.group(1).lower() if cuda_match else ''
+    
+              pt_match = re.search(r'(?:pt|torch)([\d\.]+)', local_block, re.I)
               torch_ver = pt_match.group(1).rstrip('.') if pt_match else ''
     
-              jax_match = re.search(r'-jax([\d\.]+)', parent_dir)
-              jax_ver = jax_match.group(1).rstrip('.') if jax_match else ''
+              jax_match = re.search(r'jax([\d\.]*)', local_block, re.I)
+              jax_ver = ''
+              if jax_match:
+                  # If tag was +jaxcu121, version is 'any'. If +jax0.4.28cu121, version is '0.4.28'
+                  jax_ver = jax_match.group(1).rstrip('.') or 'any'
     
-              # 3. Assemble a guaranteed-unique, pip-legal PEP 427 wheel filename
-              # Format: {distribution}-{version}(+{local_tag})-{python}-{abi}-{platform}.whl
-              parts = orig_fname.split('-')
-              dist = parts[0]
-              base_ver = parts[1].split('+')[0] # strip any pre-existing local tags
-              tail = '-'.join(parts[2:])
+              # Tier 2 Fallback: If local block missed something, check the parent folder name
+              if not cuda_ver:
+                  p_cu = re.search(r'-(cu\d+)', parent_dir, re.I)
+                  if p_cu: cuda_ver = p_cu.group(1).lower()
     
-              local_tags = []
-              if torch_ver: local_tags.append(f'torch{torch_ver}')
-              if jax_ver:   local_tags.append(f'jax{jax_ver}')
-              if cuda_ver:  local_tags.append(cuda_ver)
+              if not torch_ver:
+                  p_pt = re.search(r'-(?:pt|torch)([\d\.]+)', parent_dir, re.I)
+                  if p_pt: torch_ver = p_pt.group(1).rstrip('.')
     
-              local_str = '+' + '.'.join(local_tags) if local_tags else ''
-              new_fname = f'{dist}-{base_ver}{local_str}-{tail}'
-              new_fpath = os.path.join('staged_wheels', new_fname)
-    
-              # Move to staging with its new unique identity
-              shutil.copy2(fpath, new_fpath)
-              sha = hashlib.sha256(open(new_fpath, 'rb').read()).hexdigest()
+              if not jax_ver and 'jax' in parent_dir.lower():
+                  p_jax = re.search(r'-jax([\d\.]*)', parent_dir, re.I)
+                  jax_ver = (p_jax.group(1).rstrip('.') if p_jax else '') or 'any'
     
               registry['versions'][version_key].append({
-                  'filename': new_fname,
+                  'filename': fname,
                   'os': os_name,
                   'python': py_ver,
                   'cuda': cuda_ver,
                   'torch': torch_ver,
                   'jax': jax_ver,
-                  'url': f'https://github.com/{repo}/releases/download/{raw_tag}/{new_fname}',
+                  'url': f'https://github.com/{repo}/releases/download/{raw_tag}/{fname}',
                   'sha256': sha
               })
     
@@ -180,7 +181,6 @@ jobs:
           "
           python3 -m pip install --upgrade wheel
           
-          # Unpack pure wheel, shove registry inside, repack
           wheel unpack artifacts/*-any.whl -d unpacked
           P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
           cp registry.json "$P_DIR/"
@@ -189,9 +189,11 @@ jobs:
           W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
           wheel pack "$W_DIR" -d dist/
     
-          # Wipe the old, dangerously ambiguous artifacts directory and stage the renamed ones
+          # Flatten all the nested matrix artifact folders into a single root directory for GitHub Release
+          mkdir -p flat_artifacts
+          find artifacts/ -name "*.whl" -exec cp {} flat_artifacts/ \;
           rm -rf artifacts/*
-          cp staged_wheels/*.whl artifacts/
+          cp flat_artifacts/* artifacts/
           cp dist/*-any.whl artifacts/
 
       - name: Create GitHub Release
