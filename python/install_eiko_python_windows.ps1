@@ -122,24 +122,32 @@ if ($nvidiaSmi) {
     $smiOutput = & $nvidiaSmi --query-gpu=driver_version --format=csv,noheader | Select-Object -First 1 | Out-String
     if ($smiOutput -match "(?m)^(\d+)") {
         $driverVer = [int]$matches[1]
-        Write-Host "  -> Found active NVIDIA driver: v$driverVer" -ForegroundColor Gray
 
         if ($driverVer -lt $minDriver) {
-            Write-Host "  -> Driver is too old for CUDA 13.0 (Requires v$minDriver+)." -ForegroundColor Yellow
+            # SOFT FAIL CASE
+            Write-Host "  -> [!] NVIDIA driver v$driverVer is below the recommended v$minDriver for CUDA 13.0." -ForegroundColor Yellow
             $driverValid = $false
         } else {
+            # SUCCESS CASE
+            Write-Host "  -> [OK] NVIDIA driver v$driverVer detected (Meets v$minDriver+ requirement for CUDA 13.0)." -ForegroundColor Green
+            Write-Host "  -> GPU environment is ready for Eiko installation."
             $driverValid = $true
         }
     }
 } else {
-    Write-Host "  -> No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
+    # MISSING DRIVER CASE
+    Write-Host "  -> [!] No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
     $driverValid = $false
 }
 
 if (-not $driverValid) {
-    Write-Host "`n====================================================" -ForegroundColor Red
-    Write-Host " CRITICAL ERROR: NVIDIA DRIVER UPDATE REQUIRED" -ForegroundColor Red
-    Write-Host "====================================================" -ForegroundColor Red
+    Write-Host "`n----------------------------------------------------" -ForegroundColor Yellow
+    Write-Host " NOTICE: NVIDIA Driver Update Required              " -ForegroundColor Yellow
+    Write-Host "----------------------------------------------------" -ForegroundColor Yellow
+    Write-Host "To support the required CUDA environment, please update your Windows host driver:"
+    Write-Host "  1. Open 'NVIDIA App' or 'GeForce Experience'."
+    Write-Host "  2. Install the latest Game Ready or Studio driver (v$minDriver+)."
+    Write-Host "  3. Rerun this script once the update is complete."
     Exit-Script
 }
 
