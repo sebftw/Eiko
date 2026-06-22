@@ -236,21 +236,21 @@ jobs:
 
             ### 🐍 Python
             
+            **Quick Install:**
+            ```bash
+            pip install eiko
+            ```
+
             ⚠️ **Prerequisite:** `eiko` requires either **PyTorch** or **JAX** to be installed in your Python environment. For example:
             
             **For PyTorch:**
             ```bash
-            pip install torch torchvision --index-url [https://download.pytorch.org/whl/cu130](https://download.pytorch.org/whl/cu130)
+            pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
             ```
             
             **Or for JAX:**
             ```bash
             pip install jax[cuda13]
-            ```
-            
-            **Quick Install:**
-            ```bash
-            pip install eiko
             ```
             
             **Guided Install (Recommended if you are new to Python):**
