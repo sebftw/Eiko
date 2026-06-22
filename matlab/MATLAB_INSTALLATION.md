@@ -17,6 +17,8 @@ The easiest way to configure your system for Eiko is to use our automated instal
 * **Windows:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat) and double-click the file.
 * **Linux:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
 
+💡 Tip: The installer will generate a `start_eiko.m` script. You can run this script from MATLAB to activate Eiko!
+
 ## Manual Installation
 If you already have a suitable C++ compiler and CUDA Toolkit installed, Eiko is easily installed by:
 1. Downloading [Eiko](https://github.com/sebftw/Eiko/archive/refs/heads/main.zip) if it is not already downloaded.
