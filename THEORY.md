@@ -21,7 +21,7 @@ The Eikonal equation states that $\|\nabla u\|=\sqrt{u_x^2+u_y^2+u_z^2}$ (the ch
 
 Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It is somewhat similar to Dijkstra's algorithm.
 
-Eiko can therefore be used for beamforming, signed distance functions (in a non-homogeneous space), shortest path planning, and much more. It is similar to the MATLAB function `bwdist`, but supports variable wave propagation speeds.
+Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` calculate fast geometric distances assuming a constant propagation speed, Eiko handles variable wave propagation speeds, making it useful for beamforming, signed distance functions in complex media, shortest path planning, and more.
 
 **Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less. The accuracy also depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
@@ -129,7 +129,7 @@ $$\frac{dL}{df} = \tilde{\lambda}(x) * f(x) * \Delta x^2$$
 * $\Delta x^2$ is the squared grid spacing. Note that this is always squared regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from the Pythagorean approximation of the gradient, not a volumetric integral.
 
 #### In human terms
-If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta V$ to correctly account for the physical size of the grid cells during the discrete integration.
+If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta x^2$ to correctly account for the local grid spacing geometry during the discrete integration.
 
 ## References
 *   [1] "Improved Fast Iterative Algorithm for Eikonal Equation for GPU Computing" by Yuhao Huang (2021), [arXiv:2106.15869](https://arxiv.org/abs/2106.15869).
