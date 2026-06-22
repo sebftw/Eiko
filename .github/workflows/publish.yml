@@ -152,7 +152,7 @@ jobs:
 
             ### 🧮 MATLAB
             1. Scroll to the **Assets** section at the very bottom of these release notes.
-            2. Download **`eiko-matlab-release.zip`** (do *not* use the generic "Source code" zips).
+            2. Download **`eiko_matlab.zip`** (do *not* use the generic "Source code" zips).
             3. Extract the folder to your local machine.
             4. Inside MATLAB, right-click the extracted folder and select **Add to Path &rarr; Selected Folders and Subfolders**.
 
