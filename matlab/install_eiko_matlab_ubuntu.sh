@@ -304,8 +304,10 @@ GRAY='\033[0;37m'
 DARK_GRAY='\033[1;30m'
 
 echo -e "\n${YELLOW}[!] How to use Eiko:${NC}"
-echo -e -n "${GRAY}    Inside MATLAB, navigate to this folder and run: ${NC}"
-echo -e -n "${CYAN}start_eiko${NC}\n"
-echo -e "${DARK_GRAY}    (This will add Eiko to your path for the current session)\n${NC}"
+echo -e "${GRAY}    1. Inside MATLAB, navigate to the installation folder by running:${NC}"
+echo -e "${CYAN}       cd('${SCRIPT_DIR}')${NC}"
+echo -e "${GRAY}    2. Then, run the activation script:${NC}"
+echo -e "${CYAN}       start_eiko${NC}"
+echo -e "${DARK_GRAY}       (This will add Eiko to your path for the current session)\n${NC}"
 
 safe_exit 0
