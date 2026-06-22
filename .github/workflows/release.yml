@@ -535,7 +535,7 @@ jobs:
       # Excluded for PyTorch 2.10 + CUDA 12.8 (missing binaries)
       - name: Set up Python 3.13
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
-        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && env.cu_version == 'cu128')
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -543,7 +543,7 @@ jobs:
           
       - name: Build 3.13 Wheel
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
-        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && env.cu_version == 'cu128')
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         env: *build_env
         run: |
           pip install --upgrade pip
@@ -558,7 +558,7 @@ jobs:
 
       - name: Upload 3.13 Wheel
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
-        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && env.cu_version == 'cu128')
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.13
@@ -566,7 +566,7 @@ jobs:
           
       - name: Clean 3.13 Workspace
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
-        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && env.cu_version == 'cu128')
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         shell: pwsh
         run: |
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
