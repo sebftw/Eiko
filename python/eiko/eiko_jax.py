@@ -81,10 +81,33 @@ except ImportError:
         # 3. Runtime Download Fallback
         # --------------------------------------------------------------------
         from eiko.bootstrap import fetch_precompiled_wheel
+        from eiko import __version__
+        import re
+        from importlib.metadata import version
+
         is_loaded = False
-        
-        if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
-            # Force Python to rescan sys.path directories, so it sees the new file
+        host_cuda_ceiling = None
+
+        # Sniff the user's installed jaxlib wheel tag (e.g. '0.4.28+cuda12.cudnn89')
+        try:
+            jlib_ver = version("jaxlib")
+            match = re.search(r'cuda(\d+)', jlib_ver, re.IGNORECASE)
+            if match:
+                # If they have cuda12, set ceiling to 'cu129'. If cuda11, 'cu119'.
+                # This acts as an upper-bound trap for the bootstrapper's regex parser.
+                host_cuda_ceiling = f"cu{match.group(1)}9"
+        except Exception:
+            pass
+
+        # Notice backend_version is passed as None: we rely strictly on the stable XLA ABI
+        if fetch_precompiled_wheel(
+            package_version=__version__, 
+            backend_name="jax",
+            backend_version=None, 
+            cuda_version=host_cuda_ceiling, 
+            target_dir=BIN_CACHE_DIR, 
+            target_impl="eiko_jax_impl"
+        ):
             import importlib
             importlib.invalidate_caches()
             try:
@@ -92,7 +115,7 @@ except ImportError:
                 is_loaded = True
             except ImportError as e:
                 print(f"[Eiko] Downloaded JAX binary failed to load natively ({e}).")
-                print(f"[Eiko] Falling back to local compilation.")
+                print(f"[Eiko] Falling back to local JIT compilation.")
 
         # --------------------------------------------------------------------
         # 4. Pure JIT Compilation Fallback via NVCC
