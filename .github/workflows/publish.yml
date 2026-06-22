@@ -174,35 +174,35 @@ jobs:
               json.dump(registry, f, indent=2)
           "
           
-          # 1. Flatten the directory FIRST so wildcards work
-          mkdir -p flat_artifacts
-          find artifacts/ -type f \( -name "*.whl" -o -name "*.zip" \) -exec cp {} flat_artifacts/ \;
-          rm -rf artifacts/*
-          cp flat_artifacts/* artifacts/
-          
-          # 2. Now the wildcard will successfully find the pure-python wheel
-          python3 -m pip install --upgrade wheel
-          wheel unpack artifacts/*-any.whl -d unpacked
-          
-          # 3. Inject registry and repack
-          P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
-          cp registry.json "$P_DIR/"
-          
-          mkdir -p dist
-          W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
-          wheel pack "$W_DIR" -d dist/
-    
-          # 4. Swap the old pure wheel for the injected one
-          rm artifacts/*-any.whl
-          cp dist/*-any.whl artifacts/
-
-          # 5. Zip the MATLAB folder into the exact asset name expected by users
+          # Zip the MATLAB folder
           if [ -d "artifacts/eiko-matlab-release" ]; then
             cd artifacts/eiko-matlab-release
             zip -r ../eiko_matlab.zip .
             cd ../..
             rm -rf artifacts/eiko-matlab-release
           fi
+          
+          # Then flatten the directory
+          mkdir -p flat_artifacts
+          find artifacts/ -type f \( -name "*.whl" -o -name "*.zip" \) -exec cp {} flat_artifacts/ \;
+          rm -rf artifacts/*
+          cp flat_artifacts/* artifacts/
+          
+          # Now the wildcard will successfully find the pure-python wheel
+          python3 -m pip install --upgrade wheel
+          wheel unpack artifacts/*-any.whl -d unpacked
+          
+          # Inject registry and repack
+          P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
+          cp registry.json "$P_DIR/"
+          
+          mkdir -p dist
+          W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
+          wheel pack "$W_DIR" -d dist/
+
+          # Swap the old pure wheel for the injected one in artifacts
+          rm artifacts/*-any.whl
+          cp dist/*-any.whl artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
