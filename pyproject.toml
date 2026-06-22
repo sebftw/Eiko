@@ -51,6 +51,7 @@ torch = ["torch>=2.4.0", "ninja"] # While this extras exists, using "pip install
 # Dependencies require to run examples.
 examples = [
 	"torch>=2.4.0",
+	"ninja",
     "matplotlib>=3.5.0", 
     "scipy>=1.7.0",
     "numpy>=1.21.0",
@@ -66,7 +67,8 @@ test = [
     "vermin",
     "jax[cuda12]>=0.4.13",
     "pybind11",
-    "torch>=2.4.0"
+    "torch>=2.4.0",
+	"ninja"
 ]
 
 [project.urls]
