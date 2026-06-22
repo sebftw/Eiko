@@ -56,7 +56,7 @@ if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     safe_exit 0
 fi
 
-# Request sudo privileges upfront for system checks now that the user agreed
+# Request sudo privileges upfront for system checks now that the user has agreed
 echo -e "\n${MAGENTA}[INFO] Requesting sudo privileges for system installation...${NC}"
 sudo -v || safe_exit 1
 
@@ -265,12 +265,33 @@ fi
 
 echo -e "${MAGENTA}  -> Starting MATLAB to run system verification...${NC}"
 
-# -batch runs MATLAB headlessly without splash/desktop and exits with an error code if the script fails.
 if matlab -batch "addpath('$SCRIPT_DIR/eiko'); eiko_lib.setup;"; then
     echo -e "\n${GREEN}[*] Verification Complete: Eiko for MATLAB is operational!${NC}"
 else
     echo -e "\n${RED}[!] Verification failed. MATLAB encountered an error while running setup.m.${NC}"
     safe_exit 1
 fi
+
+# ---------------------------------------------------------
+# Step 6: Generate MATLAB Initialization Script
+# ---------------------------------------------------------
+LAUNCHER_PATH="$SCRIPT_DIR/start_eiko.m"
+cat << EOF > "$LAUNCHER_PATH"
+% Eiko Initialization Script
+addpath('$SCRIPT_DIR/eiko');
+disp('[*] Eiko is activated. Ready to compute!');
+EOF
+
+echo -e "\n${GREEN}====================================================${NC}"
+echo -e "${GREEN} EIKO ENVIRONMENT INSTALLED SUCCESSFULLY${NC}"
+echo -e "${GREEN}====================================================${NC}"
+
+GRAY='\033[0;37m'
+DARK_GRAY='\033[1;30m'
+
+echo -e "\n${YELLOW}[!] How to use Eiko:${NC}"
+echo -e -n "${GRAY}    Inside MATLAB, navigate to this folder and run: ${NC}"
+echo -e -n "${CYAN}start_eiko.m${NC}\n"
+echo -e "${DARK_GRAY}    (This will add Eiko to your path for the current session)\n${NC}"
 
 safe_exit 0
