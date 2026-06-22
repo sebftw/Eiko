@@ -24,7 +24,8 @@ dx = 0.001          # Grid spacing in meters (1 mm)
 msfm = True         # Multi-stencil fast marching
 c_bg = 1540.0       # Background speed of sound
 
-# Create spatial coordinate grids centered at 0offset = (N // 2) * dx
+# Create spatial coordinate grids centered at 0
+offset = (N // 2) * dx
 x_coords = torch.arange(N, dtype=torch.float32, device=device) * dx - offset
 y_coords = torch.arange(N, dtype=torch.float32, device=device) * dx - offset
 
