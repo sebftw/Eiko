@@ -197,6 +197,8 @@ jobs:
           mkdir -p flat_artifacts
           find artifacts/ -type f \( -name "*.whl" -o -name "*.zip" \) -exec cp {} flat_artifacts/ \;
           rm -rf artifacts/*
+          cp python/install_eiko_python.bat flat_artifacts/
+          cp matlab/install_eiko_matlab.bat flat_artifacts/
           cp flat_artifacts/* artifacts/
           
           # Now the wildcard will successfully find the pure-python wheel
@@ -234,7 +236,7 @@ jobs:
             
             **Guided Install (Recommended if you are new to Python):**
             If you need assistance setting up Python, creating a virtual environment, installing PyTorch/JAX, or updating your drivers, download and run our smart installer:
-            * [Download `install_eiko_python.bat`](https://github.com/${{ github.repository }}/raw/${{ env.TAG }}/python/install_eiko_python.bat) *(Compatible with Windows & Ubuntu)*
+            * Download and run [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat) *(Compatible with Windows & Ubuntu)*
 
             ---
 
@@ -248,7 +250,7 @@ jobs:
 
             **Guided Install:**
             If you need help checking your MATLAB environment or ensuring you have the correct drivers configured, use the smart installer:
-            * [Download `install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/raw/${{ env.TAG }}/matlab/install_eiko_matlab.bat) *(Compatible with Windows & Ubuntu)*
+            * Download and run [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) *(Compatible with Windows & Ubuntu)*
             ***
 
       - name: Publish to PyPI
