@@ -82,38 +82,39 @@ fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
     DRIVER_VER=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -n 1 | cut -d'.' -f1)
-    echo -e "  -> Found active NVIDIA driver: v${DRIVER_VER}"
     
     if [ "$DRIVER_VER" -lt "$MIN_DRIVER" ]; then
-        echo -e "${YELLOW}  -> Driver is too old for CUDA 12.8 (Requires v${MIN_DRIVER}+).${NC}"
+        # SOFT FAIL CASE: Informative warning instead of fatalistic screaming
+        echo -e "${YELLOW}  -> [!] NVIDIA driver v${DRIVER_VER} is below the recommended v${MIN_DRIVER} for CUDA 12.8.${NC}"
         
         if [ "$IS_WSL" = true ]; then
-            echo -e "\n${RED}====================================================${NC}"
-            echo -e "${RED} CRITICAL ERROR: NVIDIA DRIVER UPDATE REQUIRED       ${NC}"
-            echo -e "${RED}====================================================${NC}"
-            echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
-            echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
-            echo -e "\nPlease update your drivers manually:"
-            echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
-            echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
-            echo -e "  3. Reboot your computer and run this script again."
+            echo -e "\n${YELLOW}----------------------------------------------------${NC}"
+            echo -e "${YELLOW} NOTICE: NVIDIA Driver Update Required              ${NC}"
+            echo -e "\n${YELLOW}----------------------------------------------------${NC}"
+            echo -e "To support the required CUDA environment, please update your Windows host driver:"
+            echo -e "  1. Open 'NVIDIA App' or 'GeForce Experience' on Windows."
+            echo -e "  2. Install the latest Game Ready or Studio driver (v${MIN_DRIVER}+)."
+            echo -e "  3. Rerun this script once the update is complete."
             safe_exit 1
         else
+            # For native Linux, we can try to handle it gracefully down-script
             UPDATE_DRIVER=true
         fi
+    else
+        # SUCCESS CASE
+        echo -e "${GREEN}  -> [OK] NVIDIA driver v${DRIVER_VER} detected (Meets v${MIN_DRIVER}+ requirement for CUDA 12.8).${NC}"
+        echo -e "  -> GPU environment is ready for Eiko installation."
     fi
 else
     echo -e "${YELLOW}  -> No active NVIDIA display driver detected.${NC}"
     if [ "$IS_WSL" = true ]; then
-        echo -e "\n${RED}====================================================${NC}"
-        echo -e "${RED} CRITICAL ERROR: NVIDIA DRIVER UPDATE REQUIRED       ${NC}"
-        echo -e "${RED}====================================================${NC}"
-        echo -e "${YELLOW}Your system requires NVIDIA display driver version ${MIN_DRIVER} or higher to run.${NC}"
-        echo -e "${MAGENTA}Because Windows hardware matching is highly specific, this cannot be safely automated.${NC}"
-        echo -e "\nPlease update your drivers manually:"
-        echo -e "  1. Open the 'NVIDIA App' or 'GeForce Experience' on your Windows PC."
-        echo -e "  2. Navigate to the 'Drivers' tab and install the latest update."
-        echo -e "  3. Reboot your computer and run this script again."
+        echo -e "\n${YELLOW}----------------------------------------------------${NC}"
+        echo -e "${YELLOW} NOTICE: NVIDIA Driver Update Required              ${NC}"
+        echo -e "\n${YELLOW}----------------------------------------------------${NC}"
+        echo -e "To support the required CUDA environment, please update your Windows host driver:"
+        echo -e "  1. Open 'NVIDIA App' or 'GeForce Experience' on Windows."
+        echo -e "  2. Install the latest Game Ready or Studio driver (v${MIN_DRIVER}+)."
+        echo -e "  3. Rerun this script once the update is complete."
         safe_exit 1
     else
         UPDATE_DRIVER=true
@@ -122,22 +123,23 @@ fi
 
 # Only proceed with the auto-update logic if NOT in WSL
 if [ "$UPDATE_DRIVER" = true ]; then
-    echo -e "${MAGENTA}WARNING: Updating Linux display drivers may cause a screen flicker and requires a reboot.${NC}"
-    read -p "Would you like to automatically install the recommended NVIDIA driver now? (y/N): " driver_confirm
+    echo -e "${YELLOW}  -> Note: Installing Linux display drivers will cause a brief screen flicker and requires a reboot.${NC}"
+    read -p "     Would you like to automatically install the recommended NVIDIA driver now? (y/N): " driver_confirm
     
     if [[ "$driver_confirm" =~ ^[Yy]$ ]]; then
-        echo -e "${MAGENTA}  -> Fetching and installing the recommended proprietary driver...${NC}"
+        echo -e "${CYAN}  -> Fetching and installing the recommended proprietary driver...${NC}"
         sudo ubuntu-drivers autoinstall
         
-        echo -e "\n${RED}====================================================${NC}"
-        echo -e "${RED} CRITICAL: SYSTEM REBOOT REQUIRED                    ${NC}"
-        echo -e "${RED}====================================================${NC}"
-        echo -e "${YELLOW}The NVIDIA display driver has been updated. The CUDA toolkit cannot map to the GPU until the kernel reloads.${NC}"
-        echo -e "Please reboot your computer, then run this script again to finish the Eiko installation."
+        echo -e "\n${GREEN}----------------------------------------------------${NC}"
+        echo -e "${GREEN} [OK] Driver Installed — Restart Required            ${NC}"
+        echo -e "${GREEN}----------------------------------------------------${NC}"
+        echo -e "The NVIDIA driver was updated successfully. The Linux kernel must reload"
+        echo -e "before the CUDA toolkit can communicate with the GPU."
+        echo -e "\nPlease reboot your computer, then rerun this script to finish the setup."
         safe_exit 0
     else
-        echo -e "\n${RED}[!] Cannot proceed without a compatible NVIDIA driver.${NC}"
-        echo -e "Update your drivers manually, reboot, and rerun this script."
+        echo -e "\n${YELLOW}  -> [!] Setup paused: A compatible NVIDIA driver is required to continue.${NC}"
+        echo -e "     Please update your drivers manually, reboot, and rerun this script."
         safe_exit 1
     fi
 fi
