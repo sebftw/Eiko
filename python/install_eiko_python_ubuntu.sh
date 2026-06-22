@@ -366,7 +366,7 @@ if [ "$PY_VER" == "3.8" ]; then
         uninstall_if_present "torch" "torchvision" "torchaudio"
         echo -e "${MAGENTA}  -> Installing JAX stack...${NC}"
         run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
-        run_pip_command install "eiko[jax]" --no-input || safe_exit 1
+        run_pip_command install "pybind11" --no-input || safe_exit 1
     elif [ "$choice" == "2" ]; then
         if ! is_torch_valid; then
             run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
@@ -381,7 +381,7 @@ else
         run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
     fi
     run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
-    run_pip_command install "eiko[jax]" --no-input || safe_exit 1
+    run_pip_command install "pybind11" --no-input || safe_exit 1
 fi
 
 # ---------------------------------------------------------
