@@ -40,9 +40,9 @@ Write-Host " Eiko MATLAB Installer (Windows)            " -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
 Write-Host "`nThis script will install all the requirements for Eiko by performing the following actions:" -ForegroundColor Gray
-Write-Host "  1. Detect MATLAB and probe for compiler/CUDA requirements." -ForegroundColor Gray
+Write-Host "  1. Detect MATLAB and probe for compiler and CUDA requirements." -ForegroundColor Gray
 Write-Host "  2. Check if your NVIDIA graphics drivers are up to date." -ForegroundColor Gray
-Write-Host "  3. Set up the correct NVIDIA CUDA tools (if not already built into MATLAB)." -ForegroundColor Gray
+Write-Host "  3. Set up the correct NVIDIA CUDA tools." -ForegroundColor Gray
 Write-Host "  4. Download and install the necessary Microsoft C++ Build Tools." -ForegroundColor Gray
 Write-Host "  5. Run a final test in MATLAB to ensure everything is working." -ForegroundColor Gray
 
@@ -56,7 +56,7 @@ $choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
     (New-Object System.Management.Automation.Host.ChoiceDescription("&No", "Cancel the setup immediately without installing anything."))
 )
 
-$decision = $Host.UI.PromptForChoice("Confirmation", "Do you agree to these terms and want to proceed?", $choices, 1)
+$decision = $Host.UI.PromptForChoice("Confirmation", "Do you agree to these terms? (Type 'Y' or 'N' and press Enter to confirm)", $choices, 1)
 
 if ($decision -eq 1) {
     Write-Host "`n[*] Setup cancelled by user." -ForegroundColor Yellow
@@ -95,7 +95,8 @@ Write-Host "  -> Querying MATLAB for version and C++ compiler requirements (~10-
 # Fetch supported compilers AND the MATLAB release version in one headless pass
 $probeScript = "cc=mex.getCompilerConfigurations('C++','Supported'); max_y=0; for i=1:length(cc), m=regexp(cc(i).Name,'(?<=Microsoft Visual C\+\+\s)\d{4}','match','once'); if ~isempty(m), max_y=max(max_y,str2double(m)); end; end; fprintf('MSVC_YEAR:%d\n',max_y); fprintf('MATLAB_RELEASE:%s\n', version('-release'));"
 
-$probeOutput = & $matlabExe -batch $probeScript
+# FIX: Pipe to Out-String so PowerShell treats the multi-line output as a single string, allowing $matches to populate correctly.
+$probeOutput = & $matlabExe -batch $probeScript | Out-String
 
 $requestedYear = "2022" # Default fallback
 $matlabRelease = "UNKNOWN"
@@ -282,7 +283,7 @@ if (-not (Test-Path -LiteralPath $setupPath)) {
 Write-Host "  -> Starting MATLAB to run system verification..." -ForegroundColor Magenta
 
 $matlabSafePath = $eikoPath -replace '\\', '/'
-$matlabCmd = "addpath('$matlabSafePath'); eiko_lib.setup;"
+$matlabCmd = "addpath('$matlabSafePath'); eiko_lib.setup; exit;"
 $matlabProc = Start-Process matlab -ArgumentList '-batch', "`"$matlabCmd`"" -Wait -PassThru -NoNewWindow
 
 if ($matlabProc.ExitCode -eq 0) {
@@ -310,4 +311,8 @@ Write-Host "    Inside MATLAB, navigate to this folder and run: " -NoNewline -Fo
 Write-Host "start_eiko`n" -ForegroundColor Cyan
 Write-Host "    (This will add Eiko to your path for the current session)`n" -ForegroundColor DarkGray
 
-Exit-Script
+# Explicitly hold the window open for the instructions
+Write-Host "Installation process complete. Press any key to close this setup window..." -ForegroundColor Cyan
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+
+exit
