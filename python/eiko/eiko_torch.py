@@ -77,16 +77,18 @@ except ImportError:
         # Runtime Download Fallback
         # --------------------------------------------------------------------
         from eiko.bootstrap import fetch_precompiled_wheel
+        from eiko import __version__
         is_loaded = False
 
-        torch_v = torch.__version__
-        cuda_v = torch.version.cuda
-        if cuda_v is not None:
-            cuda_v = f"cu{cuda_v.replace('.', '')}"
-        else:
-            cuda_v = "cpu"
-
-        if fetch_precompiled_wheel(__version__, torch_v, cuda_v, BIN_CACHE_DIR, target_impl="eiko_torch_impl"):
+        cuda_tag = f"cu{torch.version.cuda.replace('.', '')}" if torch.version.cuda else "cpu"
+        if fetch_precompiled_wheel(
+                package_version=__version__,
+                backend_name="torch",
+                backend_version=torch.__version__,
+                cuda_version=cuda_tag,
+                target_dir=BIN_CACHE_DIR,
+                target_impl="eiko_torch_impl"
+            ):
             # Force Python to rescan sys.path directories, so it sees the new file
             import importlib
             importlib.invalidate_caches()
