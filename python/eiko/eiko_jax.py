@@ -84,6 +84,9 @@ except ImportError:
         is_loaded = False
         
         if fetch_precompiled_wheel(__version__, torch_version=None, cuda_version=None, target_dir=BIN_CACHE_DIR, target_impl="eiko_jax_impl"):
+            # Force Python to rescan sys.path directories, so it sees the new file
+            import importlib
+            importlib.invalidate_caches()
             try:
                 import eiko_jax_impl as _fim_jax_impl
                 is_loaded = True
