@@ -174,11 +174,22 @@ jobs:
               json.dump(registry, f, indent=2)
           "
           
-          # Zip the MATLAB folder
+          # Handle the MATLAB artifact
           if [ -d "artifacts/eiko-matlab-release" ]; then
-            cd artifacts/eiko-matlab-release
-            zip -r ../eiko_matlab.zip .
-            cd ../..
+            # Check if the directory already contains a zip file
+            EXISTING_ZIP=$(find artifacts/eiko-matlab-release -maxdepth 1 -name "*.zip" | head -n 1)
+            
+            if [ -n "$EXISTING_ZIP" ]; then
+              # It's already zipped: just move and rename it
+              mv "$EXISTING_ZIP" artifacts/eiko_matlab.zip
+            else
+              # It's an uncompressed folder: zip it
+              cd artifacts/eiko-matlab-release
+              zip -r ../eiko_matlab.zip .
+              cd ../..
+            fi
+            
+            # Clean up the artifact folder
             rm -rf artifacts/eiko-matlab-release
           fi
           
