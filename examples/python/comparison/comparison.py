@@ -26,7 +26,7 @@ except AttributeError:
     _FTEIK_SOLVER_2D = None
 
 # ==========================================
-# JAX 2D Parallel Jacobi Eikonal
+# JAX 2D Gauss-Seidel Algorithm (JAX-GS)
 # ==========================================
 try:
     import jax
