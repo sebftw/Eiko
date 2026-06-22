@@ -226,16 +226,29 @@ jobs:
             ## Installation Instructions
 
             ### 🐍 Python
-            Run
+            
+            **Quick Install:**
             ```bash
             pip install eiko
             ```
+            
+            **Guided Install (Recommended if you are new to Python):**
+            If you need assistance setting up Python, creating a virtual environment, installing PyTorch/JAX, or updating your drivers, download and run our smart installer:
+            * [Download `install_eiko_python.bat`](https://github.com/${{ github.repository }}/raw/${{ env.TAG }}/python/install_eiko_python.bat) *(Compatible with Windows & Ubuntu)*
+
+            ---
 
             ### 🧮 MATLAB
+            
+            **Quick Install:**
             1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
             2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
             
             💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
+
+            **Guided Install:**
+            If you need help checking your MATLAB environment or ensuring you have the correct drivers configured, use the smart installer:
+            * [Download `install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/raw/${{ env.TAG }}/matlab/install_eiko_matlab.bat) *(Compatible with Windows & Ubuntu)*
             ***
 
       - name: Publish to PyPI
