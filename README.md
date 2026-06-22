@@ -203,7 +203,6 @@ Eiko/
 ├── src/            # Core CUDA C++ Eiko implementation and interface
 ├── images/         # Various image assets
 ├── pyproject.toml  # Python package configuration (for pip install)
-├── setup.m         # MATLAB compilation and setup script
 ├── THEORY.md       # Mathematical background and Eikonal algorithm details
 └── README.md       # This file
 ```
