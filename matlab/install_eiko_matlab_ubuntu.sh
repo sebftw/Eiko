@@ -287,9 +287,12 @@ else
 fi
 
 LAUNCHER_PATH="$SCRIPT_DIR/start_eiko.m"
-cat << EOF > "$LAUNCHER_PATH"
+# Wrapping 'EOF' in single quotes blocks Bash from expanding variables inside
+cat << 'EOF' > "$LAUNCHER_PATH"
 % Eiko Initialization Script
-addpath('$SCRIPT_DIR/eiko');
+[scriptDir, ~, ~] = fileparts(mfilename('fullpath'));
+eikoPath = fullfile(scriptDir, 'eiko');
+addpath(eikoPath);
 disp('[*] Eiko is activated. Ready to compute!');
 EOF
 
