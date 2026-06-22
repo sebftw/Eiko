@@ -248,6 +248,8 @@ if IS_RELEASE_BUILD:
             '-Xcudafe', '--diag_suppress=177'    # Unused variable in CUDA files
         ])
 else:
+    if "TORCH_CUDA_ARCH_LIST" not in os.environ:
+        os.environ["TORCH_CUDA_ARCH_LIST"] = "native"
     NVCC_ARGS.append('-arch=native')
 
 # ------------------------------------------------------------------------
