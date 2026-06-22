@@ -28,10 +28,11 @@
 %    until all points converge to the theoretically minimum travel time. It 
 %    is somewhat similar to Dijkstra's algorithm.
 %    
-%    Eiko can therefore be used for beamforming, signed distance functions 
-%    (in a non-homogeneous space), shortest path planning, and much more. 
-%    It is similar to the MATLAB function bwdist, but supports variable wave 
-%    propagation speeds.
+%    Eiko can therefore be seen as a generalized, non-homogeneous distance 
+%    transform. While the MATLAB function bwdist calculates fast geometric 
+%    distances assuming a constant propagation speed, Eiko handles variable 
+%    wave propagation speeds, making it useful for beamforming, signed 
+%    distance functions in complex media, shortest path planning, and more.
 %
 %  Limitations: The calculated time-of-flight will always be an overestimate, 
 %    but it is usually accurate enough for most use cases as long as the 
@@ -215,3 +216,5 @@
 %% REFERENCES:
 %  [1]: "Improved Fast Iterative Algorithm for Eikonal Equation for GPU
 %  Computing" by Yuhao Huang (2021), https://arxiv.org/abs/2106.15869 .
+%
+% See also bwdist, eiko, eiko_lib.doc.advection
