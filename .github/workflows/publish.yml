@@ -197,6 +197,13 @@ jobs:
           mkdir -p flat_artifacts
           find artifacts/ -type f \( -name "*.whl" -o -name "*.zip" \) -exec cp {} flat_artifacts/ \;
           rm -rf artifacts/*
+          
+          # Pin Python script to raw files for the specific release tag
+          sed -i "s|raw.githubusercontent.com/sebftw/Eiko/main|raw.githubusercontent.com/${{ github.repository }}/${{ env.TAG }}|g" python/install_eiko_python.bat
+
+          # Pin MATLAB script to the full repository archive for the specific release tag
+          sed -i "s|github.com/sebftw/Eiko/archive/refs/heads/main|github.com/${{ github.repository }}/archive/refs/tags/${{ env.TAG }}|g" matlab/install_eiko_matlab.bat
+          
           cp python/install_eiko_python.bat flat_artifacts/
           cp matlab/install_eiko_matlab.bat flat_artifacts/
           cp flat_artifacts/* artifacts/
