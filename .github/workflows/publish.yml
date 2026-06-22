@@ -94,43 +94,104 @@ jobs:
           # The raw MEX artifacts will be ignored and won't clutter your release.
           pattern: '{*wheel*,eiko-matlab-release}'
           path: artifacts
-          merge-multiple: true
+          merge-multiple: false
           run-id: ${{ env.TARGET_RUN_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # ---------------------------------------------------------
       # REGISTRY INJECTION & RELEASE
       # ---------------------------------------------------------
-      - name: Generate Registry and Inject
+      - name: Generate Registry, Rename Wheels, and Inject
         run: |
           python3 -c "
-          import os, json, hashlib, glob
-          repo, tag = '${{ github.repository }}', '${{ env.TAG }}'
-          registry = {'version': tag, 'wheels': []}
-          for fpath in glob.glob('artifacts/*.whl'):
-              if 'any.whl' in fpath: continue
-              fname = os.path.basename(fpath)
-              sha = hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
-              registry['wheels'].append({'file': fname, 'url': f'https://github.com/{repo}/releases/download/{tag}/{fname}', 'sha256': sha})
-          json.dump(registry, open('registry.json', 'w'), indent=2)
+          import os, json, hashlib, glob, re, shutil
+    
+          repo = '${{ github.repository }}'
+          raw_tag = '${{ env.TAG }}'
+          version_key = raw_tag.lstrip('v')
+    
+          registry = {'versions': {version_key: []}}
+          os.makedirs('staged_wheels', exist_ok=True)
+    
+          # recursive=True is critical to peek inside the downloaded artifact sub-folders
+          for fpath in glob.glob('artifacts/**/*.whl', recursive=True):
+              if 'any.whl' in fpath: 
+                  continue
+              
+              # Grab the container folder name (e.g., 'wheels-ubuntu22.04-pt2.3.0-cu121-py3.10')
+              parent_dir = os.path.basename(os.path.dirname(fpath))
+              orig_fname = os.path.basename(fpath)
+    
+              # 1. Parse Python & OS from the actual wheel filename
+              py_match = re.search(r'cp(\d)(\d{1,2})', orig_fname)
+              py_ver = f'{py_match.group(1)}.{py_match.group(2)}' if py_match else 'unknown'
+    
+              os_name = 'unknown'
+              if any(w in orig_fname.lower() for w in ['linux', 'manylinux', 'musllinux']):
+                  os_name = 'linux'
+              elif 'win' in orig_fname.lower():
+                  os_name = 'windows'
+              elif 'mac' in orig_fname.lower():
+                  os_name = 'macos'
+    
+              # 2. Extract Frameworks & CUDA from the PARENT folder name
+              cu_match = re.search(r'-(cu\d+)', parent_dir)
+              cuda_ver = cu_match.group(1) if cu_match else ''
+    
+              pt_match = re.search(r'-(?:pt|torch)([\d\.]+)', parent_dir)
+              torch_ver = pt_match.group(1).rstrip('.') if pt_match else ''
+    
+              jax_match = re.search(r'-jax([\d\.]+)', parent_dir)
+              jax_ver = jax_match.group(1).rstrip('.') if jax_match else ''
+    
+              # 3. Assemble a guaranteed-unique, pip-legal PEP 427 wheel filename
+              # Format: {distribution}-{version}(+{local_tag})-{python}-{abi}-{platform}.whl
+              parts = orig_fname.split('-')
+              dist = parts[0]
+              base_ver = parts[1].split('+')[0] # strip any pre-existing local tags
+              tail = '-'.join(parts[2:])
+    
+              local_tags = []
+              if torch_ver: local_tags.append(f'torch{torch_ver}')
+              if jax_ver:   local_tags.append(f'jax{jax_ver}')
+              if cuda_ver:  local_tags.append(cuda_ver)
+    
+              local_str = '+' + '.'.join(local_tags) if local_tags else ''
+              new_fname = f'{dist}-{base_ver}{local_str}-{tail}'
+              new_fpath = os.path.join('staged_wheels', new_fname)
+    
+              # Move to staging with its new unique identity
+              shutil.copy2(fpath, new_fpath)
+              sha = hashlib.sha256(open(new_fpath, 'rb').read()).hexdigest()
+    
+              registry['versions'][version_key].append({
+                  'filename': new_fname,
+                  'os': os_name,
+                  'python': py_ver,
+                  'cuda': cuda_ver,
+                  'torch': torch_ver,
+                  'jax': jax_ver,
+                  'url': f'https://github.com/{repo}/releases/download/{raw_tag}/{new_fname}',
+                  'sha256': sha
+              })
+    
+          with open('registry.json', 'w') as f:
+              json.dump(registry, f, indent=2)
           "
           python3 -m pip install --upgrade wheel
           
-          # Unpack the pure-python wheel
+          # Unpack pure wheel, shove registry inside, repack
           wheel unpack artifacts/*-any.whl -d unpacked
-          
-          # Find internal package directory and copy registry inside
           P_DIR=$(find unpacked -mindepth 2 -maxdepth 2 -type d -not -name "*.dist-info")
           cp registry.json "$P_DIR/"
           
-          # Find top-level unpacked directory and pack it to dist/
           mkdir -p dist
           W_DIR=$(find unpacked -mindepth 1 -maxdepth 1 -type d)
           wheel pack "$W_DIR" -d dist/
-
-          # Replace the old pure wheel in artifacts with the newly injected one
-          # This ensures your GitHub Release step uploads the correct asset.
-          rm artifacts/*-any.whl
+    
+          # Wipe the old, dangerously ambiguous artifacts directory and stage the renamed ones
+          rm -rf artifacts/*
+          cp staged_wheels/*.whl artifacts/
           cp dist/*-any.whl artifacts/
 
       - name: Create GitHub Release
