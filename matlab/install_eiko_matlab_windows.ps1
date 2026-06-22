@@ -23,18 +23,6 @@ function Exit-Script {
     exit
 }
 
-# 0. Ensure the script is running with Administrator privileges
-$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if (-not $isAdmin) {
-    Write-Host "[INFO] Requesting Administrator privileges for system checks..." -ForegroundColor Magenta
-    
-    # Run the steps as administrator.
-    $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -ElevatedSession"
-    Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -Wait
-    
-    return
-}
-
 Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host " Eiko MATLAB Installer (Windows)            " -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
@@ -46,21 +34,45 @@ Write-Host "  3. Set up the correct NVIDIA CUDA tools." -ForegroundColor Gray
 Write-Host "  4. Download and install the necessary Microsoft C++ Build Tools." -ForegroundColor Gray
 Write-Host "  5. Run a final test in MATLAB to ensure everything is working." -ForegroundColor Gray
 
-# Disclaimer Notice
-Write-Host "`n[!] DISCLAIMER: This script requires administrative privileges and modifies your system." -ForegroundColor Yellow
-Write-Host "    It is provided 'as-is' without any express or implied warranties. Run at your own risk." -ForegroundColor Yellow
+# ---------------------------------------------------------
+# Phase 1: User Confirmation (Runs in current privilege level)
+# ---------------------------------------------------------
 
+# If we are NOT in the auto-relaunched elevated session, show the intro and prompt.
+if (-not $ElevatedSession) {
+	
+    # Disclaimer Notice
+    Write-Host "`n[!] DISCLAIMER: This script requires administrative privileges and modifies your system." -ForegroundColor Yellow
+    Write-Host "    It is provided 'as-is' without any express or implied warranties. Run at your own risk." -ForegroundColor Yellow 
 
-$choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
-    (New-Object System.Management.Automation.Host.ChoiceDescription("&Yes", "Accept the terms, grant admin rights, and begin installation.")),
-    (New-Object System.Management.Automation.Host.ChoiceDescription("&No", "Cancel the setup immediately without installing anything."))
-)
+    $choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
+        (New-Object System.Management.Automation.Host.ChoiceDescription("&Yes", "Accept the terms, grant admin rights, and begin installation.")),
+        (New-Object System.Management.Automation.Host.ChoiceDescription("&No", "Cancel the setup immediately without installing anything."))
+    )
 
-$decision = $Host.UI.PromptForChoice("Confirmation", "Do you agree to these terms? (Type 'Y' or 'N' and press Enter to confirm)", $choices, 1)
+    $decision = $Host.UI.PromptForChoice("Confirmation", "Do you agree to these terms and want to proceed?", $choices, 1)
 
-if ($decision -eq 1) {
-    Write-Host "`n[*] Setup cancelled by user." -ForegroundColor Yellow
-    Exit-Script
+    if ($decision -eq 1) {
+        Write-Host "`n[*] Setup cancelled by user." -ForegroundColor Yellow
+        Exit-Script
+    }
+
+    # ---------------------------------------------------------
+    # Phase 2: Elevation Trigger
+    # ---------------------------------------------------------
+    # Now that they agreed, check if we actually have admin rights
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+
+    if (-not $isAdmin) {
+        Write-Host "`n[INFO] Requesting Administrator privileges to begin installation..." -ForegroundColor Magenta
+        
+        # Relaunch the script as admin, passing the flag to skip the menu we just did
+        $argList = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -ElevatedSession"
+        Start-Process powershell.exe -ArgumentList $argList -Verb RunAs -Wait
+        
+        # Close the non-admin window since the new elevated window is taking over
+        exit
+    }
 }
 
 function Refresh-EnvPath {
