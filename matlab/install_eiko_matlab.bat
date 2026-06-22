@@ -11,14 +11,16 @@
 :;    elif command -v python3 >/dev/null 2>&1; then python3 -c "import urllib.request; urllib.request.urlretrieve('$URL', 'Eiko-src.tar.gz')"
 :;    else echo "Error: Neither curl, wget, nor python3 were found." && exit 1; fi
 :;    
-:;    echo "Extracting MATLAB components..."
+:;    echo "Extracting MATLAB components, CUDA source, and examples..."
 :;    rm -rf .eiko_tmp Eiko 2>/dev/null
 :;    mkdir .eiko_tmp
 :;    tar -xzf Eiko-src.tar.gz -C .eiko_tmp
 :;    
-:;    # Dynamically find the extracted directory and move ONLY the matlab folder
+:;    # Dynamically find the extracted directory, move matlab, copy src and examples
 :;    EXTRACTED_DIR=$(find .eiko_tmp -maxdepth 1 -type d -name "Eiko-*" | head -n 1)
 :;    mv "$EXTRACTED_DIR/matlab" ./Eiko
+:;    cp -r "$EXTRACTED_DIR/src" ./Eiko/eiko/+eiko_lib/
+:;    cp -r "$EXTRACTED_DIR/examples/matlab" ./Eiko/examples
 :;    
 :;    # Clean up the archive and the remaining repo contents
 :;    rm -rf .eiko_tmp Eiko-src.tar.gz
@@ -32,7 +34,7 @@
 :; exit $?
 @echo off
 REM Windows Command Prompt / Batch Section
-powershell -NoExit -ExecutionPolicy Bypass -Command "if (Test-Path '.\install_eiko_matlab_windows.ps1') { Write-Host 'Local installer found. Skipping download.' } else { $ProgressPreference = 'SilentlyContinue'; Write-Host 'Downloading Eiko repository...'; Invoke-WebRequest -Uri 'https://github.com/sebftw/Eiko/archive/refs/heads/main.zip' -OutFile 'Eiko-src.zip'; Write-Host 'Extracting MATLAB components...'; if (Test-Path 'Eiko') { Remove-Item 'Eiko' -Recurse -Force }; New-Item -ItemType Directory -Force -Path '.\EikoTmp' | Out-Null; Expand-Archive -Path 'Eiko-src.zip' -DestinationPath '.\EikoTmp' -Force; Remove-Item -Path 'Eiko-src.zip' -Force; $extracted = Get-ChildItem -Path '.\EikoTmp' -Directory | Where-Object Name -like 'Eiko-*' | Select-Object -First 1; $target = Join-Path $extracted.FullName 'matlab'; Move-Item -Path $target -Destination '.\Eiko' -Force; Remove-Item -Path '.\EikoTmp' -Recurse -Force; Set-Location -Path 'Eiko' } .\install_eiko_matlab_windows.ps1"
+powershell -NoExit -ExecutionPolicy Bypass -Command "if (Test-Path '.\install_eiko_matlab_windows.ps1') { Write-Host 'Local installer found. Skipping download.' } else { $ProgressPreference = 'SilentlyContinue'; Write-Host 'Downloading Eiko repository...'; Invoke-WebRequest -Uri 'https://github.com/sebftw/Eiko/archive/refs/heads/main.zip' -OutFile 'Eiko-src.zip'; Write-Host 'Extracting MATLAB components, CUDA source, and examples...'; if (Test-Path 'Eiko') { Remove-Item 'Eiko' -Recurse -Force }; New-Item -ItemType Directory -Force -Path '.\EikoTmp' | Out-Null; Expand-Archive -Path 'Eiko-src.zip' -DestinationPath '.\EikoTmp' -Force; Remove-Item -Path 'Eiko-src.zip' -Force; $extracted = Get-ChildItem -Path '.\EikoTmp' -Directory | Where-Object Name -like 'Eiko-*' | Select-Object -First 1; $matlabDir = Join-Path $extracted.FullName 'matlab'; Move-Item -Path $matlabDir -Destination '.\Eiko' -Force; $srcDir = Join-Path $extracted.FullName 'src'; $destDir = Join-Path '.\Eiko' 'eiko\+eiko_lib'; Copy-Item -Path $srcDir -Destination $destDir -Recurse -Force; $exSrc = Join-Path $extracted.FullName 'examples\matlab'; $exDest = Join-Path '.\Eiko' 'examples'; Copy-Item -Path $exSrc -Destination $exDest -Recurse -Force; Remove-Item -Path '.\EikoTmp' -Recurse -Force; Set-Location -Path 'Eiko' } .\install_eiko_matlab_windows.ps1"
 if %errorlevel% neq 0 (
     echo [!] Windows Installation failed.
     pause
