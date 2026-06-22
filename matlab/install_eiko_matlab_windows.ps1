@@ -18,14 +18,12 @@ $ErrorActionPreference = "Continue"
 
 # Unified exit handler
 function Exit-Script {
-    # if (-not $ElevatedSession) {
-        Write-Host "`nPress any key to exit..." -ForegroundColor Cyan
-        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-    # }
+    Write-Host "`nPress any key to exit..." -ForegroundColor Cyan
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     exit
 }
 
-# 1. Ensure the script is running with Administrator privileges
+# 0. Ensure the script is running with Administrator privileges
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host "[INFO] Requesting Administrator privileges for system checks..." -ForegroundColor Magenta
@@ -42,9 +40,9 @@ Write-Host " Eiko MATLAB Installer (Windows)            " -ForegroundColor Cyan
 Write-Host "====================================================" -ForegroundColor Cyan
 
 Write-Host "`nThis script will install all the requirements for Eiko by performing the following actions:" -ForegroundColor Gray
-Write-Host "  1. Check if your NVIDIA graphics drivers are up to date." -ForegroundColor Gray
-Write-Host "  2. Set up the correct NVIDIA CUDA tools (v12.8.2) for GPU computing." -ForegroundColor Gray
-Write-Host "  3. Detect which C++ compiler your specific MATLAB version needs." -ForegroundColor Gray
+Write-Host "  1. Detect MATLAB and probe for compiler/CUDA requirements." -ForegroundColor Gray
+Write-Host "  2. Check if your NVIDIA graphics drivers are up to date." -ForegroundColor Gray
+Write-Host "  3. Set up the correct NVIDIA CUDA tools (if not already built into MATLAB)." -ForegroundColor Gray
 Write-Host "  4. Download and install the necessary Microsoft C++ Build Tools." -ForegroundColor Gray
 Write-Host "  5. Run a final test in MATLAB to ensure everything is working." -ForegroundColor Gray
 
@@ -54,15 +52,12 @@ Write-Host "    It is provided 'as-is' without any express or implied warranties
 
 
 $choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
-    # Format: New-Object ChoiceDescription("Label", "Help Text")
     (New-Object System.Management.Automation.Host.ChoiceDescription("&Yes", "Accept the terms, grant admin rights, and begin installation.")),
     (New-Object System.Management.Automation.Host.ChoiceDescription("&No", "Cancel the setup immediately without installing anything."))
 )
 
-# 1 sets the default safe choice to "No"
 $decision = $Host.UI.PromptForChoice("Confirmation", "Do you agree to these terms and want to proceed?", $choices, 1)
 
-# $decision 0 is Yes, 1 is No
 if ($decision -eq 1) {
     Write-Host "`n[*] Setup cancelled by user." -ForegroundColor Yellow
     Exit-Script
@@ -83,11 +78,50 @@ function Refresh-EnvPath {
 }
 
 # ---------------------------------------------------------
-# Step 0: Check NVIDIA Display Drivers
+# Step 1: Locate MATLAB & Probe System Requirements
 # ---------------------------------------------------------
-Write-Host "`n[1/5] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
+Write-Host "`n[1/5] Locating MATLAB and Probing System Requirements..." -ForegroundColor Cyan
 
-# CUDA 12.8 requires driver >= 570.00
+$matlabExe = (Get-Command matlab -ErrorAction SilentlyContinue).Source
+if (-not $matlabExe) {
+    Write-Host "`n[!] 'matlab' command not found in your system PATH." -ForegroundColor Red
+    Write-Host "Please ensure MATLAB is installed and correctly added to your environment variables." -ForegroundColor Yellow
+    Exit-Script
+}
+
+Write-Host "  -> MATLAB executable found at: $matlabExe" -ForegroundColor DarkGray
+Write-Host "  -> Querying MATLAB for version and C++ compiler requirements (~10-20 seconds)..." -ForegroundColor Magenta
+
+# Fetch supported compilers AND the MATLAB release version in one headless pass
+$probeScript = "cc=mex.getCompilerConfigurations('C++','Supported'); max_y=0; for i=1:length(cc), m=regexp(cc(i).Name,'(?<=Microsoft Visual C\+\+\s)\d{4}','match','once'); if ~isempty(m), max_y=max(max_y,str2double(m)); end; end; fprintf('MSVC_YEAR:%d\n',max_y); fprintf('MATLAB_RELEASE:%s\n', version('-release'));"
+
+$probeOutput = & $matlabExe -batch $probeScript
+
+$requestedYear = "2022" # Default fallback
+$matlabRelease = "UNKNOWN"
+$matlabYear = 0
+
+if ($probeOutput -match "MATLAB_RELEASE:(\d{4}[ab])") {
+    $matlabRelease = $matches[1]
+    $matlabYear = [int]($matlabRelease.Substring(0,4))
+    Write-Host "  -> MATLAB Release R$matlabRelease detected." -ForegroundColor Green
+}
+
+if ($probeOutput -match "MSVC_YEAR:(\d{4})") {
+    $requestedYear = $matches[1]
+    Write-Host "  -> MATLAB requested MSVC $requestedYear." -ForegroundColor Green
+} else {
+    Write-Host "  -> MATLAB compiler query failed. Defaulting to MSVC 2022." -ForegroundColor Yellow
+}
+
+$msvcId = "Microsoft.VisualStudio.$requestedYear.BuildTools"
+
+# ---------------------------------------------------------
+# Step 2: Check NVIDIA Display Drivers
+# ---------------------------------------------------------
+Write-Host "`n[2/5] Checking NVIDIA Display Drivers..." -ForegroundColor Cyan
+
+# CUDA 12.8 requires driver >= 570.00 (Even if MATLAB ships with CUDA, the host driver is still required)
 $minDriver = 570
 $driverValid = $false
 $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
@@ -98,18 +132,14 @@ if ($nvidiaSmi) {
         $driverVer = [int]$matches[1]
         
         if ($driverVer -lt $minDriver) {
-            # SOFT FAIL CASE
             Write-Host "  -> [!] NVIDIA driver v$driverVer is below the recommended v$minDriver for CUDA 12.8." -ForegroundColor Yellow
             $driverValid = $false
         } else {
-            # SUCCESS CASE
-            Write-Host "  -> [OK] NVIDIA driver v$driverVer detected (Meets v$minDriver+ requirement for CUDA 12.8)." -ForegroundColor Green
-            Write-Host "  -> GPU environment is ready for Eiko installation."
+            Write-Host "  -> [OK] NVIDIA driver v$driverVer detected (Meets v$minDriver+ requirement)." -ForegroundColor Green
             $driverValid = $true
         }
     }
 } else {
-    # MISSING DRIVER CASE
     Write-Host "  -> [!] No active NVIDIA display driver detected (nvidia-smi not found)." -ForegroundColor Yellow
     $driverValid = $false
 }
@@ -126,27 +156,32 @@ if (-not $driverValid) {
 }
 
 # ---------------------------------------------------------
-# Step 1: Check and Install Targeted CUDA (Pinned to 12.8.2)
+# Step 3: Check and Install Targeted CUDA
 # ---------------------------------------------------------
-Write-Host "`n[2/5] Checking CUDA installation (Target: 12.8.2)..." -ForegroundColor Cyan
+Write-Host "`n[3/5] Checking system CUDA requirements..." -ForegroundColor Cyan
 
 $installCuda = $true
 $targetCuda = "12.8.2"
-$cudaCheck = Get-Command nvcc -ErrorAction SilentlyContinue
 
-if ($cudaCheck) {
-    $nvccOutput = nvcc --version | Out-String
-    if ($nvccOutput -match "release (\d+\.\d+)") {
-        $cudaVer = [version]$matches[1]
-        if ($cudaVer -ge [version]"12.8") {
-            Write-Host "  -> Found CUDA $cudaVer. Skipping installation." -ForegroundColor Yellow
-            $installCuda = $false
+if ($matlabYear -ge 2026) {
+    Write-Host "  -> Built-in CUDA detected (MATLAB R$matlabRelease). Skipping system CUDA installation." -ForegroundColor Green
+    $installCuda = $false
+} else {
+    $cudaCheck = Get-Command nvcc -ErrorAction SilentlyContinue
+    if ($cudaCheck) {
+        $nvccOutput = nvcc --version | Out-String
+        if ($nvccOutput -match "release (\d+\.\d+)") {
+            $cudaVer = [version]$matches[1]
+            if ($cudaVer -ge [version]"12.8") {
+                Write-Host "  -> Found system CUDA $cudaVer. Skipping installation." -ForegroundColor Yellow
+                $installCuda = $false
+            }
         }
     }
 }
 
 if ($installCuda) {
-    Write-Host "  -> Installing target CUDA version ($targetCuda)..." -ForegroundColor Magenta
+    Write-Host "  -> Installing target system CUDA version ($targetCuda)..." -ForegroundColor Magenta
     winget install --id Nvidia.CUDA -v $targetCuda -e --accept-package-agreements --accept-source-agreements
     
     if ($LASTEXITCODE -ne 0) {
@@ -157,54 +192,19 @@ if ($installCuda) {
 }
 
 # ---------------------------------------------------------
-# Step 2: Locate MATLAB & Probe Required MSVC Version
-# ---------------------------------------------------------
-Write-Host "`n[3/5] Locating MATLAB and Probing Compiler Requirements..." -ForegroundColor Cyan
-
-$matlabExe = (Get-Command matlab -ErrorAction SilentlyContinue).Source
-if (-not $matlabExe) {
-    Write-Host "`n[!] 'matlab' command not found in your system PATH." -ForegroundColor Red
-    Write-Host "Please ensure MATLAB is installed and correctly added to your environment variables." -ForegroundColor Yellow
-    Exit-Script
-}
-
-Write-Host "  -> MATLAB executable found at: $matlabExe" -ForegroundColor DarkGray
-Write-Host "  -> Querying MATLAB for supported C++ compilers (headless mode, ~10-20 seconds)..." -ForegroundColor Magenta
-
-# One-liner to fetch the supported compilers, regex the year, and dump the latest one to stdout.
-$probeScript = "cc=mex.getCompilerConfigurations('C++','Supported'); max_y=0; for i=1:length(cc), m=regexp(cc(i).Name,'(?<=Microsoft Visual C\+\+\s)\d{4}','match','once'); if ~isempty(m), max_y=max(max_y,str2double(m)); end; end; if max_y>0, fprintf('MSVC_YEAR:%d\n',max_y); else, fprintf('MSVC_YEAR:UNKNOWN\n'); end;"
-
-# Run the probe and capture output
-$probeOutput = & $matlabExe -batch $probeScript
-$requestedYear = "2022" # Safe default if probe fails entirely
-
-if ($probeOutput -match "MSVC_YEAR:(\d{4})") {
-    $requestedYear = $matches[1]
-    Write-Host "  -> MATLAB requested MSVC $requestedYear." -ForegroundColor Green
-} else {
-    Write-Host "  -> MATLAB compiler query failed or returned unrecognized output. Defaulting to MSVC 2022." -ForegroundColor Yellow
-}
-
-$msvcId = "Microsoft.VisualStudio.$requestedYear.BuildTools"
-$legacyComponent = ""
-
-# ---------------------------------------------------------
-# Step 3: Validate and Install MSVC Build Tools
+# Step 4: Validate and Install MSVC Build Tools
 # ---------------------------------------------------------
 Write-Host "`n[4/5] Validating MSVC $requestedYear availability via WinGet..." -ForegroundColor Cyan
 
-# Initialize component tracking
-$componentIdToCheck = "Microsoft.VisualStudio.Workload.VCTools" # Base default
+$componentIdToCheck = "Microsoft.VisualStudio.Workload.VCTools"
 $isLegacy = $false
 
-# Check if WinGet actually hosts this exact year natively
 $null = winget show --id $msvcId --accept-source-agreements 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  -> WinGet does not host a native package for MSVC $requestedYear." -ForegroundColor Yellow
     Write-Host "  -> Falling back to the 2022 Build Tools host with legacy toolset." -ForegroundColor DarkGray
     
     $isLegacy = $true
-    # Map legacy years to their specific internal component IDs
     if ($requestedYear -eq "2019") {
         $componentIdToCheck = "Microsoft.VisualStudio.Component.VC.v142.x86.x64"
     } elseif ($requestedYear -eq "2017") {
@@ -212,17 +212,13 @@ if ($LASTEXITCODE -ne 0) {
     } elseif ($requestedYear -eq "2015") {
         $componentIdToCheck = "Microsoft.VisualStudio.Component.VC.v140.x86.x64"
     }
-    
-    # Override the target package to the modern 2022 host
     $msvcId = "Microsoft.VisualStudio.2022.BuildTools"
 }
 
-# Check if the component/workload is already installed
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $isInstalled = $false
 
 if (Test-Path $vsWhere) {
-    # vswhere will return a path if the requested component/workload is present
     $existingPath = & $vsWhere -latest -products * -requires $componentIdToCheck -property installationPath
     if ($existingPath) { 
         $isInstalled = $true
@@ -234,7 +230,6 @@ if ($isInstalled) {
 } else {
     Write-Host "  -> Installing/Modifying $msvcId to include required toolset..." -ForegroundColor Magenta
     
-    # Construct arguments cleanly based on whether it's legacy or native
     if ($isLegacy) {
         $overrideArgs = "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --add $componentIdToCheck --includeRecommended"
     } else {
@@ -251,13 +246,11 @@ if ($isInstalled) {
 
 Refresh-EnvPath
 
-# AUTOMATICALLY IMPORT MSVC ENVs FOR COMPILING
 function Invoke-MsvcEnvironment {
     Write-Host "  -> Integrating MSVC Developer paths into the current shell..." -ForegroundColor Magenta
     $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     
     if (Test-Path $vsWhere) {
-        # vswhere dynamically locates the highest available installed version that matches our workload
         $installPath = & $vsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
         if ($installPath -and (Test-Path "$installPath\Common7\Tools\Launch-VsDevShell.ps1")) {
             Import-Module "$installPath\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
@@ -274,7 +267,7 @@ function Invoke-MsvcEnvironment {
 Invoke-MsvcEnvironment
 
 # ---------------------------------------------------------
-# Step 4: Execute setup.m
+# Step 5: Execute setup.m & Generate Init Script
 # ---------------------------------------------------------
 Write-Host "`n[5/5] Verifying Eiko via setup.m..." -ForegroundColor Cyan
 
@@ -288,17 +281,33 @@ if (-not (Test-Path -LiteralPath $setupPath)) {
 
 Write-Host "  -> Starting MATLAB to run system verification..." -ForegroundColor Magenta
 
-# Construct the MATLAB command string cleanly
 $matlabSafePath = $eikoPath -replace '\\', '/'
 $matlabCmd = "addpath('$matlabSafePath'); eiko_lib.setup;"
-
-# Execute statelessly (Wrapped in single quotes to protect the internal double quotes)
 $matlabProc = Start-Process matlab -ArgumentList '-batch', "`"$matlabCmd`"" -Wait -PassThru -NoNewWindow
 
 if ($matlabProc.ExitCode -eq 0) {
     Write-Host "`n[*] Verification Complete: Eiko for MATLAB is operational!" -ForegroundColor Green
 } else {
     Write-Host "`n[!] Verification failed. MATLAB encountered an error while running setup.m." -ForegroundColor Red
+    Exit-Script
 }
+
+$launcherPath = Join-Path $PSScriptRoot "start_eiko.m"
+$launcherContent = @"
+% Eiko Initialization Script
+addpath('$matlabSafePath');
+disp('[*] Eiko environment active. Ready to compute!');
+"@
+
+$launcherContent | Out-File -FilePath $launcherPath -Encoding utf8
+
+Write-Host "`n====================================================" -ForegroundColor Green
+Write-Host " EIKO ENVIRONMENT INSTALLED SUCCESSFULLY" -ForegroundColor Green
+Write-Host "====================================================" -ForegroundColor Green
+
+Write-Host "`n[!] How to use Eiko:" -ForegroundColor Yellow
+Write-Host "    Inside MATLAB, navigate to this folder and run: " -NoNewline -ForegroundColor Gray
+Write-Host "start_eiko`n" -ForegroundColor Cyan
+Write-Host "    (This will add Eiko to your path for the current session)`n" -ForegroundColor DarkGray
 
 Exit-Script
