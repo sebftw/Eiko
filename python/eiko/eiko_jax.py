@@ -14,35 +14,36 @@ try:
 except UnicodeEncodeError:
     pass
 
+# Determine installation command based on Python version
+if sys.version_info[:2] == (3, 8):
+    install_cmd = 'pip install "jax==0.4.13" "jaxlib==0.4.13+cuda12.cudnn89" "nvidia-cudnn-cu12~=8.9.0" "pybind11"'
+else:
+    install_cmd = 'pip install -U "jax[cuda13]>=0.4.30" "pybind11"  # Note: You can replace [cuda13] with [cuda12] if needed'
+
 try:
     import jax
     import pybind11
     import jaxlib
     
-    # Immediately trap CPU-only installations or missing GPU hardware
     if jax.default_backend() == "cpu":
         raise RuntimeError(
-            "\n" + "="*75 + "\n"
+            "\n" + "="*70 + "\n"
             "[Eiko] ERROR: CPU-only JAX or missing GPU detected.\n"
-            + "="*75 + "\n"
-            "You have JAX installed, but it is currently defaulting to the CPU backend.\n"
-            "Eiko strictly requires a GPU-enabled version of JAX to run.\n\n"
+            "Eiko strictly requires a GPU-enabled version of JAX.\n\n"
             "HOW TO FIX:\n"
-            "1. If you have the CPU-only version, uninstall it first:\n"
-            f"   {link_emoji} pip uninstall jax jaxlib\n"
-            "2. Install the CUDA-enabled version of JAX (e.g., for CUDA 12):\n"
-            f"   {link_emoji} pip install -U \"jax[cuda12]\"\n"
-            "3. Ensure your NVIDIA drivers are correctly installed and visible to Python.\n\n"
-            "For full installation details, visit:\n"
-            "https://jax.readthedocs.io/en/latest/installation.html\n"
-            + "="*75 + "\n"
+            f"1. Uninstall CPU version:  {link} pip uninstall -y jax jaxlib\n"
+            f"2. Install GPU version:    {link} {install_cmd}\n"
+            "3. Verify NVIDIA drivers are installed and visible to Python.\n"
+            "Docs: https://jax.readthedocs.io/en/latest/installation.html\n"
+            + "="*70 + "\n"
         )
 except ImportError as e:
-    missing_pkg = getattr(e, 'name', 'a required dependency')
+    missing = getattr(e, 'name', 'a required dependency')
     raise ImportError(
-        f"\n[Eiko] ERROR: Failed to import '{missing_pkg}'.\n"
-        f"JAX bindings require 'jax', 'jaxlib', and 'pybind11' to be installed.\n"
-        f"Please install via: pip install \"eiko[jax]\"\n"
+        f"\n[Eiko] ERROR: Missing package '{missing}'.\n"
+        f"JAX bindings require 'jax', 'jaxlib', and 'pybind11'.\n\n"
+        f"HOW TO FIX:\n"
+        f"{link} {install_cmd}\n"
     ) from e
 
 import jax.numpy as jnp
