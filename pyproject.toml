@@ -47,13 +47,11 @@ jax-local = [
     "jax[cuda12-local]>=0.4.13",  # This is only for HPC users ("modules load cuda/12.0").
     "pybind11"
 ]
-torch = ["torch>=2.4.0", "ninja"]
+torch = ["torch>=2.4.0", "ninja"] # While this extras exists, using "pip install eiko[torch]" will only install a CPU-only version of PyTorch, unfortunately.
 # Dependencies require to run examples.
 examples = [
 	"torch>=2.4.0",
     "matplotlib>=3.5.0", 
-    "pybind11",
-    "optax",
     "scipy>=1.7.0",
     "numpy>=1.21.0",
     "scikit-image",
