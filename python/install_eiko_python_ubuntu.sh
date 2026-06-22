@@ -259,7 +259,7 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 
 if [ "$INSTALL_PYTHON" = true ]; then
-    echo -e "${MAGENTA}  -> Active Python ($PY_VER) is incompatible or managed by Conda. Installing isolated system Python 3.12...${NC}"
+    echo -e "${MAGENTA}  -> Active Python ($PY_VER) is incompatible. Installing Python 3.12...${NC}"
     sudo apt-get install -y software-properties-common> /dev/null 2>&1
     sudo add-apt-repository ppa:deadsnakes/ppa -y > /dev/null 2>&1
     sudo apt-get update -qq
