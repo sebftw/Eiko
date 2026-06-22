@@ -10,6 +10,7 @@ import zipfile
 import shutil
 import tempfile
 import re
+import sysconfig
 
 def fetch_precompiled_wheel(
     package_version, 
@@ -31,13 +32,18 @@ def fetch_precompiled_wheel(
     # Clean the package version key to match semver format stored in generator
     clean_pkg_ver = package_version.lstrip("v").split("+")[0]
 
+    # Get the exact C-extension suffix for the current environment
+    # e.g., '.cpython-310-x86_64-linux-gnu.so' or '.cp310-win_amd64.pyd'
+    ext_suffix = sysconfig.get_config_var("EXT_SUFFIX")
+    
+    # Fallback to generic extensions if sysconfig returns None (rare edge case)
+    valid_suffixes = (ext_suffix,) if ext_suffix else ('.so', '.pyd', '.dll')
+
     # Early Exit: Check if valid binaries already exist
     existing_binaries = [
         f for f in os.listdir(target_dir) 
-        if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))
+        if target_impl in f and f.endswith(valid_suffixes)
     ]
-    if existing_binaries:
-        return True
     
     # 1. Load Local Registry
     try:
