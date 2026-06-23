@@ -176,18 +176,36 @@ jobs:
           
           # Handle the MATLAB artifact
           if [ -d "artifacts/eiko-matlab-release" ]; then
+            # Create a staging directory to assemble the final zip contents
+            mkdir -p artifacts/eiko-matlab-release/staging
+            
             # Check if the directory already contains a zip file
             EXISTING_ZIP=$(find artifacts/eiko-matlab-release -maxdepth 1 -name "*.zip" | head -n 1)
             
             if [ -n "$EXISTING_ZIP" ]; then
-              # It's already zipped: just move and rename it
-              mv "$EXISTING_ZIP" artifacts/eiko_matlab.zip
+              # It's zipped: extract it into staging so we can modify it
+              unzip -q "$EXISTING_ZIP" -d artifacts/eiko-matlab-release/staging/
+              rm "$EXISTING_ZIP"
             else
-              # It's an uncompressed folder: zip it
-              cd artifacts/eiko-matlab-release
-              zip -r ../eiko_matlab.zip .
-              cd ../..
+              # It's an uncompressed folder: move its contents into staging
+              mv artifacts/eiko-matlab-release/* artifacts/eiko-matlab-release/staging/ 2>/dev/null || true
             fi
+            
+            # 1. Inject the 'examples/matlab' folder as 'examples'
+            # Using cp -a with '/.' ensures the contents are copied directly into the target directory
+            mkdir -p artifacts/eiko-matlab-release/staging/examples
+            cp -a examples/matlab/. artifacts/eiko-matlab-release/staging/examples/
+            
+            # 2. Inject the 'src' folder into 'eiko/+eiko_lib/src'
+            mkdir -p artifacts/eiko-matlab-release/staging/eiko/+eiko_lib/src
+            cp -a src/. artifacts/eiko-matlab-release/staging/eiko/+eiko_lib/src/
+            
+            # Zip the newly assembled folder structure
+            cd artifacts/eiko-matlab-release/staging
+            zip -rq ../../eiko_matlab.zip .
+            
+            # Return to the workspace root
+            cd ../../..
             
             # Clean up the artifact folder
             rm -rf artifacts/eiko-matlab-release
