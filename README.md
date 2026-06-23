@@ -12,8 +12,8 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 - [Why use Eiko?](#why-use-eiko)
 - [Installation](#installation)
   * [Requirements](#requirements)
-  * [Installing for MATLAB](#installing-for-matlab)
-  * [Installing for Python](#installing-for-python)
+  * [Installing Eiko for MATLAB](#installing-eiko-for-matlab)
+  * [Installing Eiko for Python](#installing-eiko-for-python)
 - [Quick Start](#quick-start)
 - [Project Layout](#project-layout)
 - [Contributing](#contributing)
@@ -30,19 +30,19 @@ For example, if the initial delays describe a plane-wave:
 <img width="360" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/77e62343-bde7-4614-a640-c5f33face1a7" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
 </p>
 
-To learn more about how Eiko works, see [THEORY](THEORY.md).
+To learn about how Eiko works, see [THEORY](THEORY.md).
 
 ## Why use Eiko?
 A few reasons to use Eiko:
-1. Eiko is **FAST** - up to 100x faster than comparable libraries.
-2. Eiko is **differentiable**, allowing it to be used with PyTorch or JAX.
-3. Eiko supports **advection**, allowing it to compute apodizations through a lens.
+1. Eiko is ***FAST*** - up to 100x faster than comparable libraries.
+2. Eiko is ***differentiable***, allowing it to be used with PyTorch or JAX.
+3. Eiko supports ***advection***, allowing it to compute apodizations through a lens.
 
 ![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
 
 
 ## Installation
-This section describes how to install Eiko for MATLAB or Python.
+This section covers how to install Eiko for MATLAB or Python.
 
 ### Requirements
 Your system must have the following:
@@ -52,21 +52,21 @@ Your system must have the following:
 If you don't own a GPU, you can run Eiko for Python from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
 
 <!-- START_MATLAB_ONLY -->
-### Installing for MATLAB
-Run `setup.m` to install Eiko in MATLAB.
+### Installing Eiko for MATLAB
+* Manual Installation (Recommended): Download [eiko_matlab.zip](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path.
+* Automated Installer: Download and run the [install_eiko_matlab.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_matlab.bat) script.
 
-See also [the Eiko MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md).
+See [the Eiko MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details and options.
+
 <!-- END_MATLAB_ONLY -->
 
-### Installing for Python
-Run the following command to install Eiko for Python.
-```
-pip install eiko
-```
+### Installing Eiko for Python
+* Manual Installation: Run `pip install eiko`. Remember to also install either PyTorch or JAX.
+* Automated Installer (Recommended): Download and run the [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat) script.
 
-<!-- START_MATLAB_ONLY -->
-See also [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md).
-<!-- END_MATLAB_ONLY -->
+The automated installer is recommended for Python because it installs Python, PyTorch, and JAX in a virtual environment.
+
+See [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
 
 ## Quick Start
 An example of how to use Eiko is shown below.
