@@ -126,6 +126,8 @@ For 3D inputs, use `eiko3d`.
 <summary><b>Python Example</b> (Click to expand)</summary>
  
 ```python
+import torch
+import matplotlib.pyplot as plt
 from eiko import eiko
 
 # 1. Setup device and grid parameters.
@@ -149,8 +151,6 @@ u_init[center_idx, center_idx] = 0.0
 u = eiko(u_init, f, dx=dx)
 
 # 5. Visualize the result.
-import matplotlib.pyplot as plt
-import torch
 
 # Create physical coordinate axes in millimeters using dx
 axis_mm = (torch.arange(N) - center_idx) * dx * 1000
