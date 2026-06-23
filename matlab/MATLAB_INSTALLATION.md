@@ -73,6 +73,6 @@ sudo apt install build-essential -y
 Verify the compiler is installed by running `gcc --version`.
 
 #### Finalizing Setup
-With both the compiler and CUDA installed, open MATLAB, navigate to the directory this guide is in, and run `eiko_lib.setup` to compile Eiko for your hardware and add the `eiko` folder to your search path.
+With both the compiler and CUDA installed, open MATLAB, navigate the "eiko" folder, and run `eiko_lib.setup` to compile Eiko for your hardware and add the `eiko` folder to your search path.
 
 💡 Tip: To avoid re-adding Eiko to your path every time you launch MATLAB, run the following command in the MATLAB Command Window after adding the eiko folder to path: `savepath`.
