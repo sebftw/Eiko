@@ -6,7 +6,7 @@ Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin sp
 
 Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels, it slows down in the foliage and mud. The wavefronts are no longer perfect circles; they bend, refract, and take the fastest available path rather than a strictly straight line.
 
-Eiko simulates this phenomenon by tracking the wave as it bends through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
+Eiko simulates this phenomenon by tracking the wave as it expands through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
 
 It is essentially ray tracing, but instead of rays bending only at sharp boundaries, the rays can bend continuously at every grid point.
 
@@ -47,9 +47,10 @@ $$v(x) = v_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)
 
 Where:
 *   $v(x)$ is the advected field (the solution).
+*   $\Gamma$ is the set of points with a known arrival time (or at least the outer boundary of that set).
 
 #### In human terms
-The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{init}$ at the boundary of the known values in $u_{init}$, the values will simply be pulled with the flow.
+The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{init}$ at the section with known values in $u_{init}$, these values will simply be pulled with the flow during the time-of-flight calculation.
 
 ### Example use cases of advection:
 *   **Apodization:** Initialize $v$ with apodization weights near the source to drag those weights along the acoustic rays.
