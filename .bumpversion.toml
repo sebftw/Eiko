@@ -23,3 +23,8 @@ replace = "date-released: {now:%Y-%m-%d}"
 filename = "matlab/eiko/+eiko_lib/setup.m"
 search = "EIKO_VERSION = '{current_version}'"
 replace = "EIKO_VERSION = '{new_version}'"
+
+[[tool.bumpversion.files]]
+filename = "matlab/MATLAB_INSTALLATION.md"
+search = "releases/download/v{current_version}/eiko_matlab.zip"
+replace = "releases/download/v{new_version}/eiko_matlab.zip"
