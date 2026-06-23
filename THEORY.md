@@ -93,7 +93,7 @@ Enabling MSFM will make Eiko also consider the diagonal neighbors, expanding the
     %             % % %
 ```
 
-The result is that enabling MSFM allows a wavefront to travel diagonally rather than zigzag, producing a less overestimated, more accurate $u$.
+This allows the wavefront to travel diagonally rather than having to zigzag, producing a less overestimated, more accurate result, $u$.
 
 
 ## Gating
