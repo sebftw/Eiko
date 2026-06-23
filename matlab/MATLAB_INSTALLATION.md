@@ -60,7 +60,7 @@ First, update your drivers to ensure they're compatible with the latest version 
 sudo ubuntu-drivers install
 sudo reboot
 ```
-You can verify that the driver was installed successfully by running nvidia-smi.
+You can verify that the driver was installed successfully by running `nvidia-smi`.
 
 Next, navigate to the [NVIDIA CUDA Downloads page](https://developer.nvidia.com/cuda-downloads). Run `uname -m && cat /etc/os-release` in your terminal to determine your OS version, select `deb (network)`, and follow the provided instructions to install the toolkit. Verify the installation by running `nvcc --version`.
 
