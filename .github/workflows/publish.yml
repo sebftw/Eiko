@@ -254,13 +254,15 @@ jobs:
 
             ### 🐍 Python
             
-            **Automated Installer (Recommended)**<br>
-            If you are new to Python, use the automated installer to set up your environment:
+            **Automated Installer (Recommended)**
             
+            If you are new to Python, use the automated installer:
             * **Windows:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat) and double-click the file.
             * **Linux:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
+
             
-            **Manual Installation**<br>
+            **Manual Installation**
+            
             To install Eiko manually, run
             ```bash
             pip install eiko
@@ -269,7 +271,7 @@ jobs:
             * **PyTorch:** `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130`
             * or **JAX:** `pip install jax[cuda13]`.
             
-            We strongly recommend installing inside a virtual environment (`venv` or `conda`).
+            We strongly recommend installing inside a virtual environment (e.g., `venv` or `conda`).
             
             ---
             
@@ -281,7 +283,8 @@ jobs:
             
             💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
             
-            **Automated Installer **<br>
+            **Automated Installer**
+            
             To automatically configure your system for Eiko, use the installer:
             
             * **Windows:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
