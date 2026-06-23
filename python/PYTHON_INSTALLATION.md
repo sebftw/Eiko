@@ -1,19 +1,13 @@
 # Installing Eiko for Python
-- [Automated Installer (Recommended)](#automated-installer--recommended-)
+- [Automated Installer (Recommended)](#automated-installer)
 - [Manual Installation](#manual-installation)
 - [Installation from Source](#installation-from-source)
 - [Installing from Scratch](#installing-from-scratch)
   * [Windows](#windows)
-    + [Display Drivers & CUDA](#display-drivers---cuda)
-    + [Compiler & Python](#compiler---python)
-    + [Environment Setup & Installation](#environment-setup---installation)
   * [Linux](#linux)
-    + [Display Drivers & CUDA](#display-drivers---cuda-1)
-    + [Compiler](#compiler)
-    + [Python & Environment Setup](#python---environment-setup)
-- [Google Colab (no GPU required)](#google-colab--no-gpu-required-)
+- [Google Colab (no GPU required)](#google-colab)
 
-##  Automated Installer (Recommended)
+##  Automated Installer
 If you are new to Python or want to set up your environment instantly, use the automated installation scripts. This script will validate your NVIDIA drivers, install CUDA and C++ Build Tools, set up Python, create a virtual environment, and install the complete Eiko ML stack.
 
 * **Windows:** Download [`install_eiko_python.bat`](./install_eiko_python.bat) and double-click the file.
@@ -128,7 +122,7 @@ python3 -c "import eiko.eiko_torch; import eiko.eiko_jax; print('Eiko loaded suc
 (Note: Every time you open a new terminal, you must run source eiko/bin/activate before using Eiko).
 
 
-## Google Colab (no GPU required)
+## Google Colab
 If the installation process is too involved or you do not have a dedicated NVIDIA GPU, you can run Eiko entirely in the cloud.
 
 You can start using Eiko immediately by opening our interactive notebook: [Eiko in Colab](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
