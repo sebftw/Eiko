@@ -83,6 +83,9 @@ def clear_binary_cache():
         try:
             print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
             shutil.rmtree(BIN_CACHE_DIR)
+            # Re-create the empty directory so PyTorch has a place to put its lockfile
+            os.makedirs(BIN_CACHE_DIR, exist_ok=True)
+            
         except PermissionError:
             print("\n" + "="*75)
             print("[Eiko] PERMISSION ERROR: Binaries are probably currently in use.")
