@@ -26,7 +26,13 @@ Where:
 The result is the shortest time-of-flight: $u(x)$ for all $x$.
 
 #### In human terms
-The Eikonal equation states that $\|\nabla u\|=\sqrt{u_x^2+u_y^2+u_z^2}$ (the change in time-of-flight when moving through a grid-point) must be equal to the slowness $f = 1/c$. The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
+The Eikonal equation states that
+
+$$\|\nabla u\|=\sqrt{\left(\frac{\partial u}{\partial x}\right)^2+\left(\frac{\partial u}{\partial y}\right)^2+\left(\frac{\partial u}{\partial z}\right)^2} = f(x)$$
+
+meaning the change in time-of-flight when moving through a grid-point must be equal to the slowness $f = 1/c$.
+
+The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
 Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It is somewhat similar to Dijkstra's algorithm.
 
