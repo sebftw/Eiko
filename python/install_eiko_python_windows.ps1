@@ -323,7 +323,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 Write-Host "  -> Installing Eiko..." -ForegroundColor Magenta
-Run-PipCommand "install", "eiko"
+Run-PipCommand "install", "--upgrade", "eiko"
 
 # ---------------------------------------------------------
 # Verification & Handoff
