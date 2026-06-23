@@ -41,9 +41,9 @@ fi
 
 echo -e "\nThis script will configure your system for the Eiko environment by performing the following actions:"
 echo -e "  1. Validate NVIDIA display driver compatibility."
-echo -e "  2. Install CUDA 12.4, 12.6, or 13.0 based on compatability."
-echo -e "  3. Install the appropriate C++ Build Tools."
-echo -e "  4. Install Python 3.12 (if necessary) and configure an isolated virtual environment at"
+echo -e "  2. Install the appropriate C++ Build Tools."
+echo -e "  3. Install CUDA 12.4, 12.6, or 13.0 based on compatibility."
+echo -e "  4. Install Python (if necessary) and configure an isolated virtual environment at"
 echo -e "     -> ${CYAN}$VENV_PATH${NC}"
 echo -e "  5. Install PyTorch, JAX, and Eiko."
 echo -e "  6. Verify that Eiko was installed correctly."
