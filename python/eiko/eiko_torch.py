@@ -115,6 +115,7 @@ except ImportError:
                 os.environ["CUDA_HOME"] = cuda_home
             
             try:
+                os.makedirs(BIN_CACHE_DIR, exist_ok=True)
                 _fim_cuda_impl = load(
                     name="eiko_torch_impl",
                     sources=[torch_source],
