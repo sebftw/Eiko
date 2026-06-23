@@ -30,18 +30,16 @@ For example, if the initial delays describe a plane-wave:
 <img width="360" alt="Eikonal Plane Wave Aberration Animation" src="https://github.com/user-attachments/assets/77e62343-bde7-4614-a640-c5f33face1a7" style="background: transparent !important; border: none !important; box-shadow: none !important;" />
 </p>
 
+To learn more about how Eiko works, see [THEORY](THEORY.md).
 
 ## Why use Eiko?
 A few reasons to use Eiko:
-1. Eiko is **fast** - up to 100x faster than comparable libraries.
+1. Eiko is **FAST** - up to 100x faster than comparable libraries.
 2. Eiko is **differentiable**, allowing it to be used with PyTorch or JAX.
 3. Eiko supports **advection**, allowing it to compute apodizations through a lens.
 
-Eiko also supports batch processing, enabling multiple time-of-flight maps to be computed efficiently in parallel.
-
 ![Performance Comparison](https://raw.githubusercontent.com/sebftw/Eiko/main/examples/python/comparison/fps_comparison.png "Comparison between Eiko and other solvers.")
 
-To learn more about how Eiko works, see [THEORY](THEORY.md).
 
 ## Installation
 This section describes how to install Eiko for MATLAB or Python.
