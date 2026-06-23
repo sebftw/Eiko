@@ -13,8 +13,8 @@ Before continuing, ensure you have MATLAB installed along with the following too
 
 ## Manual Installation
 This is the recommended approach on MATLAB:
-1. Download [`eiko_matlab.zip`](https://github.com/sebftw/Eiko/releases/download/v0.8.6/eiko_matlab.zip) and extract the "eiko" folder.
-2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
+1. Download [`eiko_matlab.zip`](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip) and extract the "eiko" folder.
+2. Inside MATLAB, right-click the `eiko` folder and select **Add to Path &rarr; Selected Folder(s)**.
 3. Eiko is now installed.
 
 💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
