@@ -405,12 +405,14 @@ torch_ok = False
 jax_ok = False
 
 try:
+    import torch
     import eiko.eiko_torch
     torch_ok = True
 except ImportError:
     pass
 
 try:
+    import jax
     import eiko.eiko_jax
     jax_ok = True
 except ImportError:
