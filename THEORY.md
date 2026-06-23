@@ -32,7 +32,7 @@ Usually, unknown points in $u_{init}$ are set to infinity, but they don't have t
 
 Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute the geometric distances under the assumption of a constant propagation speed, Eiko handles variable propagation speeds. This makes it useful for aberration-corrected beamforming, acoustic lens design, signed distance functions, fastest-path planning (e.g., robot navigation), predicting wildfire movement or seismic migrations, and much more.
 
-**Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less. The accuracy also depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
+**Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less (more grid points equals a higher accuracy). The accuracy depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
 ## Advection Field
 
