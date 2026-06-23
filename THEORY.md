@@ -1,6 +1,22 @@
 # Theory
 This document summarizes the mathematical theory behind Eiko.
 
+- [Background](#background)
+- [Travel Time](#travel-time)
+    + [In human terms](#in-human-terms)
+- [Advection Field](#advection-field)
+    + [In human terms](#in-human-terms-1)
+  * [Example use cases of advection](#example-use-cases-of-advection)
+- [MSFM (Multi-Stencil Fast Marching)](#msfm-multi-stencil-fast-marching)
+- [Gating](#gating)
+- [Gradients with respect to the loss](#gradients-with-respect-to-the-loss-l)
+  * [Gradient w.r.t. step size](#gradient-wrt-step-size-delta-x)
+  * [Gradient w.r.t. initial conditions](#gradient-wrt-initial-conditions-u_init)
+    + [In human terms](#in-human-terms-2)
+  * [Gradient w.r.t. slowness](#gradient-wrt-slowness-f)
+    + [In human terms](#in-human-terms-3)
+- [References](#references)
+
 ## Background
 Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin spreading outward in uniform, concentric circles. If the water is identical everywhere, the wave travels at a constant speed, and finding the wavefront's arrival time at any point is simply a matter of measuring the straight-line distance.
 
@@ -8,7 +24,7 @@ Now, imagine instead that the pond has patches of thick aquatic plants and areas
 
 Eiko simulates this phenomenon by tracking the wave as it expands through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
 
-It is essentially ray tracing, but instead of rays bending only at sharp boundaries, the rays can bend continuously at every grid point.
+It is essentially ray tracing, but instead of rays bending only at sharp boundaries, the rays may bend continuously at every grid point.
 
 ## Travel Time
 
@@ -112,7 +128,7 @@ Where:
 Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
 
 ### Gradient w.r.t. initial conditions ($u_{init}$)
-This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable lambda ($\lambda$) and lets it flow backward along the characteristics (rays) generated during the forward pass. This is conceptually similar to advection, but reversed - it collects $\lambda$ values and pulls them upstream toward the sources, accumulating gradients and residuals along the way, rather than spreading initial values across a field. Interestingly, while the forward Eikonal equation is non-linear, this backward adjoint process is entirely linear.
+This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable, lambda ($\lambda$), and allows it to flow backward along the characteristics (rays) generated during the forward pass. This is conceptually similar to advection, but reversed - it collects $\lambda$ values and pulls them upstream toward the sources, accumulating gradients and residuals along the way.
 
 Mathematically, the continuous equation for this backward pass is:
 
@@ -126,12 +142,16 @@ Where:
 *   $g = \frac{dL}{du}$ is the gradient of the loss with respect to the local arrival times (the injected residual).
 *   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (distinct from $\Gamma$, which were the original source points).
 
+Interestingly, while the forward Eikonal equation is non-linear, this backward adjoint process is entirely linear.
+
 #### In human terms
 Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
 The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $n(x)$ ), exactly the way they came. 
  
 The divergence operator ($-\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{init}$).
+
+**Note:** The gradient of the travel time w.r.t. initial travel time is only non-zero in source points (identified as $u_{init}(x)\neq \infty$).
 
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication based on the local wave geometry.
@@ -143,6 +163,8 @@ $$\frac{dL}{df} = \tilde{\lambda}(x) * f(x) * \Delta x^2$$
 **Where**:
 * $\tilde{\lambda}(x)$ is the discrete adjoint variable divided by the geometric normalizer (the time-of-flight difference between nodes).
 * $\Delta x^2$ is the squared grid spacing. Note that this is always squared regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from the Pythagorean approximation of the gradient, not a volumetric integral.
+
+**Note:** The gradient of the travel time w.r.t. slowness is zero in source points (identified as $u_{init}(x)\neq \infty$). This is because those points were prescribed a travel time, so changing the slowness will not affect them.
 
 #### In human terms
 If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta x^2$ to correctly account for the local grid spacing geometry during the discrete integration.
