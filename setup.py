@@ -136,11 +136,7 @@ setup(
     ext_modules=ext_modules,
     license="BSD-3-Clause",
     cmdclass=cmdclass_dict,
-    # Ensure standard setuptools knows to bundle these files in the final wheel
-    package_data={
-        "eiko": [
-            "src/*.cuh", 
-            "src/bindings/*.cu"
-        ],
-    }
+    # package_data is omitted because:
+    # 1. CustomBuildPy manually stages the CUDA/C++ source code into build_lib.
+    # 2. The registry.json is injected via post-processing of the built wheel.
 )
