@@ -13,7 +13,7 @@ If you are new to Python or want to set up your environment instantly, use the a
 * **Windows:** Download [`install_eiko_python.bat`](./install_eiko_python.bat) and double-click the file.
 * **Linux:** Download [`install_eiko_python.bat`](./install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
 
-💡 Tip: The installer will generate a `start_eiko` script in the same folder. You can double-click this file at any time to instantly open a terminal with your Eiko environment activated and ready to go!
+💡 Tip: The installer will generate a `start_eiko` script. Run this script at any time to open a terminal with your Eiko environment activated and ready to go!
 
 ## Manual Installation
 If you already have a functional environment, you can install Eiko manually. We strongly recommend installing inside a virtual environment (`venv` or `conda`).
@@ -24,7 +24,7 @@ Eiko requires PyTorch or JAX as a backend, so you must also run one of the follo
 * **PyTorch:** `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130`
 * or **JAX:** `pip install jax[cuda13]`
 
-(See the [PyTorch Get Started guide](https://pytorch.org/get-started/) and [JAX Installation guide](https://docs.jax.dev/en/latest/installation.html) for other possible configurations)
+(See the [PyTorch Get Started guide](https://pytorch.org/get-started/) and [JAX Installation guide](https://docs.jax.dev/en/latest/installation.html) for installation options)
 
 
 ## Installation from Source
@@ -63,7 +63,9 @@ To ensure the compiler and CUDA paths are correctly exposed to Python during ins
 python -m venv eiko
 call eiko\Scripts\activate.bat
 ```
-* Install PyTorch and Eiko inside this compiler-ready terminal: <br>
+💡 Tip: The virtual environment folder `eiko` is portable and self-contained. You can move it anywhere, and it will still work.
+
+* Install PyTorch and Eiko inside this virtual environment: <br>
 ```bat
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
 pip install eiko
@@ -119,7 +121,7 @@ python3 -c "import torch; print('CUDA Available:', torch.cuda.is_available())"
 python3 -c "import eiko.eiko_torch; import eiko.eiko_jax; print('Eiko loaded successfully!')"
 ```
 
-(Note: Every time you open a new terminal, you must run source eiko/bin/activate before using Eiko).
+(Note: Every time you open a new terminal, you must run `source eiko/bin/activate` before using Eiko).
 
 
 ## Google Colab
