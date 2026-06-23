@@ -2,6 +2,7 @@ import os
 import sys
 import shutil
 import tempfile
+from pathlib import Path
 
 # ---------------------------------------------------------
 # PACKAGE METADATA & VERSION
@@ -74,12 +75,24 @@ eiko = eiko2d
 # ---------------------------------------------------------
 # CACHE MANAGEMENT UTILITIES
 # ---------------------------------------------------------
+def is_dir_empty(path_str):
+    path = Path(path_str)
+    try:
+        return not any(path.iterdir())
+    except FileNotFoundError:
+        # Returns True if the directory doesn't exist
+        return True
+    except NotADirectoryError:
+        # Optional: Handles cases where the path points to a file instead of a folder
+        print(f"[Eiko] Warning: {path_str} is a file, not a directory.")
+        return False
+
 def clear_binary_cache():
     """
     Removes all precompiled and JIT-compiled binaries from the persistent local cache.
     Useful if you switch CUDA drivers or encounter corrupted compilation states.
     """
-    if os.path.exists(BIN_CACHE_DIR):
+    if not is_dir_empty(BIN_CACHE_DIR):
         try:
             print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
             shutil.rmtree(BIN_CACHE_DIR)
@@ -104,7 +117,7 @@ def clear_download_cache():
     Removes any cached wheel archives from the temporary download directory.
     """
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
-    if os.path.exists(eiko_tmp_dir):
+    if not is_dir_empty(eiko_tmp_dir):
         print(f"[Eiko] Clearing downloaded wheels at: {eiko_tmp_dir}")
         shutil.rmtree(eiko_tmp_dir)
 
