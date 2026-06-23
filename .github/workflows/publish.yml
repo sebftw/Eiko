@@ -256,19 +256,19 @@ jobs:
             ---
             
             ### 🧮 MATLAB
+
+            **Manual Installation (Recommended)**
+            1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
+            2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
             
-            **Automated Installer (Recommended)**<br>
+            💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
+            
+            **Automated Installer **<br>
             To automatically configure your system for Eiko, use the installer:
             
             * **Windows:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
             * **Linux:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
             
-            
-            **Manual Installation**
-            1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
-            2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
-            
-            💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
 
       - name: Publish to PyPI
         if: ${{ !contains(github.ref_name, '-test') }}
