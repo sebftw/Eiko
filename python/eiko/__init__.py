@@ -1,5 +1,6 @@
 import os
 import sys
+import errno
 import shutil
 import tempfile
 from pathlib import Path
@@ -90,27 +91,42 @@ def is_dir_empty(path_str):
 def clear_binary_cache():
     """
     Removes all precompiled and JIT-compiled binaries from the persistent local cache.
-    Useful if you switch CUDA drivers or encounter corrupted compilation states.
+    Useful if you switch CUDA drivers, encounter corrupted states, or just want to re-trigger JIT-compilation.
     """
     if not is_dir_empty(BIN_CACHE_DIR):
-        try:
-            print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
-            shutil.rmtree(BIN_CACHE_DIR)
-            # Re-create the empty directory so PyTorch has a place to put its lockfile
-            os.makedirs(BIN_CACHE_DIR, exist_ok=True)
-            
-        except PermissionError:
-            print("\n" + "="*75)
-            print("[Eiko] PERMISSION ERROR: Binaries are probably currently in use.")
-            print("="*75)
-            print("The operating system cannot delete the files that are")
-            print("currently loaded into the active Python memory space.")
-            print("\nHOW TO FIX:")
-            print("1. Restart your Python session (or restart your Jupyter kernel).")
-            print("2. Run the cache clearing command *before* calling any Eiko solvers.")
-            print("="*75 + "\n")
-        except OSError as e:
-            print(f"[Eiko] Failed to clear binary cache due to an OS error: {e}")
+        print(f"[Eiko] Clearing binary cache at: {BIN_CACHE_DIR}")
+        files_in_use = False
+
+        # Error codes representing a locked, busy, or permission-denied state
+        # EACCES: Permission denied (Windows locked files, Linux strict permissions)
+        # EBUSY: Device or resource busy (NFS loaded libraries)
+        # ENOTEMPTY: Directory not empty (if a locked file prevented a sub-folder deletion)
+        locked_errnos = {errno.EACCES, errno.EBUSY, errno.ENOTEMPTY}
+        
+        for item in os.listdir(BIN_CACHE_DIR):
+            item_path = os.path.join(BIN_CACHE_DIR, item)
+            try:
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+            except OSError as e:
+                if e.errno in locked_errnos:
+                    files_in_use = True
+                elif e.errno == errno.ENOENT:
+                    # FileNotFoundError: Another process probably already deleted it. Safely ignore.
+                    pass
+                else:
+                    # An unexpected OS error occurred (e.g., read-only filesystem, I/O error)
+                    # Re-raise it so it doesn't fail silently.
+                    raise
+                
+        if files_in_use:
+            print("\n" + "-"*65)
+            print("[Eiko] WARNING: Some cached files are currently in use.")
+            print("To fully clear the cache, restart your Python/Jupyter session")
+            print("and run this command *before* calling any Eiko solvers.")
+            print("-"*65 + "\n")
 
 def clear_download_cache():
     """
