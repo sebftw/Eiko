@@ -78,8 +78,9 @@ if not cuda_home:
 def _resolve_best_nvcc() -> str:
     """
     Searches system paths, environment variables, and standard installation 
-    directories to find all available nvcc executables. Returns the path 
-    to the compiler with the highest version number.
+    directories to find all available nvcc executables. Prefers the compiler 
+    that matches PyTorch's compiled CUDA version. Otherwise, returns the 
+    path to the NVCC CUDA compiler with the highest version number.
     """
     candidates = set()
     ext = ".exe" if sys.platform == "win32" else ""
@@ -111,7 +112,17 @@ def _resolve_best_nvcc() -> str:
             "Please ensure the NVIDIA CUDA toolkit is installed."
         )
 
-    # Evaluate all candidates; best match wins.
+    # Attempt to get PyTorch's compiled CUDA version
+    pt_cuda_tuple = None
+    try:
+        import torch
+        if torch.version.cuda:
+            # Usually formatted as "11.8" or "12.1"
+            pt_cuda_tuple = tuple(map(int, torch.version.cuda.split(".")))
+    except ImportError:
+        pass
+
+    # Evaluate all candidates
     best_nvcc = ""
     max_ver = (-1,)  # Tuple for reliable semantic version comparison
 
@@ -136,13 +147,19 @@ def _resolve_best_nvcc() -> str:
             if match:
                 # Convert "12.2" -> (12, 2) or "11.8.89" -> (11, 8, 89)
                 current_ver = tuple(map(int, match.group(1).split(".")))
+                
+                # Priority 1: Exact match with PyTorch's CUDA version
+                if pt_cuda_tuple and current_ver[:len(pt_cuda_tuple)] == pt_cuda_tuple:
+                    return current_path  # Short-circuit and return the matching compiler
+
+                # Priority 2: Keep tracking the highest version for fallback
                 if current_ver > max_ver:
                     max_ver = current_ver
                     best_nvcc = current_path
         except (subprocess.CalledProcessError, OSError, ValueError):
             continue
 
-    # Fallback to the first found candidate if version parsing fails entirely
+    # Fallbacks if a PyTorch match wasn't found or version parsing fails entirely
     if not best_nvcc:
         return sorted(list(candidates))[0]
 
