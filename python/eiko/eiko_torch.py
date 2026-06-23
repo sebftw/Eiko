@@ -56,6 +56,7 @@ from eiko.build_config import (
 # ------------------------------------------------------------------------
 # Windows DLL Registration
 # ------------------------------------------------------------------------
+os.makedirs(BIN_CACHE_DIR, exist_ok=True)
 if sys.platform == "win32" and hasattr(os, "add_dll_directory"):
     try:
         os.add_dll_directory(BIN_CACHE_DIR)
@@ -115,7 +116,6 @@ except ImportError:
                 os.environ["CUDA_HOME"] = cuda_home
             
             try:
-                os.makedirs(BIN_CACHE_DIR, exist_ok=True)
                 _fim_cuda_impl = load(
                     name="eiko_torch_impl",
                     sources=[torch_source],
