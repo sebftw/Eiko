@@ -365,12 +365,11 @@ if [ "$PY_VER" == "3.8" ]; then
     if [ "$choice" == "1" ]; then
         uninstall_if_present "torch" "torchvision" "torchaudio"
         echo -e "${MAGENTA}  -> Installing JAX stack...${NC}"
-		run_pip_command uninstall torch torchvision --no-input || safe_exit 1
         run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
         run_pip_command install pybind11 --no-input || safe_exit 1
 		run_pip_command install -U eiko --no-input || safe_exit 1
     elif [ "$choice" == "2" ]; then
-		run_pip_command uninstall jax jaxlib --no-input || safe_exit 1
+		uninstall_if_present "jax" "jaxlib"
         if ! is_torch_valid; then
             run_pip_command install $TARGET_TORCH_VER --index-url $TARGET_WHEEL_URL --no-input || safe_exit 1
 			run_pip_command install ninja --no-input || safe_exit 1
@@ -387,7 +386,7 @@ else
     fi
     run_pip_command install $TARGET_JAX_VER --no-input -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html || safe_exit 1
     run_pip_command install pybind11 --no-input || safe_exit 1
-	run_pip_command install  -U eiko --no-input || safe_exit 1
+	run_pip_command install -U eiko --no-input || safe_exit 1
 fi
 
 # ---------------------------------------------------------
