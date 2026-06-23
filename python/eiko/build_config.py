@@ -248,8 +248,8 @@ if IS_RELEASE_BUILD:
             '-Xcudafe', '--diag_suppress=177'    # Unused variable in CUDA files
         ])
 else:
-    if "TORCH_CUDA_ARCH_LIST" not in os.environ:
-        os.environ["TORCH_CUDA_ARCH_LIST"] = "native"  # (This is also the fallback value if no arch is given, but setting it here avoids a user warning).
+    # if "TORCH_CUDA_ARCH_LIST" not in os.environ:
+    #     os.environ["TORCH_CUDA_ARCH_LIST"] = "native"  # (This option only exists on recent PyTorch versions. However, it is already the default behaviour).
     NVCC_ARGS.append('-arch=native')
 
 # ------------------------------------------------------------------------
