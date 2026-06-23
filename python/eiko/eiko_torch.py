@@ -116,15 +116,25 @@ except ImportError:
                 os.environ["CUDA_HOME"] = cuda_home
             
             try:
-                _fim_cuda_impl = load(
-                    name="eiko_torch_impl",
-                    sources=[torch_source],
-                    extra_cflags=CXX_ARGS,
-                    extra_cuda_cflags=[arg for arg in NVCC_ARGS if arg != "-arch=native"],
-                    extra_include_paths=EXTRA_INCLUDE_PATHS,
-                    verbose=False,
-                    build_directory=BIN_CACHE_DIR
-                )
+                import warnings
+                with warnings.catch_warnings():
+                    # Suppress this specific warning message.
+                    # In newer PyTorch versions, the solution is just to set TORCH_CUDA_ARCH_LIST = "native", but that option does not exist in older versions.
+                    # However, if TORCH_CUDA_ARCH_LIST is not set, the behavior is the same (it chooses native compilation, after throwing a warning).
+                    warnings.filterwarnings(
+                        "ignore", 
+                        message="TORCH_CUDA_ARCH_LIST is not set", 
+                        category=UserWarning
+                    )
+                    _fim_cuda_impl = load(
+                        name="eiko_torch_impl",
+                        sources=[torch_source],
+                        extra_cflags=CXX_ARGS,
+                        extra_cuda_cflags=NVCC_ARGS,
+                        extra_include_paths=EXTRA_INCLUDE_PATHS,
+                        verbose=False,
+                        build_directory=BIN_CACHE_DIR
+                    )
                 print("[Eiko] Compilation complete. Congratulations, you are now ready to use Eiko! :)")
                 
             except Exception as e:
