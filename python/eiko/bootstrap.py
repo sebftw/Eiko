@@ -22,13 +22,14 @@ def fetch_precompiled_wheel(
 ):
     if target_dir is None:
         raise ValueError("[Eiko] target_dir must be explicitly provided.")
-        
-    os.makedirs(target_dir, exist_ok=True)
-    
+    if package_version is None:
+        ValueError("[Eiko] package_version must be explicitly provided.")
     # Auto-infer backend from target_impl if not explicitly passed
     if not backend_name:
         backend_name = "jax" if "jax" in target_impl.lower() else "torch"
-
+    
+    os.makedirs(target_dir, exist_ok=True)
+    
     # Clean the package version key to match semver format stored in generator
     clean_pkg_ver = package_version.lstrip("v").split("+")[0]
 
@@ -44,6 +45,9 @@ def fetch_precompiled_wheel(
         f for f in os.listdir(target_dir) 
         if target_impl in f and f.endswith(valid_suffixes)
     ]
+
+    if existing_binaries:
+        return True
     
     # 1. Load Local Registry
     try:
@@ -58,7 +62,7 @@ def fetch_precompiled_wheel(
     
     # 2. Match Environment (OS & Python)
     py_ver = f"{sys.version_info.major}.{sys.version_info.minor}"
-    os_name = "windows" if platform.system().lower() == "windows" else "linux"
+    os_name = platform.system().lower()
     
     builds = registry.get("versions", {}).get(clean_pkg_ver, [])
     valid_builds = []
@@ -67,7 +71,7 @@ def fetch_precompiled_wheel(
     target_b_minor = ""
     if backend_version:
         target_b_minor = ".".join(backend_version.split("+")[0].split(".")[:2])
-
+    
     for b in builds:
         if b.get("os") != os_name or b.get("python") != py_ver:
             continue
@@ -78,7 +82,7 @@ def fetch_precompiled_wheel(
         # Hard Reject: Wheel does not support this backend at all
         if not wheel_b_ver:
             continue
-            
+        
         # Version Check: Match target version unless wheel is universally compatible ("any")
         if target_b_minor and wheel_b_ver != "any":
             if not wheel_b_ver.startswith(target_b_minor):
@@ -87,7 +91,8 @@ def fetch_precompiled_wheel(
         valid_builds.append(b)
 
     if not valid_builds:
-        print(f"[Eiko] No precompiled wheels matching OS: {os_name}, Python: {py_ver}, {backend_name}: {target_b_minor}. Falling back to JIT.")
+        cuda_str = (", CUDA: " + cuda_version) if cuda_version else ""
+        print(f"[Eiko] No precompiled wheels matching OS: {os_name}, Python: {py_ver}, {backend_name}: {target_b_minor}{cuda_str} Falling back to JIT.")
         return False
 
     # 3. Select Variant (CUDA Scoring)
@@ -151,28 +156,34 @@ def fetch_precompiled_wheel(
             os.replace(tmp_wheel_path, wheel_path)
         
         # Atomic Extraction Phase
-        with zipfile.ZipFile(wheel_path, 'r') as z:
-            binary_files = [
-                f for f in z.namelist() 
-                if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))
-            ]
-            if not binary_files:
-                raise ValueError(f"Target artifact '{target_impl}' missing from wheel.")
-                
-            for bf in binary_files:
-                filename = os.path.basename(bf)
-                final_target_path = os.path.join(target_dir, filename)
-                tmp_target_path = final_target_path + tmp_suffix
-                
-                with z.open(bf) as source, open(tmp_target_path, "wb") as target:
-                    shutil.copyfileobj(source, target)
-                
-                os.replace(tmp_target_path, final_target_path)
+        tmp_target_path = None
+        try:
+            with zipfile.ZipFile(wheel_path, 'r') as z:
+                binary_files = [
+                    f for f in z.namelist() 
+                    if target_impl in f and f.endswith(('.so', '.pyd', '.dll'))
+                ]
+                if not binary_files:
+                    raise ValueError(f"Target artifact '{target_impl}' missing from wheel.")
                     
-        return True
-        
+                for bf in binary_files:
+                    filename = os.path.basename(bf)
+                    final_target_path = os.path.join(target_dir, filename)
+                    tmp_target_path = final_target_path + tmp_suffix
+                    
+                    with z.open(bf) as source, open(tmp_target_path, "wb") as target:
+                        shutil.copyfileobj(source, target)
+                    
+                    os.replace(tmp_target_path, final_target_path)
+                        
+            return True
+        except zipfile.BadZipFile:
+            print(f"[Eiko] Precompiled wheel (zip) was corrupted. Deleting and falling back to JIT.")
+            os.remove(wheel_path)
+            return False
+    
     except Exception as e:
         print(f"[Eiko] Binary bootstrap failed: {e}. Falling back to JIT.")
-        if os.path.exists(tmp_wheel_path):
-            os.remove(tmp_wheel_path)
+        if tmp_target_path and os.path.exists(tmp_target_path):
+            os.remove(tmp_target_path)
         return False
