@@ -275,6 +275,7 @@ jobs:
             * **Windows:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat) and double-click the file.
             * **Linux:** Download [`install_eiko_python.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
 
+            💡 Tip: The installer will generate a `start_eiko` script. Run this script at any time to open a terminal with your Eiko environment activated and ready to go!
             
             **Manual Installation**
             
@@ -295,6 +296,7 @@ jobs:
             **Manual Installation (Recommended)**
             1. Download [**`eiko_matlab.zip`**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
             2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
+            3. Eiko is now installed and ready for use.
             
             💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
             
@@ -304,7 +306,9 @@ jobs:
             
             * **Windows:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
             * **Linux:** Download [`install_eiko_matlab.bat`](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
-
+            
+            💡 Tip: The installer will generate a `start_eiko.m` script. You can run this script from MATLAB to activate Eiko!
+            
             ***
             
 
