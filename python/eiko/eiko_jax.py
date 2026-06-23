@@ -31,8 +31,8 @@ try:
             "[Eiko] ERROR: CPU-only JAX or missing GPU detected.\n"
             "Eiko strictly requires a GPU-enabled version of JAX.\n\n"
             "HOW TO FIX:\n"
-            f"1. Uninstall CPU version:  {link} pip uninstall -y jax jaxlib\n"
-            f"2. Install GPU version:    {link} {install_cmd}\n"
+            f"1. Uninstall CPU version:  {link_emoji} pip uninstall -y jax jaxlib\n"
+            f"2. Install GPU version:    {link_emoji} {install_cmd}\n"
             "3. Verify NVIDIA drivers are installed and visible to Python.\n"
             "Docs: https://jax.readthedocs.io/en/latest/installation.html\n"
             + "="*70 + "\n"
@@ -43,7 +43,7 @@ except ImportError as e:
         f"\n[Eiko] ERROR: Missing package '{missing}'.\n"
         f"JAX bindings require 'jax', 'jaxlib', and 'pybind11'.\n\n"
         f"HOW TO FIX:\n"
-        f"{link} {install_cmd}\n"
+        f"{link_emoji} {install_cmd}\n"
     ) from e
 
 import jax.numpy as jnp
