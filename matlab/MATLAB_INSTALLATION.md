@@ -1,6 +1,6 @@
 # Installing Eiko for MATLAB
 - [Prerequisites](#prerequisites)
-- [Automated Installer (Recommended)](#automated-installer--recommended-)
+- [Automated Installer (Recommended)](#automated-installer)
 - [Manual Installation](#manual-installation)
 - [Installing from Scratch](#installing-from-scratch)
   * [Windows](#windows)
@@ -11,7 +11,7 @@ Before continuing, ensure you have MATLAB installed along with the following too
 * Parallel Computing Toolbox (Required for GPU acceleration and MEX compilation)
 * Deep Learning Toolbox (Required for differentiable operations)
 
-## Automated Installer (Recommended)
+## Automated Installer
 The easiest way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and CUDA toolkit.
 
 * **Windows:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat) and double-click the file.
