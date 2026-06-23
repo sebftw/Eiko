@@ -242,9 +242,24 @@ jobs:
           rm artifacts/*-any.whl
           cp dist/*-any.whl artifacts/
 
+      - name: Format Release Title
+        run: |
+          # Remove leading 'v' if present
+          VER="${TAG#v}"
+          
+          # If the version does NOT contain a hyphen, it's a stable release.
+          # Strip the trailing '.0' if it exists.
+          if [[ "$VER" != *-* ]]; then
+            VER="${VER%.0}"
+          fi
+          
+          # Save to environment variables
+          echo "RELEASE_TITLE=Eiko $VER" >> $GITHUB_ENV
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ env.RELEASE_TITLE }}
           files: artifacts/*
           tag_name: ${{ env.TAG }}
           prerelease: ${{ contains(env.TAG, '-test') }}
