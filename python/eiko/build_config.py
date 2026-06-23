@@ -36,6 +36,7 @@ else:
     _cache_base = Path.home() / ".cache"
 
 BIN_CACHE_DIR = str(_cache_base / "eiko" / "binaries")
+os.makedirs(BIN_CACHE_DIR, exist_ok=True)
 
 # ------------------------------------------------------------------------
 # 3. Source Path Resolution
