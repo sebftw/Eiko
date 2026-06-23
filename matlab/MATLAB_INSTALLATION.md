@@ -8,8 +8,8 @@
 
 ## Prerequisites
 Before continuing, ensure you have MATLAB installed along with the following toolboxes:
-* Parallel Computing Toolbox (Required for GPU acceleration and MEX compilation)
-* Deep Learning Toolbox (Required for differentiable operations)
+* Parallel Computing Toolbox
+* Deep Learning Toolbox (Only required for differentiable operations)
 
 ## Automated Installer
 The easiest way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and CUDA toolkit.
