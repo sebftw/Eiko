@@ -120,7 +120,7 @@ except ImportError:
                     name="eiko_torch_impl",
                     sources=[torch_source],
                     extra_cflags=CXX_ARGS,
-                    extra_cuda_cflags=NVCC_ARGS,
+                    extra_cuda_cflags=[arg for arg in NVCC_ARGS if arg != "-arch=native"],
                     extra_include_paths=EXTRA_INCLUDE_PATHS,
                     verbose=False,
                     build_directory=BIN_CACHE_DIR
