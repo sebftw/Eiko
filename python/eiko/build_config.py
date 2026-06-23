@@ -249,7 +249,7 @@ if IS_RELEASE_BUILD:
         ])
 else:
     if "TORCH_CUDA_ARCH_LIST" not in os.environ:
-        os.environ["TORCH_CUDA_ARCH_LIST"] = "native"
+        os.environ["TORCH_CUDA_ARCH_LIST"] = "native"  # (This is also the fallback value if no arch is given, but setting it here avoids a user warning).
     NVCC_ARGS.append('-arch=native')
 
 # ------------------------------------------------------------------------
