@@ -1,7 +1,7 @@
 # Installing Eiko for MATLAB
 - [Prerequisites](#prerequisites)
-- [Automated Installer (Recommended)](#automated-installer)
-- [Manual Installation](#manual-installation)
+- [Manual Installation (Recommended)](#manual-installation)
+- [Automated Installer](#automated-installer)
 - [Installing from Scratch](#installing-from-scratch)
   * [Windows](#windows)
   * [Linux](#linux)
@@ -11,6 +11,14 @@ Before continuing, ensure you have MATLAB installed along with the following too
 * Parallel Computing Toolbox
 * Deep Learning Toolbox (Only required for differentiable operations)
 
+## Manual Installation
+This is the recommended approach on MATLAB:
+1. Navigate to the [Release page](https://github.com/sebftw/Eiko/releases), download `eiko_matlab.zip` from the latest Eiko release, and extract the "eiko" folder.
+2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
+3. Eiko is now installed.
+
+💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
+
 ## Automated Installer
 The easiest way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and CUDA toolkit.
 
@@ -18,14 +26,6 @@ The easiest way to configure your system for Eiko is to use our automated instal
 * **Linux:** Download [`install_eiko_matlab.bat`](./install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
 
 💡 Tip: The installer will generate a `start_eiko.m` script. You can run this script from MATLAB to activate Eiko!
-
-## Manual Installation
-If you already have a suitable C++ compiler and CUDA Toolkit installed, Eiko is easily installed by:
-1. Downloading [Eiko](https://github.com/sebftw/Eiko/archive/refs/heads/main.zip) if it is not already downloaded.
-2. Opening MATLAB, navigating to the `matlab` folder (the same folder this document is in).
-3. Right-clicking the "eiko" folder and selecting **Add to Path &rarr; Selected Folder(s)**.
-
-💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
 
 ## Installing from Scratch
 If you prefer to set up your environment entirely by hand, follow these steps to install the required dependencies before running Eiko.
