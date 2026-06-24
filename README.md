@@ -58,16 +58,16 @@ Download [eiko_matlab.zip](https://github.com/sebftw/Eiko/releases/latest/downlo
 ```matlab
 addpath('/path/to/eiko')
 ```
-Requires MATLAB R2018b+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details and options.
+Requires MATLAB R2021a+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details.
 <!-- END_MATLAB_ONLY -->
 
 ### Python
 ```bash
 pip install eiko
 ```
-Requires Python 3.8+ and either PyTorch or JAX. We recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ and CUDA compilers, and sets up Python, PyTorch, and JAX in a virtual environment.
+Requires Python 3.8+ and PyTorch or JAX. We recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ and CUDA compilers, and sets up Python, PyTorch, and JAX in a virtual environment.
 
-See the [Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
+See the [Python installation guide](/python/PYTHON_INSTALLATION.md) for more details.
 
 ### Requirements
 Your system must have the following:
