@@ -29,6 +29,7 @@ A few features that would be nice to have:
 * **Beamforming:** Because Eiko can compute time-of-flight and apodizations based on electronic emission delays without relying on geometric distance equations, it can seamlessly handle arbitrary or unconventional emission sequences inside non-uniform media. This black-box functionality pairs well with a beamformer, allowing users to image through acoustic lenses or aberrations without deriving any time-of-flight equations manually.
 * **Simulation Framework:** Eiko's inputs (a sound speed map and initial delays) closely mirror those of simulation tools like Field II and k-Wave. Future examples could simulate RF data and let Eiko compute the time-of-flight and apodization. Combining these outputs allows an image to be beamformed with ideal aberration correction.
 * **More Comparisons:** Add more comparisons with other libraries (maybe TomoATT, if comparable).
+* **Add Numpy integration:** While Numpy does not support GPU, it is more commonly used, so it would be nice to be able to call Eiko with Numpy inputs.
 
 A few features which will probably never be added:
 * **Non-GPU implementation:** CPUs are slow, so maintaining a separate codebase for CPU-only users makes little sense.
