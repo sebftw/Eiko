@@ -7,7 +7,7 @@
   * [Linux](#linux)
 
 ## Prerequisites
-Before continuing, ensure you have MATLAB installed with the following toolboxes:
+Before continuing, ensure you have MATLAB R2021b (or newer) installed with the following toolboxes:
 * Parallel Computing Toolbox
 * Deep Learning Toolbox (only required for differentiable operations)
 
