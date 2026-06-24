@@ -37,7 +37,6 @@
 :; 
 :; chmod +x install_eiko_matlab_ubuntu.sh
 :; bash ./install_eiko_matlab_ubuntu.sh
-:; read -n 1 -s -r -p "Installation finished. Press any key to exit..."
 :; exit $?
 @echo off
 REM Windows Command Prompt / Batch Section
