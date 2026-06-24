@@ -50,7 +50,7 @@ meaning the change in time-of-flight when moving through a grid-point must be eq
 
 The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
-Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It is somewhat similar to Dijkstra's algorithm.
+Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a continuous generalization of Dijkstra's shortest path algorithm.
 
 Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute the geometric distances under the assumption of a constant propagation speed, Eiko handles variable propagation speeds. This makes it useful for aberration-corrected beamforming, acoustic lens design, signed distance functions, fastest-path planning (e.g., robot navigation), predicting wildfire movement or seismic migrations, and much more.
 
