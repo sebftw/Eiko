@@ -69,7 +69,7 @@ When $v_{\text{init}}$ is provided, Eiko couples the Eikonal equation ($\|\nabla
 
 $$n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$$
 
-When $v_{\text{init}}$ is given, Eiko transports any quantity $v$ initialized at the boundary $\Gamma$ along the vector field $n(x)$ by solving for $v(x)$ in:
+When $v_{\text{init}}$ is given, Eiko transports any quantity at the boundary $\Gamma$ along the vector field $n(x)$ by solving for $v(x)$ in:
 
 $$\nabla v(x) \cdot n(x) = 0 \quad \text{for } x \in \Omega$$
 $$v(x) = v_{\text{init}}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
