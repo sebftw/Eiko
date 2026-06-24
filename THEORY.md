@@ -20,17 +20,17 @@ This document summarizes the mathematical theory behind Eiko.
 ## Background
 Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin spreading outward in uniform, concentric circles. If the water is identical everywhere, the wave travels at a constant speed, and finding the wavefront's arrival time at any point is simply a matter of measuring the straight-line distance from the source.
 
-Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels, it slows down in this foliage and mud. The wavefronts are no longer perfect circles; they bend, refract, and take the fastest available path rather than a strictly straight line.
+Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels through this foliage and mud, it slows down. The wavefronts are no longer perfect circles - they bend, refract, and take the fastest available path rather than a straight line.
 
-Eiko simulates this phenomenon by tracking the wave as it expands through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
+Eiko simulates this phenomenon by tracking the wave as it expands through the complex medium. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial traveltime at the source point(s), $u_{\text{init}}(\mathbf{x})$, alongside a speed map for the medium.
 
-It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), where the rays are allowed to bend continuously through every grid point.
+It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), but the rays are allowed to bend continuously throughout every grid point.
 
-Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute geometric distances under the assumption of a constant wave-propagation speed, Eiko handles variable propagation speeds. This makes Eiko useful for things like
-* **Wavefront prediction:** Modeling evolving fronts like wildfires, tsunamis, or even glacier flows.
-* **Lens design:** Designing and optimizing acoustic or optical lenses.
+Eiko can therefore be seen as an inhomogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute geometric distances under the assumption of a constant wave propagation speed, Eiko handles variable propagation speeds. This makes Eiko useful for things like
+* **Wavefront prediction:** Modeling evolving fronts like sound, wildfires, or tsunamis, or even glacier flows.
 * **Aberration-correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
-* **Fastest-path planning:** Navigating through complex environments where the "cost" of moving isn't just binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speeds, or risk zones).
+* **Lens design:** Designing and optimizing acoustic or optical lenses.
+* **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't just binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk).
 * **Traveltime tomography:** Reconstructing the Earth's subsurface structure by solving for the slowness field $f(\mathbf{x})$ using the arrival times of seismic waves.
 
 ## Travel Time
