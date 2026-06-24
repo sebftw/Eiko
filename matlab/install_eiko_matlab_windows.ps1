@@ -305,18 +305,6 @@ if ($matlabProc.ExitCode -eq 0) {
     Exit-Script
 }
 
-$launcherPath = Join-Path $PSScriptRoot "start_eiko.m"
-# Using a literal Here-String (@' ... '@)
-$launcherContent = @'
-% Eiko Initialization Script
-[scriptDir, ~, ~] = fileparts(mfilename('fullpath'));
-eikoPath = fullfile(scriptDir, 'eiko');
-addpath(eikoPath);
-disp('[*] Eiko environment active. Ready to compute!');
-'@
-
-$launcherContent | Out-File -FilePath $launcherPath -Encoding utf8
-
 Write-Host "`n====================================================" -ForegroundColor Green
 Write-Host " EIKO ENVIRONMENT INSTALLED SUCCESSFULLY" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
