@@ -3,18 +3,14 @@ This document summarizes the mathematical theory behind Eiko.
 
 - [Background](#background)
 - [Travel Time](#travel-time)
-    + [In human terms](#in-human-terms)
 - [Advection Field](#advection-field)
-    + [In human terms](#in-human-terms-1)
   * [Use cases of advection](#use-cases-of-advection)
 - [MSFM (Multi-Stencil Fast Marching)](#msfm-multi-stencil-fast-marching)
 - [Gating](#gating)
 - [Gradients with respect to the loss](#gradients-with-respect-to-the-loss-l)
   * [Gradient w.r.t. step size](#gradient-wrt-step-size-delta-x)
   * [Gradient w.r.t. initial conditions](#gradient-wrt-initial-conditions-u_textinit)
-    + [In human terms](#in-human-terms-2)
   * [Gradient w.r.t. slowness](#gradient-wrt-slowness-f)
-    + [In human terms](#in-human-terms-3)
 - [References](#references)
 
 ## Background
