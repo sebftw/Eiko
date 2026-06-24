@@ -18,9 +18,9 @@ This document summarizes the mathematical theory behind Eiko.
 - [References](#references)
 
 ## Background
-Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin spreading outward in uniform, concentric circles. If the water is identical everywhere, the wave travels at a constant speed, and finding the wavefront's arrival time at any point is simply a matter of measuring the straight-line distance.
+Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin spreading outward in uniform, concentric circles. If the water is identical everywhere, the wave travels at a constant speed, and finding the wavefront's arrival time at any point is simply a matter of measuring the straight-line distance from the source.
 
-Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels, it slows down in the foliage and mud. The wavefronts are no longer perfect circles; they bend, refract, and take the fastest available path rather than a strictly straight line.
+Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels, it slows down in this foliage and mud. The wavefronts are no longer perfect circles; they bend, refract, and take the fastest available path rather than a strictly straight line.
 
 Eiko simulates this phenomenon by tracking the wave as it expands through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
 
