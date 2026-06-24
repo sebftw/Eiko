@@ -6,7 +6,8 @@
 % the current working directory.
 
 % Determine the directory containing this script.
-[scriptDir, ~, ~] = fileparts(mfilename('fullpath'));
+scriptPath = mfilename('fullpath');
+[scriptDir, ~, ~] = fileparts(scriptPath);
 
 % Construct the path to the 'eiko' directory.
 eikoPath = fullfile(scriptDir, 'eiko');
