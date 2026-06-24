@@ -25,7 +25,6 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
   * [Python](#python)
   * [Requirements](#requirements)
 - [Examples](#examples)
-- [Project Layout](#project-layout)
 - [Contributing](#contributing)
 - [Citing](#citing)
 <!-- END_MATLAB_ONLY -->
@@ -197,24 +196,9 @@ For 3D inputs, use `from eiko import eiko3d`.
 
 See [EXAMPLES](/examples/README.md) for more code examples.
 
-## Project Layout
-The files are as follows:
-```
-Eiko/
-├── examples/       # Example scripts (tomography, lens design, etc.).
-│   ├── matlab/     #   MATLAB example scripts 
-│   └── python/     #   Python example scripts
-├── matlab/         # MATLAB Eiko library
-├── python/         # Python Eiko library
-├── src/            # Core CUDA C++ Eiko implementation and interface
-├── images/         # Various image assets
-├── pyproject.toml  # Python package configuration (for pip install)
-├── THEORY.md       # Mathematical background and Eikonal algorithm details
-└── README.md       # This file
-```
-
 ## Contributing
-Feel free to contribute to the project. Bug reports and feature requests may be submitted on the "Issues" page.
+Feel free to contribute to the project.
+Bug reports and feature requests may be submitted on the [Issues](https://github.com/sebftw/Eiko/issues/) page. See [PROJECT](PROJECT.md).
 
 ## Citing
 You can cite Eiko as
