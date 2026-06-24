@@ -12,10 +12,10 @@ authors = [
     {name = "Sebastian Kazmarek Præsius", email = "sebastian.devel@gmail.com"},
 ]
 keywords = [
-    "gpu", "cuda", "pytorch", "jax", "automatic differentiation", "autodiff", 
+    "GPU", "CUDA", "PyTorch", "JAX", "automatic differentiation", "autodiff", 
     "time of flight", "beamforming", "shortest path", 
-    "batch-processing", "fast iterative Method", "eikonal", "eikonal equation",
-    "PDE", "partial differential equations", "scientific computing"
+    "batch-processing", "eikonal", "eikonal equation",
+    "seismology", "acoustics", "scientific computing"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
