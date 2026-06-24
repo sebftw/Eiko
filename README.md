@@ -1,14 +1,20 @@
 
 ![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
+<div align="center">
+  <a href="https://github.com/sebftw/Eiko/blob/main/LICENSE"><img src="https://img.shields.io/github/license/sebftw/Eiko?color=525d6b&style=flat" alt="License" /></a>&nbsp;<a href="https://github.com/sebftw/Eiko/releases"><img src="https://img.shields.io/github/downloads/sebftw/Eiko/total?color=525d6b&label=Downloads&style=flat&logo=github" alt="GitHub Downloads" /></a>&nbsp;<a href="https://pypi.org/project/eiko/"><img src="https://img.shields.io/pypi/v/eiko?logo=python&logoColor=white&style=flat&color=3776AB" alt="PyPI version" /></a>&nbsp;<a href="https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip"><img src="https://img.shields.io/badge/MATLAB-Download_.zip-a2142f?logo=matlab&style=flat" alt="MATLAB Setup" /></a>&nbsp;<a href="https://pytorch.org/"><img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white" alt="PyTorch" /></a>&nbsp;<a href="https://github.com/google/jax"><img src="https://img.shields.io/badge/JAX-4285F4?style=flat" alt="JAX" /></a>&nbsp;<a href="https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab" /></a>
+</div>
+ <!--
 [![License](https://img.shields.io/github/license/sebftw/Eiko?color=525d6b&style=flat)](https://github.com/sebftw/Eiko/blob/main/LICENSE)
 [![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=525d6b&label=Downloads&style=flat&logo=github)](https://github.com/sebftw/Eiko/releases)
 [![MATLAB Setup](https://img.shields.io/badge/MATLAB-Download_.zip-a2142f?logo=matlab&style=flat)](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip)
 [![PyPI version](https://img.shields.io/pypi/v/eiko?logo=python&logoColor=white&style=flat&color=3776AB)](https://pypi.org/project/eiko/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/) 
 [![JAX](https://img.shields.io/badge/JAX-4285F4?style=flat)](https://github.com/google/jax)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb) -->
  <!-- [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?logo=python&logoColor=white&style=flat-square&color=005b96)](https://pypi.org/project/eiko/) -->
+ 
 ---
+
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 
