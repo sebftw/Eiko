@@ -2,7 +2,6 @@
 % EIKONAL AUTOGRAD TEST: Traveltime Tomography Inversion
 % =========================================================================
 clear all; clc; close all;
-parallel.gpu.enableCUDAForwardCompatibility(true);
 
 %% 1. Setup Grid and True Slowness Model
 N = 64; 
@@ -29,7 +28,7 @@ end
 
 %% 3. Generate "Measured" Data (Target Traveltimes)
 disp('Generating target traveltime data...');
-T_measured = eiko(u_init, true_f, dx, msfm=msfm);
+T_measured = eiko(u_init, true_f, dx, 'msfm', msfm);
 
 %% 4. Optimization Setup
 % Initial guess: A completely homogeneous field of 1.0
@@ -158,7 +157,7 @@ function [loss, grad_m] = eikonal_inversion_loss(m_dl, u_init, T_measured, dx, m
     f_dl = exp(m_dl); 
     
     % 1. Forward Pass
-    T_pred = eiko(u_init, f_dl, dx, msfm=msfm);
+    T_pred = eiko(u_init, f_dl, dx, 'msfm', msfm);
     
     % 2. Compute Mean Squared Error Loss
     mse_diff = T_pred - T_measured;
