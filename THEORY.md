@@ -59,9 +59,9 @@ meaning the change in time-of-flight when moving through a grid-point must be eq
 
 The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
-Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a continuous generalization of Dijkstra's shortest path algorithm.
+Usually, unknown points in $u_{init}$ are set to infinity ("infinitely far away"), but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a generalization of Dijkstra's shortest path algorithm to a continuous domain.
 
-**Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less (more grid points equals a higher accuracy). The accuracy depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
+**Limitations:** The calculated time-of-flight will always be an overestimate, but it is accurate enough for most use cases as long as the grid spacing is half a wavelength or less (more grid points equals a higher accuracy). The accuracy depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
 ## Advection Field
 
