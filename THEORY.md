@@ -7,7 +7,7 @@ This document summarizes the mathematical theory behind Eiko.
   * [Use cases of advection](#use-cases-of-advection)
 - [MSFM (Multi-Stencil Fast Marching)](#msfm-multi-stencil-fast-marching)
 - [Gating](#gating)
-- [Gradients with respect to the loss](#gradients-with-respect-to-the-loss-l)
+- [Gradients](#gradients)
   * [Gradient w.r.t. step size](#gradient-wrt-step-size-delta-x)
   * [Gradient w.r.t. initial conditions](#gradient-wrt-initial-conditions-u_textinit)
   * [Gradient w.r.t. slowness](#gradient-wrt-slowness-f)
@@ -18,16 +18,17 @@ Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin sp
 
 Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels through this foliage and mud, it slows down. The wavefronts are no longer perfect circles - they bend, refract, and take the fastest available path rather than a straight line.
 
-Eiko simulates this phenomenon by tracking the wave as it expands through the complex medium. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial travel time at the source point(s), $u_{\text{init}}(\mathbf{x})$, alongside a speed map for the medium.
+Eiko simulates this phenomenon by tracking the wave as it expands through the complex medium. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial travel time at the source point(s), $u_{\text{init}}(\mathbf{x})$, alongside a slowness map for the medium.
 
 It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), but the rays are allowed to bend continuously throughout every grid point.
 
 Eiko can therefore be seen as an inhomogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute geometric distances under the assumption of a constant wave propagation speed, Eiko handles variable propagation speeds. This makes Eiko useful for things like
-* **Wavefront prediction:** Modeling evolving fronts like sound, wildfires, or tsunamis, or glacier flows.
-* **Aberration correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
-* **Lens design:** Designing and optimizing lenses, acoustic or optical.
+* **Wavefront prediction:** Modeling evolving fronts like sound, wildfires, tsunamis, or glacier flows.
+* **Lens design:** Designing and optimizing optical and acoustic lenses.
 * **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk zones).
-* **Traveltime tomography:** Reconstructing the Earth's subsurface structure by solving for the slowness field $f(\mathbf{x})$ using the arrival times of seismic waves.
+* **Aberration correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
+* **Speed-of-sound estimation:** Reconstructing unknown velocity or slowness fields $f(\mathbf{x})$, such as mapping the Earth's subsurface structure using seismic arrival times.
+* **Cost map learning:** Rather than finding the fastest path through a known environment, the differentiability of Eiko enables the reverse: observing an agent's trajectories to deduce the hidden continuous cost map they were implicitly navigating.
 
 And much more...
 
@@ -116,8 +117,8 @@ Setting `gating = true` speeds up the code because the stencil is smaller. It ma
 
 Gating can usually be enabled in pulse-echo setups without issues, but **be careful** because gating is implemented only along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions is usually flipped compared to MATLAB (which uses column-major aka. Fortran order), so the last axis is the leading dimension.
 
-## Gradients with respect to the loss $L$
-Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
+## Gradients
+Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs. This allows it to be used in [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation) (optimization) frameworks like PyTorch or JAX. In this section, $L(x)$ represents the loss or residual associated with each grid point.
 
 ### Gradient w.r.t. step size ($\Delta x$)
 By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{\partial u}{\partial \Delta x} = \frac{u}{\Delta x}$, and using the chain rule, we get:
