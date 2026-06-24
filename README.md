@@ -21,8 +21,8 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 <!-- START_MATLAB_ONLY -->
 - [Why use Eiko?](#why-use-eiko)
 - [Installation](#installation)
-  * [MATLAB](#matlab)
-  * [Python](#python)
+  * [MATLAB](#matlab-)
+  * [Python](#python-)
   * [Requirements](#requirements)
 - [Examples](#examples)
 - [Contributing](#contributing)
@@ -52,7 +52,7 @@ A few reasons to use Eiko:
 
 ## Installation
 <!-- START_MATLAB_ONLY -->
-### MATLAB
+### MATLAB 🧮
 Download [**eiko_matlab.zip**](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path:
 ```matlab
 addpath('/path/to/eiko')
@@ -60,7 +60,7 @@ addpath('/path/to/eiko')
 Requires MATLAB R2021a+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details.
 <!-- END_MATLAB_ONLY -->
 
-### Python
+### Python 🐍
 We recommend using the [**automated installer script**](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ and CUDA compilers, and sets up a Python virtual environment with PyTorch and JAX. Alternatively, Eiko can be installed through pip:
 ```bash
 pip install eiko
