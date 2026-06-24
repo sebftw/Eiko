@@ -23,7 +23,7 @@ def fetch_precompiled_wheel(
     if target_dir is None:
         raise ValueError("[Eiko] target_dir must be explicitly provided.")
     if package_version is None:
-        ValueError("[Eiko] package_version must be explicitly provided.")
+        raise ValueError("[Eiko] package_version must be explicitly provided.")
     # Auto-infer backend from target_impl if not explicitly passed
     if not backend_name:
         backend_name = "jax" if "jax" in target_impl.lower() else "torch"
@@ -150,10 +150,10 @@ def fetch_precompiled_wheel(
                         out_file.write(chunk)
                         sha256_hash.update(chunk)
             
-            if expected_hash and sha256_hash.hexdigest() != expected_hash:
-                raise ValueError(f"Hash mismatch for {matched_build['filename']}.")
-            
-            os.replace(tmp_wheel_path, wheel_path)
+                if expected_hash and sha256_hash.hexdigest() != expected_hash:
+                    raise ValueError(f"Hash mismatch for {matched_build['filename']}.")
+                
+                os.replace(tmp_wheel_path, wheel_path)
         
         # Atomic Extraction Phase
         tmp_target_path = None
@@ -186,4 +186,6 @@ def fetch_precompiled_wheel(
         print(f"[Eiko] Binary bootstrap failed: {e}. Falling back to JIT.")
         if tmp_target_path and os.path.exists(tmp_target_path):
             os.remove(tmp_target_path)
+        if tmp_wheel_path and os.path.exists(tmp_wheel_path):
+            os.remove(tmp_wheel_path)
         return False
