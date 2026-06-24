@@ -27,10 +27,10 @@ Eiko simulates this phenomenon by tracking the wave as it expands through the co
 It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), but the rays are allowed to bend continuously throughout every grid point.
 
 Eiko can therefore be seen as an inhomogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute geometric distances under the assumption of a constant wave propagation speed, Eiko handles variable propagation speeds. This makes Eiko useful for things like
-* **Wavefront prediction:** Modeling evolving fronts like sound, wildfires, or tsunamis, or even glacier flows.
-* **Aberration-correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
-* **Lens design:** Designing and optimizing acoustic or optical lenses.
-* **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't just binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk).
+* **Wavefront prediction:** Modeling evolving fronts like sound, wildfires, or tsunamis, or glacier flows.
+* **Aberration correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
+* **Lens design:** Designing and optimizing lenses, acoustic or optical.
+* **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk zones).
 * **Traveltime tomography:** Reconstructing the Earth's subsurface structure by solving for the slowness field $f(\mathbf{x})$ using the arrival times of seismic waves.
 
 ## Travel Time
