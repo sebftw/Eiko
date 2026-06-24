@@ -21,16 +21,16 @@ Eiko/
 ```
 
 ## Future Plans
-A few features that would be nice to add:
+A few features that would be nice to have:
 
-* **Double-Precision Floating-Point Support:** Eiko currently operates exclusively in single-precision (32-bit). While double-precision computation will incur a performance penalty, particularly on gaming GPUs, it is helpful for numerical validation, such as estimating rounding errors or validating Eiko against numerical gradients.
-* **Robust Backward Pass:** The forward pass (computing time-of-flight) is highly robust and deterministic due to monotonic convergence: time of flight decreases every iteration. Conversely, the backward pass (computing gradients) currently exhibits non-monotonic behavior because residuals can be positive or negative. The simple solution is to compute two separate backward passes: one for positive and one for negative residuals, and then sum the results (the backward pass is linear). While this doubles memory requirements, it will guarantee deterministic convergence and likely accelerate the backward pass.
-* **Auto-Tuning:** Current optimizations are primarily tuned for the `NVIDIA GeForce RTX 5070 Ti`, with extensive tuning limited to 2D cases. A future update could include an auto-tuning function that lets users optimize Eiko for their specific hardware, alongside out-of-the-box presets for various GPU generations to improve baseline performance.
-* **Differentiable Beamforming:** Because Eiko computes time-of-flight and apodizations based on electronic emission delays without relying on closed-form geometric distance equations, it can seamlessly handle arbitrary or unconventional emission sequences and non-uniform media. This black-box functionality will pair well with a fully differentiable beamformer, allowing users to image through acoustic lenses or aberrations without deriving any time-of-flight equations manually.
-* **Simulation Framework:** Eiko's required inputs (sound speed maps and initial delays) closely mirror those of simulation tools like Field II and k-Wave. Future examples could simulate RF data and let Eiko compute the time-of-flight and apodization. Combining these outputs allows an image to be beamformed with ideal aberration correction.
+* **Double-Precision Floating-Point Support:** Eiko currently operates exclusively in single-precision (32-bit). While double-precision is slower, particularly on gaming GPUs, it can be helpful for numerical validation, such as estimating rounding errors or validating Eiko against numerical (finite difference) gradients.
+* **Robust Backward Pass:** The forward pass (computing time-of-flight) is robust and deterministic due to monotonic convergence: time of flight decreases every iteration. This makes it easier to parallelize. Conversely, the backward pass (computing gradients) currently exhibits non-monotonic behavior because input residuals may be positive or negative. The simple solution is to perform two backward passes: one for positive and one for negative residuals. Then, the two results can be summed since the backward pass is linear. While this doubles the memory requirements, it guarantees deterministic convergence and likely accelerates the backward pass.
+* **Auto-Tuning:** The code is currently optimized for a `NVIDIA GeForce RTX 5070 Ti` GPU, with extensive tuning only for the to 2D input case. A future update could include an auto-tuning function that lets users optimize Eiko for their specific hardware, alongside out-of-the-box presets for various GPU generations to improve baseline performance.
+* **Beamforming:** Because Eiko can compute time-of-flight and apodizations based on electronic emission delays without relying on geometric distance equations, it can seamlessly handle arbitrary or unconventional emission sequences inside non-uniform media. This black-box functionality pairs well with a beamformer, allowing users to image through acoustic lenses or aberrations without deriving any time-of-flight equations manually.
+* **Simulation Framework:** Eiko's inputs (a sound speed map and initial delays) closely mirror those of simulation tools like Field II and k-Wave. Future examples could simulate RF data and let Eiko compute the time-of-flight and apodization. Combining these outputs allows an image to be beamformed with ideal aberration correction.
 
 
-A few features which probably will never be added:
+A few features which probably will probably never be added:
 * **Non-GPU implementation:** CPUs are slow, so maintaining a separate codebase for CPU-only users makes little sense.
 
 
