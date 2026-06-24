@@ -4,7 +4,7 @@
 :; # Works on Linux (via "bash install_eiko_matlab.bat") and Windows (via double-click)
 :; # Logic: 
 :; # 1. If a local installer is in the current dir, run it.
-:; # 2. If Eiko dir exists, cd into it and run the installer.
+:; # 2. If the Eiko dir exists, cd into it and run the installer.
 :; # 3. Otherwise, download Eiko, cd into it, and run the installer.
 :; # ==============================================================================
 :; # Linux/Bash Section
