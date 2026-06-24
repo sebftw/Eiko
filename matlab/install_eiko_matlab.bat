@@ -19,7 +19,7 @@
 :;        exit 1
 :;    fi
 :; else
-:;    echo "Downloading latest Eiko release..."
+:;    echo "Downloading Eiko..."
 :;    URL="https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip"
 :;    if command -v curl >/dev/null 2>&1; then curl -sL "$URL" -o eiko_matlab.zip
 :;    elif command -v wget >/dev/null 2>&1; then wget -qO eiko_matlab.zip "$URL"
