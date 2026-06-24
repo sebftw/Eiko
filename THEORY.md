@@ -65,7 +65,7 @@ When $v_{\text{init}}$ is provided, Eiko couples the Eikonal equation ($\|\nabla
 
 $$n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$$
 
-When $v_{\text{init}}$ is given, Eiko transports any quantity at the boundary $\Gamma$ along the vector field $n(x)$ by solving for $v(x)$ in:
+When $v_{\text{init}}$ is given, Eiko transports any quantity at the boundary $\Gamma$ along the vector field $n(x)$ by solving
 
 $$\nabla v(x) \cdot n(x) = 0 \quad \text{for } x \in \Omega$$
 $$v(x) = v_{\text{init}}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
@@ -120,7 +120,7 @@ Gating can usually be enabled in pulse-echo setups without issues, but **be care
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
 
 ### Gradient w.r.t. step size ($\Delta x$)
-By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{\partial u}{\partial \Delta x} = u/\Delta x$, and using the chain rule, we get:
+By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{\partial u}{\partial \Delta x} = \frac{u}{\Delta x}$, and using the chain rule, we get:
 
 $$\frac{\partial L}{\partial \Delta x} = \sum \frac{\partial u}{\partial \Delta x} = \frac{1}{\Delta x} \sum u\frac{\partial L}{\partial u}$$
 
