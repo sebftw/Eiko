@@ -24,7 +24,14 @@ Now, imagine instead that the pond has patches of thick aquatic plants and areas
 
 Eiko simulates this phenomenon by tracking the wave as it expands through the complex media. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial time-of-flight at the "source" points, $u_{init}(x)$, alongside the speed-of-sound map for the medium.
 
-It is essentially ray tracing, but instead of rays bending only at sharp boundaries, the rays may bend continuously at every grid point.
+It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), where the rays are allowed to bend continuously through every grid point.
+
+Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute geometric distances under the assumption of a constant wave-propagation speed, Eiko handles variable propagation speeds. This makes Eiko useful for things like
+* **Wavefront prediction:** Modeling evolving fronts like wildfires, tsunamis, or even glacier flows.
+* **Lens design:** Designing and optimizing acoustic or optical lenses.
+* **Aberration-correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
+* **Fastest-path planning:** Navigating through complex environments where the "cost" of moving isn't just binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speeds, or risk zones).
+* **Traveltime tomography:** Reconstructing the Earth's subsurface structure by solving for the slowness field $f(\mathbf{x})$ using the arrival times of seismic waves.
 
 ## Travel Time
 
@@ -51,8 +58,6 @@ meaning the change in time-of-flight when moving through a grid-point must be eq
 The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
 Usually, unknown points in $u_{init}$ are set to infinity, but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a continuous generalization of Dijkstra's shortest path algorithm.
-
-Eiko can therefore be seen as a generalized, non-homogeneous distance transform. While functions like MATLAB's `bwdist` or CuPy's `distance_transform_edt` compute the geometric distances under the assumption of a constant propagation speed, Eiko handles variable propagation speeds. This makes it useful for aberration-corrected beamforming, acoustic lens design, signed distance functions, fastest-path planning (e.g., robot navigation), predicting wildfire movement or seismic migrations, and much more.
 
 **Limitations:** The calculated time-of-flight will always be an overestimate, but it is usually accurate enough for most use cases as long as the grid spacing is half a wavelength or less (more grid points equals a higher accuracy). The accuracy depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
