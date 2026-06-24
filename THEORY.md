@@ -48,7 +48,7 @@ Where:
 *   $\Omega$ is the entire grid of points.
 *   $\Gamma$ is the set of points with a known arrival time ("sources").
 
-The result is the shortest time-of-flight: $u(x)$ for all $x$.
+The result is the shortest time-of-flight: $u(\textbf{x})$ for all $\textbf{x}$.
 
 #### In human terms
 The Eikonal equation states that
