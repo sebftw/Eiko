@@ -22,7 +22,7 @@ Imagine dropping a rock into a perfectly calm pond. Ripples immediately begin sp
 
 Now, imagine instead that the pond has patches of thick aquatic plants and areas of dense mud. As the wave travels through this foliage and mud, it slows down. The wavefronts are no longer perfect circles - they bend, refract, and take the fastest available path rather than a straight line.
 
-Eiko simulates this phenomenon by tracking the wave as it expands through the complex medium. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial traveltime at the source point(s), $u_{\text{init}}(\mathbf{x})$, alongside a speed map for the medium.
+Eiko simulates this phenomenon by tracking the wave as it expands through the complex medium. It calculates the exact arrival time of that first ripple at every point on the grid, even when the propagation speed varies continuously. All Eiko requires is the initial travel time at the source point(s), $u_{\text{init}}(\mathbf{x})$, alongside a speed map for the medium.
 
 It essentially performs [ray tracing](https://en.wikipedia.org/wiki/Ray_tracing_(graphics)), but the rays are allowed to bend continuously throughout every grid point.
 
@@ -33,16 +33,18 @@ Eiko can therefore be seen as an inhomogeneous distance transform. While functio
 * **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk zones).
 * **Traveltime tomography:** Reconstructing the Earth's subsurface structure by solving for the slowness field $f(\mathbf{x})$ using the arrival times of seismic waves.
 
+And much more...
+
 ## Travel Time
 
 Eiko solves the Eikonal equation:
 
-$$\left|\nabla u(x)\right| = f(x) \quad \text{for } x \in \Omega$$
-$$u(x) = u_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
+$$\left|\nabla u(\mathbf{x})\right| = f(\mathbf{x}) \quad \text{for } \mathbf{x} \in \Omega$$
+$$u(\mathbf{x}) = u_{\text{init}}(\mathbf{x}) \quad \text{for } \mathbf{x} \in \Gamma \text{ (boundary conditions)}$$
 
 Where:
-*   $u(x)$ is the time-of-flight map (the solution).
-*   $f(x)$ is the slowness (the inverse of speed, $c(x) = 1/f(x)$ ).
+*   $u(\mathbf{x})$ is the time-of-flight map (the solution).
+*   $f(\mathbf{x})$ is the slowness (the inverse of speed, $c(x) = 1/f(x)$ ).
 *   $\Omega$ is the entire grid of points.
 *   $\Gamma$ is the set of points with a known arrival time ("sources").
 
