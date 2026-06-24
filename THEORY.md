@@ -115,7 +115,7 @@ The result is a "shadowed" region behind any object that blocks the wavefront, i
 
 Setting `gating = true` speeds up the code because the stencil is smaller. It may also be necessary in some imaging setups. For example, if a wave is blocked, one might expect a "shadow" behind the obscuring object in an acoustic setup, since most of the energy won't make it around a bend (even though some energy theoretically bends around the object via Huygens' principle in a wavelength-dependent diffraction process).
 
-Gating can usually be enabled in pulse-echo setups without issues, but **be careful** because gating is implemented only along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions is usually flipped compared to MATLAB (which uses column-major aka. Fortran order), so the last axis is the leading dimension.
+Gating can usually be enabled in pulse-echo setups without issues, but **be careful** because gating is implemented only along the first data dimension. So, if your input is 2D, the first dimension (vertical) should correspond to $z$ (axial/depth), while the second axis (horizontal) should correspond to the lateral spatial dimension. In Python, the order of dimensions is usually flipped compared to MATLAB (which uses column-major, aka Fortran order), so the last axis is the leading dimension.
 
 ## Gradients
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs. This allows it to be used in [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation) (optimization) frameworks like PyTorch or JAX. In this section, $L(x)$ represents the loss or residual associated with each grid point.
@@ -123,7 +123,7 @@ Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs. This allo
 ### Gradient w.r.t. step size ($\Delta x$)
 By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{\partial u}{\partial \Delta x} = \frac{u}{\Delta x}$, and using the chain rule, we get:
 
-$$\frac{\partial L}{\partial \Delta x} = \sum \frac{\partial u}{\partial \Delta x} = \frac{1}{\Delta x} \sum u\frac{\partial L}{\partial u}$$
+$$\frac{\partial L}{\partial \Delta x} = \sum \left( \frac{\partial L}{\partial u} \frac{\partial u}{\partial \Delta x} \right)= \frac{1}{\Delta x} \sum u\frac{\partial L}{\partial u}$$
 
 Where:
 *   $\sum$ represents the summation over the entire input-space.
