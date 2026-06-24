@@ -8,7 +8,7 @@
 [![JAX](https://img.shields.io/badge/JAX-4285F4?style=flat)](https://github.com/google/jax)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
  <!-- [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?logo=python&logoColor=white&style=flat-square&color=005b96)](https://pypi.org/project/eiko/) -->
-
+---
 **Eiko** is a GPU-accelerated Eikonal equation solver, enabling fast
 computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 
