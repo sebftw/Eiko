@@ -42,7 +42,7 @@ $$u(x) = u_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)
 
 Where:
 *   $u(x)$ is the time-of-flight map (the solution).
-*   $f(x)$ is the slowness map (the inverse of speed, $c(x) = 1/f(x)$ ).
+*   $f(x)$ is the slowness (the inverse of speed, $c(x) = 1/f(x)$ ).
 *   $\Omega$ is the entire grid of points.
 *   $\Gamma$ is the set of points with a known arrival time ("sources").
 
