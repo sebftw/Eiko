@@ -219,7 +219,7 @@ You can cite Eiko as
 ```
 @misc{eiko2026,
   author       = {Pr{\ae}sius, Sebastian Kazmarek},
-  title        = {Eiko: the {GPU}-accelerated {E}ikonal equation solver},
+  title        = {{Eiko}: the {GPU}-accelerated {E}ikonal equation solver},
   year         = {2026},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/sebftw/Eiko}},
