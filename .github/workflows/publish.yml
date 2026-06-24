@@ -204,7 +204,12 @@ jobs:
             cp -a src/. artifacts/eiko-matlab-release/staging/eiko/+eiko_lib/src/
             
             # 3. Inject installation scripts
-            cp matlab/MATLAB_INSTALLATION.md artifacts/eiko-matlab-release/staging/
+            # Convert MD directly into the staging folder as HTML
+            pandoc --standalone \
+              matlab/MATLAB_INSTALLATION.md \
+              -o artifacts/eiko-matlab-release/staging/MATLAB_INSTALLATION.html \
+              --metadata title="Installing Eiko for MATLAB"
+                        
             cp matlab/install_eiko_matlab.bat artifacts/eiko-matlab-release/staging/
             cp matlab/install_eiko_matlab_ubuntu.sh artifacts/eiko-matlab-release/staging/
             cp matlab/install_eiko_matlab_windows.ps1 artifacts/eiko-matlab-release/staging/
