@@ -117,7 +117,6 @@ def fetch_precompiled_wheel(
         matched_build = max(fallback_pool, key=lambda b: parse_cuda_num(b.get("cuda", "")))
 
     # 4. Multiprocessing-Safe Download & Extract
-    print(f"[Eiko] Downloading precompiled {backend_name.upper()} kernels...")
     wheel_url = matched_build["url"]
     eiko_tmp_dir = os.path.join(tempfile.gettempdir(), "eiko_cache")
     os.makedirs(eiko_tmp_dir, exist_ok=True)
@@ -133,6 +132,7 @@ def fetch_precompiled_wheel(
     try:
         # Only download if not already cached in temp
         if not os.path.exists(wheel_path):
+            print(f"[Eiko] Downloading precompiled {backend_name.upper()} kernels...")
             req = urllib.request.Request(wheel_url, headers={'User-Agent': 'eiko-bootstrap'})
             with urllib.request.urlopen(req, timeout=10.0) as response:
                 content_length = response.getheader('Content-Length')
@@ -178,14 +178,18 @@ def fetch_precompiled_wheel(
                         
             return True
         except zipfile.BadZipFile:
-            print(f"[Eiko] Precompiled wheel (zip) was corrupted. Deleting and falling back to JIT.")
+            print(f"[Eiko] Precompiled wheel (zip) was corrupted. Deleting it and falling back to JIT.")
             os.remove(wheel_path)
             return False
     
     except Exception as e:
-        print(f"[Eiko] Binary bootstrap failed: {e}. Falling back to JIT.")
-        if tmp_target_path and os.path.exists(tmp_target_path):
-            os.remove(tmp_target_path)
-        if tmp_wheel_path and os.path.exists(tmp_wheel_path):
-            os.remove(tmp_wheel_path)
+        if isinstance(e, urllib.error.URLError):
+            print(f"[Eiko] Network error: Unable to reach the internet ({e.reason}). Falling back to JIT compilation.")
+        else:
+            print(f"[Eiko] Binary bootstrap failed: {e}. Falling back to JIT compilation.")
+        
+        # Centralized cleanup
+        for path in (tmp_target_path, tmp_wheel_path):
+            if path and os.path.exists(path):
+                os.remove(path)
         return False
