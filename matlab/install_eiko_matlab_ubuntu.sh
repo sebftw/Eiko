@@ -77,7 +77,7 @@ if ! command -v matlab >/dev/null 2>&1; then
     safe_exit 1
 fi
 
-echo -e "  -> MATLAB found. Starting headless probe for system requirements (~10-20 seconds)..."
+echo -e "  -> MATLAB found. Probing for system requirements (may take ~20 seconds)..."
 
 # Headless probe script: extracts MATLAB release version and native GCC requirements.
 PROBE_SCRIPT="cc=mex.getCompilerConfigurations('C++','Supported'); gcc_found=false; for i=1:length(cc), if ~isempty(strfind(lower(cc(i).Manufacturer), 'gnu')), m=regexp(cc(i).Version, '^(\d+)', 'tokens', 'once'); if ~isempty(m), fprintf('GCC_MAJOR:%s\n', m{1}); gcc_found=true; break; end; end; end; if ~gcc_found, fprintf('GCC_MAJOR:UNKNOWN\n'); end; fprintf('MATLAB_RELEASE:%s\n', version('-release')); exit;"
