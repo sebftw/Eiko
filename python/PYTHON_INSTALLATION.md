@@ -8,7 +8,7 @@
 - [Google Colab (no GPU required)](#google-colab)
 
 ##  Automated Installer
-If you are new to Python or want to set up your environment instantly, use the automated installation scripts. This script will validate your NVIDIA drivers, install CUDA and C++ Build Tools, set up Python, create a virtual environment, and install the complete Eiko ML stack in your home directory.
+If you are new to Python or want to set up your environment instantly, use the automated installation scripts. This script will  validate your GPU drivers, install CUDA and C++ Build Tools, set up Python, and create a virtual environment folder in your home directory with the complete Eiko ML stack.
 
 * **Windows:** Download [`install_eiko_python.bat`](./install_eiko_python.bat) and double-click the file.
 * **Linux:** Download [`install_eiko_python.bat`](./install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
