@@ -9,7 +9,7 @@
 ## Prerequisites
 Before continuing, ensure you have MATLAB installed with the following toolboxes:
 * Parallel Computing Toolbox
-* Deep Learning Toolbox (Optional, only required for differentiable operations)
+* Deep Learning Toolbox (only required for differentiable operations)
 
 ## Manual Installation
 This is the recommended approach for MATLAB:
