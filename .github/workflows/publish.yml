@@ -309,15 +309,15 @@ jobs:
             ### 🧮 MATLAB
 
             **Manual Installation (Recommended)**
-            1. Download [**eiko_matlab.zip**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the "eiko" folder.
-            2. Inside MATLAB, right-click the "eiko" folder and select **Add to Path &rarr; Selected Folder(s)**.
-            3. Eiko is now installed and ready for use.
+            1. Download [**eiko_matlab.zip**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/eiko_matlab.zip) and extract the `eiko` folder.
+            2. Inside MATLAB, right-click the `eiko` folder and select **Add to Path &rarr; Selected Folder(s)**.
+            3. Eiko is now activated and ready for use.
             
             💡 **Tip:** To avoid doing this every time you launch MATLAB, you can add `addpath('/path/to/eiko')` to your `startup.m` file.
             
             **Automated Installer**
             
-            Another way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and the CUDA toolkit. This allows it to compile Eiko specifically for your system.
+            Another way to configure your system for Eiko is to use our automated installation script. It will check your NVIDIA drivers, download the correct C++ build tools, and the CUDA toolkit. This allows it to compile Eiko specifically for your system setup.
             
             * **Windows:** Download [**install_eiko_matlab.bat**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
             * **Linux:** Download [**install_eiko_matlab.bat**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
