@@ -19,6 +19,3 @@ eikoPath = fullfile(scriptDir, 'eiko');
 % Dynamically add the 'eiko' folder to the top of MATLAB's search path.
 %    - This allows MATLAB to find and execute any functions/classes inside it.
 addpath(eikoPath);
-
-% 4. Print a status message to the Command Window confirming initialization.
-disp('[*] Eiko environment active. Ready to compute!');
