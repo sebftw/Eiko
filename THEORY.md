@@ -6,12 +6,12 @@ This document summarizes the mathematical theory behind Eiko.
     + [In human terms](#in-human-terms)
 - [Advection Field](#advection-field)
     + [In human terms](#in-human-terms-1)
-  * [Example use cases of advection](#example-use-cases-of-advection)
+  * [Use cases of advection](#use-cases-of-advection)
 - [MSFM (Multi-Stencil Fast Marching)](#msfm-multi-stencil-fast-marching)
 - [Gating](#gating)
 - [Gradients with respect to the loss](#gradients-with-respect-to-the-loss-l)
   * [Gradient w.r.t. step size](#gradient-wrt-step-size-delta-x)
-  * [Gradient w.r.t. initial conditions](#gradient-wrt-initial-conditions-u_init)
+  * [Gradient w.r.t. initial conditions](#gradient-wrt-initial-conditions-u_textinit)
     + [In human terms](#in-human-terms-2)
   * [Gradient w.r.t. slowness](#gradient-wrt-slowness-f)
     + [In human terms](#in-human-terms-3)
@@ -59,30 +59,30 @@ meaning the change in time-of-flight when moving through a grid-point must be eq
 
 The solver is therefore initialized with one or more known travel times (boundary conditions), after which it finds the shortest distance from those points to any other points on the grid.
 
-Usually, unknown points in $u_{init}$ are set to infinity ("infinitely far away"), but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a generalization of Dijkstra's shortest path algorithm to a continuous domain.
+Usually, unknown points in $u_{\text{init}}$ are set to infinity ("infinitely far away"), but they don't have to be: Eiko simply checks if any points violate the principle of minimizing time-of-flight and corrects them. It uses a fast iterative method (FIM) [1] to parallelize this on a GPU and continues iterating until all points converge to the theoretically minimum travel time. It can be viewed as a generalization of Dijkstra's shortest path algorithm to a continuous domain.
 
 **Limitations:** The calculated time-of-flight will always be an overestimate, but it is accurate enough for most use cases as long as the grid spacing is half a wavelength or less (more grid points equals a higher accuracy). The accuracy depends on the exact medium in which the calculations are performed (e.g., whether a lens is present).
 
 ## Advection Field
 
-When $v_{init}$ is provided, Eiko couples the Eikonal equation ($\|\nabla u\| = f$) with a steady-state advection (transport) equation. Note that the ray-path-of-fastest-travel is always perpendicular to the wavefront $u(x)$. Thus, its direction is given by the normalized gradient vector:
+When $v_{\text{init}}$ is provided, Eiko couples the Eikonal equation ($\|\nabla u\| = f$) with a steady-state advection (transport) equation. Note that the ray-path-of-fastest-travel is always perpendicular to the wavefront $u(x)$. Thus, its direction is given by the normalized gradient vector:
 
 $$n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$$
 
-When $v_{init}$ is given, the solver transports any quantity $v$ initialized at the boundary $\Gamma$ along this exact vector field $n(x)$ by solving for $v(x)$ in:
+When $v_{\text{init}}$ is given, Eiko transports any quantity $v$ initialized at the boundary $\Gamma$ along the vector field $n(x)$ by solving for $v(x)$ in:
 
 $$\nabla v(x) \cdot n(x) = 0 \quad \text{for } x \in \Omega$$
-$$v(x) = v_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
+$$v(x) = v_{\text{init}}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
 
 Where:
 *   $v(x)$ is the advected field (the solution).
 *   $\Gamma$ is the set of points with a known arrival time (or at least the outer boundary of that set).
 
 #### In human terms
-The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{init}$ at the section with known values in $u_{init}$, these values will simply be pulled with the flow during the time-of-flight calculation.
+The constraint $\nabla v(x) \cdot n(x) = 0$ means that $v$ must be constant along the direction in which $u$ varies the most. By initializing $v_{\text{init}}$ at the section with known values in $u_{\text{init}}$, these values will simply be pulled with the flow during the time-of-flight calculation.
 
-### Example use cases of advection:
-*   **Apodization:** Initialize $v$ with apodization weights near the source to drag those weights along the acoustic rays.
+### Use cases of advection
+*   **Apodization:** Initialize $v$ with valid apodization weights near the source to drag those weights along the acoustic rays. This allows one to compute apodizations through a lens.
 *   **Polar Decomposition:** Initialize $v$ with departure angles to map out a $(\theta, r)$ coordinate system across the Cartesian grid.
 
 
@@ -134,7 +134,7 @@ Where:
 
 Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
 
-### Gradient w.r.t. initial conditions ($u_{init}$)
+### Gradient w.r.t. initial conditions ($u_{\text{init}}$)
 This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable, lambda ($\lambda$), and allows it to flow backward along the characteristics (rays) generated during the forward pass. This is conceptually similar to advection, but reversed - it collects $\lambda$ values and pulls them upstream toward the sources, accumulating gradients and residuals along the way.
 
 Mathematically, the continuous equation for this backward pass is:
@@ -152,13 +152,13 @@ Where:
 Interestingly, while the forward Eikonal equation is non-linear, this backward adjoint process is entirely linear.
 
 #### In human terms
-Imagine the forward pass as water flowing outward from a spring (the sources in $u_{init}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
+Imagine the forward pass as water flowing outward from a spring (the sources in $u_{\text{init}}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
 The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $-n(x)$ ), exactly the way they came. 
  
-The divergence operator ($\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{init}$).
+The divergence operator ($\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{\text{init}}$).
 
-**Note:** The gradient of the travel time w.r.t. initial travel time is only non-zero in source points (identified as $u_{init}(x)\neq \infty$).
+**Note:** The gradient of the travel time w.r.t. initial travel time is only non-zero in source points (identified as $u_{\text{init}}(x)\neq \infty$).
 
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication based on the local wave geometry.
@@ -171,7 +171,7 @@ $$\frac{dL}{df} = \tilde{\lambda}(x) * f(x) * \Delta x^2$$
 * $\tilde{\lambda}(x)$ is the discrete adjoint variable divided by the geometric normalizer (the time-of-flight difference between nodes).
 * $\Delta x^2$ is the squared grid spacing. Note that this is always squared regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from the Pythagorean approximation of the gradient, not a volumetric integral.
 
-**Note:** The gradient of the travel time w.r.t. slowness is zero in source points (identified as $u_{init}(x)\neq \infty$). This is because those points were prescribed a travel time, so changing the slowness will not affect them.
+**Note:** The gradient of the travel time w.r.t. slowness is zero in source points (identified as $u_{\text{init}}(x)\neq \infty$). This is because those points were prescribed a travel time, so changing the slowness will not affect them.
 
 #### In human terms
 If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta x^2$ to correctly account for the local grid spacing geometry during the discrete integration.
