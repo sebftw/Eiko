@@ -1,5 +1,5 @@
 [tool.bumpversion]
-current_version = "0.8.6"
+current_version = "0.8.7"
 commit = true
 tag = false # Let GitHub Actions handle tagging or do it manually later
 
