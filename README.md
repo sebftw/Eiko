@@ -65,14 +65,14 @@ If you don't have a GPU, you can instead run Eiko for Python from Google Colab [
 ### Installing Eiko for MATLAB
 Download [eiko_matlab.zip](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path.
 
-See [the Eiko MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details and options.
+See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details and options.
 
 <!-- END_MATLAB_ONLY -->
 
 ### Installing Eiko for Python
 Eiko can be installed using `pip install eiko`. However, we recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs a C++ and CUDA compiler, and sets up Python, PyTorch, and/or JAX inside a virtual environment.
 
-See [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
+See the [Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
 
 ## Quick Start
 An example of how to use Eiko is shown below.
