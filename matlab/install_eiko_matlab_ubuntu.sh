@@ -286,16 +286,6 @@ else
     safe_exit 1
 fi
 
-LAUNCHER_PATH="$SCRIPT_DIR/start_eiko.m"
-# Wrapping 'EOF' in single quotes blocks Bash from expanding variables inside
-cat << 'EOF' > "$LAUNCHER_PATH"
-% Eiko Initialization Script
-[scriptDir, ~, ~] = fileparts(mfilename('fullpath'));
-eikoPath = fullfile(scriptDir, 'eiko');
-addpath(eikoPath);
-disp('[*] Eiko is activated. Ready to compute!');
-EOF
-
 echo -e "\n${GREEN}====================================================${NC}"
 echo -e "${GREEN} EIKO ENVIRONMENT INSTALLED SUCCESSFULLY${NC}"
 echo -e "${GREEN}====================================================${NC}"
