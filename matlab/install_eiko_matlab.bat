@@ -29,7 +29,7 @@
 :; exit $?
 @echo off
 REM Windows Command Prompt / Batch Section
-powershell -NoExit -ExecutionPolicy Bypass -Command "if (Test-Path '.\install_eiko_matlab_windows.ps1') { Write-Host 'Local installer found. Skipping download.' } else { $ProgressPreference = 'SilentlyContinue'; Write-Host 'Downloading latest Eiko release...'; Invoke-WebRequest -Uri 'https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip' -OutFile 'eiko_matlab.zip'; Write-Host 'Extracting files...'; if (Test-Path 'Eiko') { Remove-Item 'Eiko' -Recurse -Force }; Expand-Archive -Path 'eiko_matlab.zip' -DestinationPath '.\Eiko' -Force; Remove-Item -Path 'eiko_matlab.zip' -Force; Set-Location -Path 'Eiko' } .\install_eiko_matlab_windows.ps1"
+powershell -NoExit -ExecutionPolicy Bypass -Command "$ProgressPreference = 'SilentlyContinue'; if (-not (Test-Path '.\install_eiko_matlab_windows.ps1')) { Write-Host 'Downloading latest Eiko release...'; Invoke-WebRequest -Uri 'https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip' -OutFile 'eiko_matlab.zip'; Write-Host 'Extracting files...'; if (Test-Path 'Eiko') { Remove-Item 'Eiko' -Recurse -Force }; Expand-Archive -Path 'eiko_matlab.zip' -DestinationPath '.\Eiko' -Force; Remove-Item -Path 'eiko_matlab.zip' -Force; Set-Location -Path 'Eiko'; } else { Write-Host 'Local installer found. Skipping download.'; } & '.\install_eiko_matlab_windows.ps1'"
 if %errorlevel% neq 0 (
     echo [!] Windows Installation failed.
     pause
