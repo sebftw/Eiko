@@ -170,7 +170,7 @@ $$\frac{\partial L}{\partial f} = \lambda(x) f(x) \Delta x^2$$
 **Note:** The gradient of the travel time w.r.t. slowness is zero in source points (identified as $u_{\text{init}}(x)\neq \infty$). This is because those points were prescribed a travel time, so changing the slowness will not affect them.
 
 #### In human terms
-If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid. We scale the result by $\Delta x^2$ to correctly account for the local grid spacing geometry during the discrete integration.
+If a lot of "error traffic" ($\lambda$) traveled backward through a specific pixel, and that pixel already had a high slowness ($f$), then changing the speed limit at that pixel will have a massive impact on the final travel times across the rest of the grid.
 
 
 ## References
