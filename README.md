@@ -51,7 +51,7 @@ This section covers how to install Eiko for MATLAB or Python.
 ### Requirements
 Your system must have the following:
 * **OS:** Windows or Linux
-* **Hardware:** A NVIDIA GPU
+* **Hardware:** A NVIDIA GPU (GeForce RTX 20-series or newer recommended).
 
 If you don't own a GPU, you can run Eiko for Python from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
 
