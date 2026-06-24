@@ -1,6 +1,7 @@
 :; # ==============================================================================
 :; # Eiko Cross-Platform Unified Installer Polyglot Script
 :; # Works on Linux (via "bash install_eiko_matlab.bat") and Windows (via double-click)
+:; # Logic: If local installer exists, use it. Otherwise, download and run.
 :; # ==============================================================================
 :; # Linux/Bash Section
 :; if [ ! -f "install_eiko_matlab_ubuntu.sh" ]; then
