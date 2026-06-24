@@ -208,6 +208,7 @@ jobs:
             cp matlab/install_eiko_matlab.bat artifacts/eiko-matlab-release/staging/
             cp matlab/install_eiko_matlab_ubuntu.sh artifacts/eiko-matlab-release/staging/
             cp matlab/install_eiko_matlab_windows.ps1 artifacts/eiko-matlab-release/staging/
+            cp matlab/start_eiko.m artifacts/eiko-matlab-release/staging/
             
             # Zip the newly assembled folder structure
             cd artifacts/eiko-matlab-release/staging
@@ -312,8 +313,8 @@ jobs:
             
             To automatically configure your system for Eiko, use the installer:
             
-            * **Windows:** Download [install_eiko_matlab.bat](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
-            * **Linux:** Download [install_eiko_matlab.bat](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
+            * **Windows:** Download [**install_eiko_matlab.bat**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat) and double-click the file.
+            * **Linux:** Download [**install_eiko_matlab.bat**](https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/install_eiko_matlab.bat), open a terminal, and run `bash install_eiko_matlab.bat`.
             
             💡 Tip: The installer will generate a `start_eiko.m` script. You can run this script from MATLAB to activate Eiko!
             
