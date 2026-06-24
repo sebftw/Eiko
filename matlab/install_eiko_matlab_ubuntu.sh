@@ -45,7 +45,7 @@ echo -e "  1. Detect MATLAB and probe for compiler/CUDA requirements."
 echo -e "  2. Validate your NVIDIA display driver compatibility."
 echo -e "  3. Install the appropriate GNU C++ Build Tools."
 echo -e "  4. Deploy the NVIDIA CUDA Toolkit (if not built into MATLAB)."
-echo -e "  5. Execute system verification and generate a launcher script."
+echo -e "  5. Verify the Eiko installation."
 
 echo -e "\n${YELLOW}[!] DISCLAIMER: This script requires sudo privileges and modifies system packages."
 echo -e "    It is provided 'as-is' without any express or implied warranties. Run at your own risk.${NC}"
