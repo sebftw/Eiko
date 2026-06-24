@@ -5,7 +5,7 @@
 :; # Logic: 
 :; # 1. If local installer is in current dir, run it.
 :; # 2. If Eiko dir exists, cd into it and run the installer.
-:; # 3. Otherwise, download Eiko, extract, cd into it, and run.
+:; # 3. Otherwise, download Eiko, cd into it, and run the installer.
 :; # ==============================================================================
 :; # Linux/Bash Section
 :; if [ -f "install_eiko_matlab_ubuntu.sh" ]; then
