@@ -28,7 +28,7 @@ Eiko can therefore be seen as an inhomogeneous distance transform. While functio
 * **Fastest-path planning:** Navigating through complex environments where the "cost" of moving one step isn't binary (obstacle vs. free space), but continuous (e.g., varying terrain roughness, elevation, speed limits, or risk zones).
 * **Aberration correction:** Compensating for tissue sound speeds (e.g., through fat, muscle, or skull) in medical ultrasound imaging.
 * **Speed-of-sound estimation:** Reconstructing unknown velocity or slowness fields $f(\mathbf{x})$, such as mapping the Earth's subsurface structure using seismic arrival times.
-* **Cost map learning:** Rather than finding the fastest path through a known environment, the differentiability of Eiko enables the reverse: observing an agent's trajectories to deduce the hidden continuous cost map they were implicitly navigating.
+* **Cost map learning:** Rather than finding the fastest path through a known environment, the differentiability of Eiko enables the reverse: observing an agent's trajectories to deduce the cost map they were implicitly navigating.
 
 And much more...
 
