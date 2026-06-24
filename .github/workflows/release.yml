@@ -26,7 +26,7 @@ jobs:
 
           # --- Next-Gen Tier (CUDA 13+) ---
           # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
-          # - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -305,7 +305,7 @@ jobs:
   build_windows_wheels:
     name: Windows (Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
     runs-on: windows-2022
-    if: false
+    if: true
     strategy:
       fail-fast: false
       matrix:
@@ -315,14 +315,14 @@ jobs:
           # - { torch: '2.7.0', cuda: '12.6.3' }
   
           # --- Transition Tier ---
-          - { torch: '2.10.0', cuda: '12.8.1' }
+          # - { torch: '2.10.0', cuda: '12.8.1' }
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
           # - { torch: '2.12.0', cuda: '12.6.3' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
           # - { torch: '2.12.0', cuda: '13.0.0' }
-          # - { torch: '2.12.0', cuda: '13.2.0' }
+          - { torch: '2.12.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
@@ -668,7 +668,7 @@ jobs:
   build_matlab_windows:
     name: MATLAB Build (Windows, CUDA 12.8)
     runs-on: windows-latest
-    if: false
+    if: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
