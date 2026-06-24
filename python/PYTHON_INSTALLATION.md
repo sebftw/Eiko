@@ -85,9 +85,10 @@ First, update your display drivers to ensure compatibility with recent CUDA vers
 sudo ubuntu-drivers install
 sudo reboot
 ```
-You can verify the driver installation by running `nvidia-smi`.
-
-Next, navigate to the [NVIDIA CUDA Downloads page](https://developer.nvidia.com/cuda-downloads). Run `uname -m && cat /etc/os-release` in your terminal to determine your OS version, select `deb (network)`, and follow the provided instructions to install the toolkit. Verify the installation by running `nvcc --version`.
+You can verify the driver installation by running `nvidia-smi`. Next:
+1. Identify your system OS and architecture by running `grep '^PRETTY_NAME' /etc/os-release && uname -m`
+2. Navigate to the [NVIDIA CUDA Downloads page](https://developer.nvidia.com/cuda-downloads). Select your specific architecture and OS version, choose `deb (network)`, and follow NVIDIA's instructions to install the toolkit.
+3. Open a new terminal and verify the installation by running `nvcc --version`.
 
 #### Compiler
 Next, you need a C++ compiler. Open your terminal and run:
