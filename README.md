@@ -57,18 +57,14 @@ If you don't own a GPU, you can run Eiko for Python from Google Colab [here](htt
 
 <!-- START_MATLAB_ONLY -->
 ### Installing Eiko for MATLAB
-* Manual Installation (Recommended): Download [eiko_matlab.zip](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path.
-* Automated Installer: Download and run the [install_eiko_matlab.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_matlab.bat) script.
+Download [eiko_matlab.zip](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path.
 
 See [the Eiko MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details and options.
 
 <!-- END_MATLAB_ONLY -->
 
 ### Installing Eiko for Python
-* Manual Installation: Run `pip install eiko`. Remember to also install either PyTorch or JAX.
-* Automated Installer (Recommended): Download and run the [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat) script.
-
-The automated installer is recommended for Python because it installs Python, PyTorch, and JAX in a virtual environment.
+Eiko can be installed using `pip install eiko`. However, we recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs a C++ and CUDA compiler, and sets up Python, PyTorch, and/or JAX inside a virtual environment.
 
 See [the Eiko Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
 
