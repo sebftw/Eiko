@@ -187,7 +187,7 @@ The result should look something like this:
 For 3D inputs, use `from eiko import eiko3d`.
 </details>
 
-See [EXAMPLES](/examples/README.md) for many more code examples.
+See [EXAMPLES](/examples/README.md) for more code examples.
 
 ## Project Layout
 The files are as follows:
