@@ -120,15 +120,14 @@ Gating can usually be enabled in pulse-echo setups without issues, but **be care
 Eiko is differentiable with respect to `u_init`, `f`, and `dx` inputs.
 
 ### Gradient w.r.t. step size ($\Delta x$)
-By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{du}{d\Delta x} = \frac{u}{\Delta x}$, and using the chain rule, we get:
+By Euler's Homogeneity Theorem, $u$ is a homogenous function of degree 1 with respect to $\Delta x$ (scaling the grid scales the travel time linearly). Therefore, $\frac{\partial u}{\partial \Delta x} = u/\Delta x$, and using the chain rule, we get:
 
-$$\frac{dL}{d\Delta x} = \sum \frac{du}{d\Delta x} = \frac{1}{\Delta x} \sum \frac{dL}{du} * u$$
+$$\frac{\partial L}{\partial \Delta x} = \sum \frac{\partial u}{\partial \Delta x} = \frac{1}{\Delta x} \sum u\frac{\partial L}{\partial u}$$
 
 Where:
 *   $\sum$ represents the summation over the entire input-space.
-*   $*$ represents point-wise multiplication of the functions.
 
-Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass.
+Thus, the gradient w.r.t. `dx` is easily computed without needing a backward pass, unlike the other gradients.
 
 ### Gradient w.r.t. initial conditions ($u_{\text{init}}$)
 This is solved using the "adjoint" equation: a transport equation that takes an adjoint variable, lambda ($\lambda$), and allows it to flow backward along the characteristics (rays) generated during the forward pass. This is conceptually similar to advection, but reversed - it collects $\lambda$ values and pulls them upstream toward the sources, accumulating gradients and residuals along the way.
@@ -142,7 +141,7 @@ Where:
 *   $\lambda(x)$ is the adjoint state variable (the backward-flowing sensitivity).
 *   $n(x) = \frac{\nabla u(x)}{\|\nabla u(x)\|}$ is the exact same ray direction computed in the forward pass.
 *   $\nabla \cdot$ is the divergence operator.
-*   $g = \frac{dL}{du}$ is the gradient of the loss with respect to the local arrival times (the injected residual).
+*   $g = \frac{\partial L}{\partial u}$ is the gradient of the loss with respect to the local arrival times (the injected residual).
 *   $\Gamma_{out}$ represents the outer edges of the grid where the forward rays exit the domain (distinct from $\Gamma$, which were the original source points).
 
 Interestingly, while the forward Eikonal equation is non-linear, this backward adjoint process is entirely linear.
@@ -150,7 +149,7 @@ Interestingly, while the forward Eikonal equation is non-linear, this backward a
 #### In human terms
 Imagine the forward pass as water flowing outward from a spring (the sources in $u_{\text{init}}$) and eventually spilling off the edges of the map ($\Gamma_{out}$). The adjoint equation reverses this process.
 
-The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{dL}{du}$) onto the map, and let them flow backward up the streams ( $-n(x)$ ), exactly the way they came. 
+The boundary condition " $\lambda = 0$ at $\Gamma_{out}$ " simply means that when we rewind time, no *new* errors enter from outside the map. We start with zero error at the borders, pour the grid's local errors ($\frac{\partial L}{\partial u}$) onto the map, and let them flow backward up the streams ( $-n(x)$ ), exactly the way they came. 
  
 The divergence operator ($\nabla \cdot$) ensures that as these error streams merge together, their values accumulate. The final pooled values, when the streams return to the original spring ($\Gamma$), become the gradient w.r.t. the initial conditions ($u_{\text{init}}$).
 
@@ -159,13 +158,13 @@ The divergence operator ($\nabla \cdot$) ensures that as these error streams mer
 ### Gradient w.r.t. slowness ($f$)
 Once the backward solver has computed the adjoint variable $\lambda(x)$ by sweeping the errors back to the source, finding the sensitivity of the slowness map becomes a simple point-wise multiplication based on the local wave geometry.
 
-Because discrete Eikonal solvers typically use a squared finite-difference formulation to approximate the PDE (e.g., $\sum (\Delta T)^2 = f^2 \Delta x^2$), the discrete gradient is extracted via the optimality condition:
+Because discrete Eikonal solvers typically use a squared finite-difference formulation to approximate the PDE (e.g., $\sum {\Delta T}^2 = f^2 \Delta x^2$), the discrete gradient is extracted via the optimality condition:
 
-$$\frac{dL}{df} = \tilde{\lambda}(x) * f(x) * \Delta x^2$$
+$$\frac{\partial L}{\partial f} = \lambda(x) f(x) \Delta x^2$$
 
 **Where**:
-* $\tilde{\lambda}(x)$ is the discrete adjoint variable divided by the geometric normalizer (the time-of-flight difference between nodes).
-* $\Delta x^2$ is the squared grid spacing. Note that this is always squared regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from the Pythagorean approximation of the gradient, not a volumetric integral.
+* $\lambda(x)$ is the discrete adjoint variable.
+* $\Delta x^2$ is the squared grid spacing. This is always squared, regardless of whether the grid is 1D, 2D, or 3D, because it stems directly from a Pythagorean approximation of the gradient rather than a volumetric integral.
 
 **Note:** The gradient of the travel time w.r.t. slowness is zero in source points (identified as $u_{\text{init}}(x)\neq \infty$). This is because those points were prescribed a travel time, so changing the slowness will not affect them.
 
