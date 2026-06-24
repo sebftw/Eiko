@@ -30,7 +30,7 @@ It is essentially ray tracing, but instead of rays bending only at sharp boundar
 
 Eiko solves the Eikonal equation:
 
-$$\|\nabla u(x)\| = f(x) \quad \text{for } x \in \Omega$$
+$$\left|\nabla u(x)\right| = f(x) \quad \text{for } x \in \Omega$$
 $$u(x) = u_{init}(x) \quad \text{for } x \in \Gamma \text{ (boundary conditions)}$$
 
 Where:
@@ -44,7 +44,7 @@ The result is the shortest time-of-flight: $u(x)$ for all $x$.
 #### In human terms
 The Eikonal equation states that
 
-$$\|\nabla u\|=\sqrt{\left(\frac{\partial u}{\partial x}\right)^2+\left(\frac{\partial u}{\partial y}\right)^2+\left(\frac{\partial u}{\partial z}\right)^2} = f(x)$$
+$$\left|\nabla u\right|=\sqrt{\left(\frac{\partial u}{\partial x}\right)^2+\left(\frac{\partial u}{\partial y}\right)^2+\left(\frac{\partial u}{\partial z}\right)^2} = f$$
 
 meaning the change in time-of-flight when moving through a grid-point must be equal to the slowness $f = 1/c$.
 
