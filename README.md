@@ -59,7 +59,7 @@ Your system must have the following:
 * **OS:** Windows or Linux.
 * **Hardware:** An NVIDIA GPU. A GeForce GTX 10-series, RTX-series, or newer is recommended.
  
-If you don't have a GPU, you can instead run Eiko for Python from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
+If you don't have a GPU, you can instead run Eiko from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
 
 <!-- START_MATLAB_ONLY -->
 ### Installing Eiko for MATLAB
@@ -70,7 +70,7 @@ See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more det
 <!-- END_MATLAB_ONLY -->
 
 ### Installing Eiko for Python
-Eiko can be installed using `pip install eiko`. However, we recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs a C++ and CUDA compiler, and sets up Python, PyTorch, and/or JAX inside a virtual environment.
+Eiko can be installed using `pip install eiko`. However, we recommend using the automated installer script [install_eiko_python.bat](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ and CUDA compilers, and sets up Python, PyTorch, and JAX in a virtual environment.
 
 See the [Python installation guide](/python/PYTHON_INSTALLATION.md) for more details and options.
 
