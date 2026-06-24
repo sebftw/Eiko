@@ -10,8 +10,8 @@
 ##  Automated Installer
 If you are new to Python or want to set up your environment instantly, use the automated installation scripts. This script will  validate your GPU drivers, install CUDA and C++ Build Tools, set up Python, and create a virtual environment folder in your home directory with the complete Eiko ML stack.
 
-* **Windows:** Download [`install_eiko_python.bat`](./install_eiko_python.bat) and double-click the file.
-* **Linux:** Download [`install_eiko_python.bat`](./install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
+* **Windows:** Download [**install_eiko_python.bat**](./install_eiko_python.bat) and double-click the file.
+* **Linux:** Download [**install_eiko_python.bat**](./install_eiko_python.bat), open a terminal, and run `bash install_eiko_python.bat`.
 
 💡 Tip: The installer will generate a `start_eiko` script. Run this script at any time to open a terminal with your Eiko environment activated and ready to go!
 
