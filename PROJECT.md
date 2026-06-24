@@ -28,7 +28,7 @@ A few features that would be nice to have:
 * **Auto-Tuning:** The code is currently optimized for a `NVIDIA GeForce RTX 5070 Ti` GPU, with extensive tuning only for the to 2D input case. A future update could include an auto-tuning function that lets users optimize Eiko for their specific hardware, alongside out-of-the-box presets for various GPU generations to improve baseline performance.
 * **Beamforming:** Because Eiko can compute time-of-flight and apodizations based on electronic emission delays without relying on geometric distance equations, it can seamlessly handle arbitrary or unconventional emission sequences inside non-uniform media. This black-box functionality pairs well with a beamformer, allowing users to image through acoustic lenses or aberrations without deriving any time-of-flight equations manually.
 * **Simulation Framework:** Eiko's inputs (a sound speed map and initial delays) closely mirror those of simulation tools like Field II and k-Wave. Future examples could simulate RF data and let Eiko compute the time-of-flight and apodization. Combining these outputs allows an image to be beamformed with ideal aberration correction.
-
+* **More Comparisons:** Add more comparisons with other libraries (maybe TomoATT, if comparable).
 
 A few features which probably will probably never be added:
 * **Non-GPU implementation:** CPUs are slow, so maintaining a separate codebase for CPU-only users makes little sense.
