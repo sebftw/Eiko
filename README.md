@@ -61,7 +61,7 @@ Requires MATLAB R2019b+ with the Parallel Computing Toolbox. See the [MATLAB ins
 <!-- END_MATLAB_ONLY -->
 
 ### Python 🐍
-We recommend using the [**automated installer script**](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ and CUDA compilers, and sets up a Python virtual environment with PyTorch and JAX. Alternatively, Eiko can be installed through pip:
+We recommend using the [**automated installer script**](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ & CUDA compilers, and sets up a Python virtual environment with PyTorch and JAX. Alternatively, Eiko can be installed through pip:
 ```bash
 pip install eiko
 ```
