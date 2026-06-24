@@ -1,3 +1,4 @@
+#!/bin/sh
 :; # ==============================================================================
 :; # Eiko Cross-Platform Unified Installer
 :; # Works on Linux (via "bash install_eiko_matlab.bat") and Windows (via double-click)
