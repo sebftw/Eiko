@@ -174,6 +174,10 @@ jobs:
               json.dump(registry, f, indent=2)
           "
           
+          # Pin MATLAB script to the specific release tag BEFORE injecting it into the zip
+          # (Updated to reflect the new release zip URL structure)
+          sed -i "s|releases/latest/download/eiko_matlab.zip|releases/download/${{ env.TAG }}/eiko_matlab.zip|g" matlab/install_eiko_matlab.bat
+          
           # Handle the MATLAB artifact
           if [ -d "artifacts/eiko-matlab-release" ]; then
             # Create a staging directory to assemble the final zip contents
@@ -192,13 +196,18 @@ jobs:
             fi
             
             # 1. Inject the 'examples/matlab' folder as 'examples'
-            # Using cp -a with '/.' ensures the contents are copied directly into the target directory
             mkdir -p artifacts/eiko-matlab-release/staging/examples
             cp -a examples/matlab/. artifacts/eiko-matlab-release/staging/examples/
             
             # 2. Inject the 'src' folder into 'eiko/+eiko_lib/src'
             mkdir -p artifacts/eiko-matlab-release/staging/eiko/+eiko_lib/src
             cp -a src/. artifacts/eiko-matlab-release/staging/eiko/+eiko_lib/src/
+            
+            # 3. Inject installation scripts
+            cp matlab/MATLAB_INSTALLATION.md artifacts/eiko-matlab-release/staging/
+            cp matlab/install_eiko_matlab.bat artifacts/eiko-matlab-release/staging/
+            cp matlab/install_eiko_matlab_ubuntu.sh artifacts/eiko-matlab-release/staging/
+            cp matlab/install_eiko_matlab_windows.ps1 artifacts/eiko-matlab-release/staging/
             
             # Zip the newly assembled folder structure
             cd artifacts/eiko-matlab-release/staging
@@ -218,11 +227,10 @@ jobs:
           
           # Pin Python script to raw files for the specific release tag
           sed -i "s|raw.githubusercontent.com/sebftw/Eiko/main|raw.githubusercontent.com/${{ github.repository }}/${{ env.TAG }}|g" python/install_eiko_python.bat
-
-          # Pin MATLAB script to the full repository archive for the specific release tag
-          sed -i "s|github.com/sebftw/Eiko/archive/refs/heads/main|github.com/${{ github.repository }}/archive/refs/tags/${{ env.TAG }}|g" matlab/install_eiko_matlab.bat
           
           cp python/install_eiko_python.bat flat_artifacts/
+          
+          # You can optionally still expose the .bat file loose alongside the zip
           cp matlab/install_eiko_matlab.bat flat_artifacts/
           cp flat_artifacts/* artifacts/
           
