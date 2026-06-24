@@ -57,7 +57,7 @@ Download [**eiko_matlab.zip**](https://github.com/sebftw/Eiko/releases/latest/do
 ```matlab
 addpath('/path/to/eiko')
 ```
-Requires MATLAB R2021a+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details.
+Requires MATLAB R2019b+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details.
 <!-- END_MATLAB_ONLY -->
 
 ### Python 🐍
