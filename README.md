@@ -1,11 +1,11 @@
 
 ![Eiko Logo](https://raw.githubusercontent.com/sebftw/Eiko/main/images/eiko_logo.png "Eiko")<br>
-[![License](https://img.shields.io/github/license/sebftw/Eiko&color=525d6b)](https://github.com/sebftw/Eiko/blob/main/LICENSE)
-[![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=525d6b&label=Downloads&style=flat-square&logo=github)](https://github.com/sebftw/Eiko/releases)
-[![PyPI version](https://img.shields.io/pypi/v/eiko?logo=python&logoColor=white&style=flat-square&color=3775A9)](https://pypi.org/project/eiko/)
-[![MATLAB Setup](https://img.shields.io/badge/MATLAB-Download_.zip-darkred?logo=matlab&logoColor=white&style=flat-square)](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip)
-[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C&logo=pytorch&logoColor=white)](https://pytorch.org/)
-[![JAX](https://img.shields.io/badge/JAX-Supported-4285F4)](https://github.com/google/jax)
+[![License](https://img.shields.io/github/license/sebftw/Eiko?color=525d6b&style=flat)](https://github.com/sebftw/Eiko/blob/main/LICENSE)
+[![GitHub Downloads](https://img.shields.io/github/downloads/sebftw/Eiko/total?color=525d6b&label=Downloads&style=flat&logo=github)](https://github.com/sebftw/Eiko/releases)
+[![MATLAB Setup](https://img.shields.io/badge/MATLAB-Download_.zip-a2142f?logo=matlab&style=flat)](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip)
+[![PyPI version](https://img.shields.io/pypi/v/eiko?logo=python&logoColor=white&style=flat&color=3776AB)](https://pypi.org/project/eiko/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org/) 
+[![JAX](https://img.shields.io/badge/JAX-4285F4?style=flat)](https://github.com/google/jax)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb)
  <!-- [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eiko?logo=python&logoColor=white&style=flat-square&color=005b96)](https://pypi.org/project/eiko/) -->
 
