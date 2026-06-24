@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software in your work, please cite it using the following metadata."
-title: "Eiko: the GPU-accelerated Eikonal equation solver"
+title: "{Eiko}: the {GPU}-accelerated {Eikonal} equation solver"
 version: 0.8.6
 date-released: 2026-06-23
 url: "https://github.com/sebftw/Eiko"
