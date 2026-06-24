@@ -34,7 +34,7 @@ To learn about how Eiko works, see [THEORY](THEORY.md).
 
 ## Why use Eiko?
 A few reasons to use Eiko:
-1. Eiko is ***FAST*** - up to 100x faster than comparable libraries.
+1. Eiko is ***fast*** - up to **100x faster** than comparable libraries.
 2. Eiko is ***differentiable***, allowing it to be used with PyTorch or JAX.
 3. Eiko supports ***advection***, allowing it to compute apodizations through a lens.
 
