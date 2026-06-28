@@ -196,7 +196,7 @@ For 3D inputs, use `from eiko import eiko3d`.
 See [EXAMPLES](/examples/README.md) for more code examples.
 
 ## Contributing
-Feel free to contribute to the project (see [PROJECT](PROJECT.md)).
+Feel free to contribute to the project (see [PROJECT](PROJECT.md)).<br>
 Bug reports and feature requests may be submitted on the [Issues](https://github.com/sebftw/Eiko/issues/) page.
 
 ## Citing
