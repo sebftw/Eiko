@@ -21,9 +21,8 @@ computation of the shortest time-of-flight through an arbitrary 2D or 3D medium.
 <!-- START_MATLAB_ONLY -->
 - [Why use Eiko?](#why-use-eiko)
 - [Installation](#installation)
-  * [MATLAB](#matlab-)
-  * [Python](#python-)
-  * [Requirements](#requirements)
+  * [MATLAB](#matlab-installation-)
+  * [Python](#python-installation-)
 - [Examples](#examples)
 - [Contributing](#contributing)
 - [Citing](#citing)
@@ -51,8 +50,14 @@ A few reasons to use Eiko:
 
 
 ## Installation
+Your system must have the following:
+* **OS:** Windows or Linux.
+* **Hardware:** An NVIDIA GPU. A GeForce GTX 10-series, RTX-series, or newer is recommended.
+ 
+If you don't have a GPU, you can instead run Eiko for Python from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
+
 <!-- START_MATLAB_ONLY -->
-### MATLAB 🧮
+### MATLAB Installation 🧮
 Download [**eiko_matlab.zip**](https://github.com/sebftw/Eiko/releases/latest/download/eiko_matlab.zip), extract the `eiko` folder, and add it to your MATLAB path:
 ```matlab
 addpath('/path/to/eiko')
@@ -60,19 +65,12 @@ addpath('/path/to/eiko')
 Requires MATLAB R2019b+ with the Parallel Computing Toolbox. See the [MATLAB installation guide](/matlab/MATLAB_INSTALLATION.md) for more details.
 <!-- END_MATLAB_ONLY -->
 
-### Python 🐍
+### Python Installation 🐍
 We recommend using the [**automated installer script**](https://github.com/sebftw/Eiko/releases/latest/download/install_eiko_python.bat), which checks your GPU driver, installs C++ & CUDA compilers, and sets up a Python virtual environment with PyTorch and JAX. Alternatively, Eiko can be installed through pip:
 ```bash
 pip install eiko
 ```
 Requires Python 3.8+ with PyTorch or JAX. See the [Python installation guide](/python/PYTHON_INSTALLATION.md) for more details.
-
-### Requirements
-Your system must have the following:
-* **OS:** Windows or Linux.
-* **Hardware:** An NVIDIA GPU. A GeForce GTX 10-series, RTX-series, or newer is recommended.
- 
-If you don't have a GPU, you can instead run Eiko for Python from Google Colab [here](https://colab.research.google.com/github/sebftw/Eiko/blob/main/examples/python/eiko_in_colab.ipynb).
 
 ## Examples
 An example of how to use Eiko is shown below.
