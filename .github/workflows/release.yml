@@ -22,11 +22,11 @@ jobs:
           # --- Standard Production Baseline (Python 3.11 / 3.12 focus) ---
           # - { torch: '2.4.1', cuda: '12.4.1', os_version: '22.04' } # This might seem redundant if we already have 20.04, but it is used to target a newer Python version.
           # - { torch: '2.10.0', cuda: '12.8.2', os_version: '22.04' }
-          # - { torch: '2.12.0', cuda: '12.6.0', os_version: '22.04' }  # Legacy support version
+          - { torch: '2.13.0', cuda: '12.6.0', os_version: '22.04' }  # Legacy support version
 
           # --- Next-Gen Tier (CUDA 13+) ---
-          # - { torch: '2.12.0', cuda: '13.0.3', os_version: '24.04' }
-          - { torch: '2.12.0', cuda: '13.2.0', os_version: '24.04' }
+          - { torch: '2.13.0', cuda: '13.0.3', os_version: '24.04' }
+          - { torch: '2.13.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
@@ -58,6 +58,8 @@ jobs:
           - platform: { torch: '2.11.0' }
             python_version: '3.9'
           - platform: { torch: '2.12.0' }
+            python_version: '3.9'
+          - platform: { torch: '2.13.0' }
             python_version: '3.9'
             
           # ==========================================================
@@ -92,6 +94,8 @@ jobs:
           - platform: { torch: '2.11.0' }
             python_version: '3.8'
           - platform: { torch: '2.12.0' }
+            python_version: '3.8'
+          - platform: { torch: '2.13.0' }
             python_version: '3.8'
         
         
@@ -319,10 +323,10 @@ jobs:
   
           # --- Modern Standard & Next-Gen Architecture ---
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
-          # - { torch: '2.12.0', cuda: '12.6.3' }
+          - { torch: '2.13.0', cuda: '12.6.3' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
-          # - { torch: '2.12.0', cuda: '13.0.0' }
-          - { torch: '2.12.0', cuda: '13.2.0' }
+          - { torch: '2.13.0', cuda: '13.0.0' }
+          - { torch: '2.13.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
@@ -367,7 +371,7 @@ jobs:
       # Excluded for PyTorch 2.10+ (Requires 3.10+)
       # ==========================================
       - name: Set up Python 3.9
-        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         uses: actions/setup-python@v5
         with:
           python-version: '3.9'
@@ -382,7 +386,7 @@ jobs:
           
       # --- PYTHON 3.9 BUILD ---
       - name: Build 3.9 Wheel
-        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         env: &build_env
           DISTUTILS_USE_SDK: "1"
           MSSdk: "1"
@@ -410,14 +414,14 @@ jobs:
           pip uninstall torch jax -y
 
       - name: Upload 3.9 Wheel
-        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.9
           path: dist/*.whl
           
       - name: Clean 3.9 Workspace
-        if: matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0' && matrix.platform.torch != '2.11.0' && matrix.platform.torch != '2.10.0'
         shell: pwsh
         run: |
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
@@ -428,7 +432,7 @@ jobs:
       # Excluded for PyTorch 2.12+ 
       - name: Set up Python 3.10
         # CHANGE: Uncommented the condition below to prevent running on unconfigured environment
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0'
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -436,7 +440,7 @@ jobs:
           
       - name: Build 3.10 Wheel
         # CHANGE: Uncommented the condition below to align with setup inclusion rules
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0'
         env: *build_env
         run: |
           pip install --upgrade pip
@@ -450,14 +454,14 @@ jobs:
 
       - name: Upload 3.10 Wheel
         # CHANGE: Uncommented the condition below to stop empty/failed matrix outputs on 2.12.0
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0'
         uses: actions/upload-artifact@v4
         with:
           name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.10
           path: dist/*.whl
           
       - name: Clean 3.10 Workspace
-        if: matrix.platform.torch != '2.12.0'
+        if: matrix.platform.torch != '2.13.0' && matrix.platform.torch != '2.12.0'
         shell: pwsh
         run: |
           if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
