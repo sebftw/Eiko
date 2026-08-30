@@ -9,7 +9,7 @@ on:
 jobs:
   build_ubuntu_wheels:
     name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    if: false
+    if: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,8 +25,8 @@ jobs:
           - { torch: '2.13.0', cuda: '12.6.0', os_version: '22.04' }  # Legacy support version
 
           # --- Next-Gen Tier (CUDA 13+) ---
-          - { torch: '2.13.0', cuda: '13.0.3', os_version: '24.04' }
-          - { torch: '2.13.0', cuda: '13.2.0', os_version: '24.04' }
+          # - { torch: '2.13.0', cuda: '13.0.3', os_version: '24.04' }
+          # - { torch: '2.13.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
         python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
