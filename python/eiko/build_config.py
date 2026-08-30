@@ -208,17 +208,14 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
-        '/std:c++17',
         '/permissive',
         '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX',
         '/D_ENABLE_EXTENDED_ALIGNED_STORAGE'
     ])
     NVCC_ARGS.extend([
-        '-std=c++17',
         '-allow-unsupported-compiler', 
         '-D_WIN32=1', '-DUSE_CUDA=1',
-        '-Xcompiler', '/std:c++17',
         '-Xcompiler', '/Zc:preprocessor',
         '-Xcompiler', '/permissive',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
@@ -309,7 +306,7 @@ def compile_raw_nvcc_shared_lib(src_file: str, output_path: str, include_dirs: l
     if is_jit:
         target_out = output_path + f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
 
-    cmd = [nvcc_bin, "-shared", "-std=c++17", src_file, "-o", target_out]
+    cmd = [nvcc_bin, "-shared", "-std=c++20", src_file, "-o", target_out]
     cmd += NVCC_ARGS
     cmd += [f"-Xcompiler={arg}" for arg in cxx_pic]
     cmd += inc_flags
