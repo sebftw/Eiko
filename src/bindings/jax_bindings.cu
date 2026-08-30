@@ -13,7 +13,8 @@
 // OPAQUE STRUCT
 // Must match the Python struct.pack('iiiifiiiiiii', ...)
 // ---------------------------------------------------------
-struct alignas(16) FIMOpaque {
+#pragma pack(push, 1)
+struct FIMOpaque {
     int width;
     int height;
     int depth;
@@ -27,6 +28,7 @@ struct alignas(16) FIMOpaque {
     int gated_x;
     int has_tof;
 };
+#pragma pack(pop)
 
 // ---------------------------------------------------------
 // DISPATCH FUNCTOR
@@ -48,8 +50,8 @@ struct FIMSolveOp {
         void* d_v_in = nullptr;
         size_t pitch_v = 0;
         if constexpr (HAS_V) {
-            d_v_in    = buffers[buf_idx++];
-            pitch_v   = cfg.width * sizeof(float) * Config::CHANNELS_V;
+            d_v_in   = buffers[buf_idx++];
+            pitch_v  = cfg.width * sizeof(float) * Config::CHANNELS_V;
         }
 
         void* d_tof = nullptr;
@@ -64,18 +66,12 @@ struct FIMSolveOp {
             }
         }
 
-        // The final buffer contains the outputs.
-        void* d_u_out = nullptr;
+        // Outputs are flattened at the end of buffers:
+        void* d_u_out = buffers[buf_idx++];
         void* d_v_out = nullptr;
 
         if constexpr (HAS_V) {
-            // XLA Multiple Outputs: The final pointer is a void** array of pointers.
-            void** tuple_outs = reinterpret_cast<void**>(buffers[buf_idx]);
-            d_u_out = tuple_outs[0];
-            d_v_out = tuple_outs[1];
-        } else {
-            // XLA Single Output: The final pointer is the direct buffer.
-            d_u_out = buffers[buf_idx];
+            d_v_out = buffers[buf_idx++];  // Direct next pointer in buffers
         }
 
         // C. Handle JAX Immutability
@@ -116,8 +112,7 @@ struct FIMSolveOp {
 // The C-ABI compliant entry point called by the JAX runtime.
 // ---------------------------------------------------------
 extern "C" void jax_fim_solve(cudaStream_t stream, void** buffers, 
-                              const char* opaque, size_t opaque_len, 
-                              void* status) {
+                              const char* opaque, size_t opaque_len) {
     
     // Unpack scalar configurations from Python
     const FIMOpaque& cfg = *reinterpret_cast<const FIMOpaque*>(opaque);

@@ -108,7 +108,7 @@ except ImportError:
         # Final JIT Compilation Fallback (With User-Friendly Error Catching)
         # --------------------------------------------------------------------
         if not is_loaded:
-            print("[Eiko] JIT Compiling CUDA kernels for your GPU... (This may take a minute)")
+            print("[Eiko] JIT Compiling PyTorch kernels for your GPU... (This may take a minute)")
             sys.stdout.flush()
 
             torch_source = os.path.join(SRC_DIR, 'bindings', 'torch_bindings.cu')

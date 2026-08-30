@@ -106,7 +106,7 @@ def test_eiko2d_constant_speed_of_sound(spatial_shape, batch_size, msfm, backend
             u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
     elif backend == "jax":
         u_numerical = eiko(u_init, f, dx=dx, msfm=msfm)
-        
+
     # Bring the results back to NumPy space
     u_numerical_np = extract_to_numpy(u_numerical, backend)
         
@@ -491,3 +491,52 @@ def test_eikonal_analytical_gradients_1d(backend):
     if backend == "torch":
         # Allow a tiny absolute tolerance for floating point summation drift
         assert np.allclose(grad_dx_np, expected_grad_dx, atol=1e-6), f"dx gradient failed on {backend}!"
+
+def test_jax_vmap_tuple_batching():
+    """Validates that jax.vmap correctly hooks into _fim_batch_rule with multiple outputs."""
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+    
+    N = 11
+    B = 4
+    u_init = jnp.full((B, N, N), jnp.inf)
+    u_init = u_init.at[:, N//2, N//2].set(0.0)
+    
+    f = jnp.ones((B, N, N))
+    v_init = jnp.ones((B, N, N))
+    
+    # Map over axis 0 for all three inputs
+    eiko_vmap = jax.vmap(eiko, in_axes=(0, 0, 0))
+    
+    u_out, v_out = eiko_vmap(u_init, f, v_init)
+    
+    assert u_out.shape == (B, N, N), "vmap failed to construct correct u_out shape"
+    assert v_out.shape == (B, N, N), "vmap failed to construct correct v_out shape"
+    assert not jnp.isnan(u_out).any(), "vmap execution produced NaNs"
+
+@pytest.mark.parametrize("backend", ["torch", "jax"])
+def test_eikonal_gradients_with_v_init(backend):
+    """Validates that autograd does not crash when unpacking tuples in the backward pass."""
+    u_init_np = np.full((10, 10), np.inf, dtype=np.float32)
+    u_init_np[0, 0] = 0.0
+    f_np = np.ones((10, 10), dtype=np.float32)
+    v_init_np = np.ones((10, 10), dtype=np.float32)
+    
+    u_init, f, v_init = cast_to_backend([u_init_np, f_np, v_init_np], backend)
+    
+    if backend == "torch":
+        u_init.requires_grad_(True)
+        u_out, v_out = eiko(u_init, f, v_init=v_init)
+        loss = u_out[-1, -1] + v_out[-1, -1]
+        loss.backward()
+        assert u_init.grad is not None
+        
+    elif backend == "jax":
+        import jax
+        def loss_fn(u, f_field, v):
+            u_out, v_out = eiko(u, f_field, v_init=v)
+            return u_out[-1, -1] + v_out[-1, -1]
+            
+        grad_fn = jax.grad(loss_fn, argnums=(0,))
+        grad_u = grad_fn(u_init, f, v_init)
+        assert grad_u[0] is not None

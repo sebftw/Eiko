@@ -66,7 +66,8 @@ from eiko.build_config import (
     get_jax_includes, 
     diagnose_build_failure
 )
-from eiko import SRC_DIR, __version__
+from eiko import __version__
+from eiko.build_config import SRC_DIR
 
 try:
     # 1. Try loading the AOT compiled version from the pip-installed wheel
@@ -122,7 +123,7 @@ except ImportError:
         # 4. Pure JIT Compilation Fallback via NVCC
         # --------------------------------------------------------------------
         if not is_loaded:
-            print("[Eiko] Precompiled binary not found. Compiling kernels via nvcc... (This might take a minute)")
+            print("[Eiko] Precompiled JAX binary not found. Compiling kernels via nvcc... (This might take a minute)")
             sys.stdout.flush()
 
             jax_source = os.path.join(SRC_DIR, 'bindings', 'jax_bindings.cu')
@@ -157,7 +158,13 @@ except ImportError:
 # 5. XLA Custom Call Registration
 # ------------------------------------------------------------------------
 for name, target in _fim_jax_impl.registrations().items():
-    xla_client.register_custom_call_target(name, target, platform="gpu")
+    if hasattr(jax, "ffi") and hasattr(jax.ffi, "register_custom_call_target"):
+        jax.ffi.register_custom_call_target(name, target, platform="CUDA", api_version=0)
+    else:
+        try:
+            xla_client.register_custom_call_target(name, target, platform="CUDA", api_version=0)
+        except TypeError:
+            xla_client.register_custom_call_target(name, target, platform="CUDA")
 
 # =========================================================
 # 1. JAX PRIMITIVE DEFINITION & MLIR LOWERING
@@ -173,11 +180,15 @@ class _OpWrapper:
         return self._results
 
 _fim_prim = core.Primitive("jax_fim_solve")
-_fim_prim.multiple_results = False
+_fim_prim.multiple_results = True  # Always return tuple from primitive bind
 _fim_prim.def_impl(partial(xla.apply_primitive, _fim_prim))
 
-def _fim_abstract_eval(*args, opaque_data, out_shape, out_dtype):
-    return core.ShapedArray(out_shape, out_dtype)
+def _fim_abstract_eval(*operands, opaque_data, out_shape, out_dtype, v_shape=None, v_dtype=None):
+    u_eval = core.ShapedArray(out_shape, out_dtype)
+    if v_shape is not None:
+        v_eval = core.ShapedArray(v_shape, v_dtype)
+        return (u_eval, v_eval)
+    return (u_eval,)
 
 _fim_prim.def_abstract_eval(_fim_abstract_eval)
 
@@ -252,8 +263,6 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     
     # EDGE CASE 3: Handle bytes in backend_config
     if backend_config is not None:
-        if isinstance(backend_config, bytes):
-            backend_config = backend_config.decode("utf-8")
         kwargs["backend_config"] = ir.StringAttr.get(backend_config)
 
     if operand_layouts is not None:
@@ -266,21 +275,25 @@ def _build_custom_call_agnostic(call_target_name, result_types, operands,
     return hlo.CustomCallOp(result_types, operands, **kwargs)
 
 # MLIR lowering rule: The bridge between JAX's Python graph and XLA C++.
-def _fim_lowering(ctx, *args, opaque_data, out_shape, out_dtype):
+def _fim_lowering(ctx, *args, opaque_data, out_shape, out_dtype, v_shape=None, v_dtype=None):
     import jaxlib.mlir.ir as ir
-    
-    # Convert numpy dtype to MLIR IR type.
-    tensor_type = ir.RankedTensorType.get(
-        out_shape, mlir.dtype_to_ir_type(out_dtype)
-    )
-    
-    operand_layouts = [tuple(range(arg.type.rank)[::-1]) for arg in args]
+
+    # Output 1: u_out
+    tensor_u = ir.RankedTensorType.get(out_shape, mlir.dtype_to_ir_type(out_dtype))
+    result_types = [tensor_u]
     result_layouts = [tuple(range(len(out_shape))[::-1])]
-        
-    # MLIR custom call builder.
+
+    # Output 2: v_out (if present)
+    if v_shape is not None:
+        tensor_v = ir.RankedTensorType.get(v_shape, mlir.dtype_to_ir_type(v_dtype))
+        result_types.append(tensor_v)
+        result_layouts.append(tuple(range(len(v_shape))[::-1]))
+
+    operand_layouts = [tuple(range(arg.type.rank)[::-1]) for arg in args]
+
     call = _build_custom_call_agnostic(
         "jax_fim_solve",
-        result_types=[tensor_type],
+        result_types=result_types,
         operands=args,
         operand_layouts=operand_layouts,
         result_layouts=result_layouts,
@@ -288,14 +301,13 @@ def _fim_lowering(ctx, *args, opaque_data, out_shape, out_dtype):
     )
     return call.results
 
-
-mlir.register_lowering(_fim_prim, _fim_lowering, platform="gpu")
+mlir.register_lowering(_fim_prim, _fim_lowering, platform="cuda")
 
 # =========================================================
 # BATCHING RULE
 # =========================================================
-def _fim_batch_rule(batched_args, batch_dims, *, opaque_data, out_shape, out_dtype):
-    # Unpack original configuration.
+
+def _fim_batch_rule(batched_args, batch_dims, *, opaque_data, out_shape, out_dtype, v_shape=None, v_dtype=None):
     unpacked = list(struct.unpack('=iiiifiiiiiii', opaque_data))
     
     # batched_args[0] is u_init, batched_args[1] is f
@@ -324,21 +336,28 @@ def _fim_batch_rule(batched_args, batch_dims, *, opaque_data, out_shape, out_dty
     
     # Push the batch dimension to axis 0 for all batched arguments.
     aligned_args = [
-        batching.moveaxis(arg, d, 0) if d is not None else arg 
+        jnp.moveaxis(arg, d, 0) if (d is not None and d != 0) else arg 
         for arg, d in zip(batched_args, batch_dims)
     ]
     
     # Prepend the new batch dimension to the output shape.
     new_out_shape = (new_batch_axis_size,) + tuple(out_shape)
     
+    # Scale v_shape up by the batch dimension too
+    new_v_shape = None if v_shape is None else (new_batch_axis_size,) + tuple(v_shape)
+    
     out = _fim_prim.bind(
         *aligned_args, 
         opaque_data=new_opaque_data, 
         out_shape=new_out_shape, 
-        out_dtype=out_dtype
+        out_dtype=out_dtype,
+        v_shape=new_v_shape,
+        v_dtype=v_dtype
     )
-    # Tell JAX that the batched dimension of the output is at axis 0.
-    return out, 0
+    
+    # Return a tuple of batch axes matching the number of outputs
+    bdim_out = (0, 0) if v_shape is not None else (0,)
+    return out, bdim_out
 
 
 batching.primitive_batchers[_fim_prim] = _fim_batch_rule
@@ -354,9 +373,13 @@ def _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward, tof=No
     has_tof = tof is not None
     operands = [u_init, f]
 
+    v_shape = None
+    v_dtype = None
     if has_v:
         v = jnp.asarray(v)
         operands.append(v)
+        v_shape = v.shape
+        v_dtype = v.dtype
         
     if is_backward and has_tof:
         tof = jnp.asarray(tof)
@@ -388,17 +411,22 @@ def _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward, tof=No
         int(broadcast_f), int(gated_x), int(has_tof)
     )
 
-    return _fim_prim.bind(
+    outs = _fim_prim.bind(
         *operands,
         opaque_data=opaque_data,
         out_shape=u_init.shape,
-        out_dtype=u_init.dtype
+        out_dtype=u_init.dtype,
+        v_shape=v_shape,
+        v_dtype=v_dtype
     )
+
+    # Return (u_out, v_out) if has_v, otherwise unpack the single u_out tensor
+    return outs if has_v else outs[0]
 
 # =========================================================
 # 3. VJP DEFINITION (Autograd support)
 # =========================================================
-@partial(jax.custom_vjp, nondiff_argnums=(2, 3, 4, 5, 6))
+@partial(jax.custom_vjp, nondiff_argnums=(3, 4, 5, 6))
 def _solve_eikonal_base(u_init, f, v, dx, msfm, is_3d, gated_x):
     if is_3d is None:
         is_3d = u_init.ndim >= 4 and u_init.shape[-3] > 1
@@ -409,22 +437,26 @@ def solve_eikonal_fwd(u_init, f, v, dx, msfm, is_3d, gated_x):
     if is_3d is None:
         is_3d = u_init.ndim >= 4 and u_init.shape[-3] > 1
         
-    u_out = _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward=False)
+    outs = _fim_custom_call(u_init, f, v, dx, msfm, is_3d, gated_x, is_backward=False)
     
-    # Identify and cache the source nodes for the backward pass
+    # Extract the primary grid for autograd residuals
+    u_out_actual = outs[0] if v is not None else outs
+    
     u_init_inf_mask = jnp.isinf(u_init)
+    res = (u_out_actual, f, u_init_inf_mask)
+    
+    # Return the exact shape of outputs the forward pass expects
+    return outs, res
 
-    # Pack the mask into the residual tuple
-    res = (u_out, f, u_init_inf_mask)
-    return u_out, res
-
-def solve_eikonal_bwd(v, dx, msfm, is_3d, gated_x, res, grad_u):
-    u_out, f, u_init_inf_mask = res
-    lambda_init = jnp.zeros_like(u_out)
+def solve_eikonal_bwd(dx, msfm, is_3d, gated_x, res, grads):
+    u_out_actual, f, u_init_inf_mask = res
+    grad_u_actual = grads[0] if isinstance(grads, tuple) else grads
+    
+    lambda_init = jnp.zeros_like(u_out_actual)
     
     lambda_adj = _fim_custom_call(
-        lambda_init, grad_u, None, dx, msfm, is_3d, gated_x, 
-        is_backward=True, tof=u_out
+        lambda_init, grad_u_actual, None, dx, msfm, is_3d, gated_x, 
+        is_backward=True, tof=u_out_actual
     )
     
     grad_u_init = jnp.where(u_init_inf_mask, 0.0, lambda_adj)
@@ -435,8 +467,10 @@ def solve_eikonal_bwd(v, dx, msfm, is_3d, gated_x, res, grad_u):
         grad_f = jnp.sum(grad_f, axis=0)
     elif f.ndim == lambda_adj.ndim and f.shape[0] == 1 and lambda_adj.shape[0] > 1:
         grad_f = jnp.sum(grad_f, axis=0, keepdims=True)
-    
-    return grad_u_init, grad_f
+        
+    # We must now return 3 gradients (for u_init, f, and v) instead of 2.
+    # Since we don't calculate gradients for v, we return None for it.
+    return grad_u_init, grad_f, None
 
 _solve_eikonal_base.defvjp(solve_eikonal_fwd, solve_eikonal_bwd)
 
@@ -446,19 +480,12 @@ _solve_eikonal_base.defvjp(solve_eikonal_fwd, solve_eikonal_bwd)
 def eiko2d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
     if u_init.ndim > 3:
         raise ValueError(f"eiko2d expects a 2D or batched 2D grid (max 3 dims), got {u_init.ndim} dims.")
-    
-    out = _solve_eikonal_base(u_init, f, v_init, dx, msfm, False, gated)
-    if v_init is not None:
-        return out, v_init
-    return out
+    return _solve_eikonal_base(u_init, f, v_init, dx, msfm, False, gated)
 
 def eiko3d(u_init, f, v_init=None, dx=1.0, msfm=False, gated=False):
     if u_init.ndim < 3:
         raise ValueError(f"eiko3d expects a 3D or batched 3D grid (min 3 dims), got {u_init.ndim} dims.")
         
-    out = _solve_eikonal_base(u_init, f, v_init, dx, msfm, True, gated)
-    if v_init is not None:
-        return out, v_init
-    return out
+    return _solve_eikonal_base(u_init, f, v_init, dx, msfm, True, gated)
 
 eiko = eiko2d

@@ -3,6 +3,7 @@
 
 import sys
 import time
+from functools import partial
 
 # Check if the optional dependencies are available
 try:
@@ -34,11 +35,13 @@ from eiko import eiko, animate_eikonal
 # Guard against missing dependencies
 # =========================================================================
 missing_deps = []
+err = None
 try:
     import matplotlib.pyplot as plt
     import numpy as np
 except ImportError as e:
     missing_deps.append("matplotlib")
+    err = e
 
 try:
     import jax
@@ -46,12 +49,13 @@ try:
     import optax
 except ImportError as e:
     missing_deps.append("jax/optax")
+    err = e
 
 if missing_deps:
     raise ImportError(
         f"\n\n[Eiko] This example script cannot run because the following components are missing: {', '.join(missing_deps)}.\n"
         f" Please install the required environment via: pip install \"eiko[examples]\"\n"
-    ) from e
+    ) from err
 
 # Import Eiko
 from eiko import eiko
@@ -142,6 +146,7 @@ print('Starting ADAM inversion (Pure GPU Computation)...')
 opt_timer_start = time.perf_counter()
 
 for iter in range(num_iters):
+    print(iter)
     m_guess, opt_state, current_loss = update_step(
         m_guess, opt_state, u_init, T_measured, src_coords, dx, msfm
     )
