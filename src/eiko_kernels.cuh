@@ -1197,18 +1197,6 @@ __global__ void batched_fim_kernel_new(
 							// TODO: If we flip some signs we can use the same criteria for both forward and backward passes.
 						}
 						
-						/*
-						if constexpr (BACKWARD_PASS) {
-							// Write, but do not enqueue.
-							// my_u[iz][iy][ix][ch] = calculated_u;
-							int flag_idx = iz * NX * NY + iy * NX + ix + 8;
-							update_flags |= (1U << flag_idx);
-							update_flags |= (1 << 6); // thread_updated_ever
-							// updated = false;
-							if(iter == 2)
-								updated = false;
-						}*/
-						
 						if (updated) {
 							thread_converged = 0;
 							if (ix == 0)      update_flags |= (causal_trigger_mask & (1 << 0)); // -X
