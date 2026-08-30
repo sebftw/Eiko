@@ -208,6 +208,7 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
+        '/Zc:reversedRewrittenOperators-',  # Fix MSVC C2666 operator rewrite ambiguity
         '/permissive',
         '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX',
@@ -216,7 +217,8 @@ if sys.platform == "win32":
     NVCC_ARGS.extend([
         '-allow-unsupported-compiler', 
         '-D_WIN32=1', '-DUSE_CUDA=1',
-        '-Xcompiler', '/Zc:preprocessor', 
+        '-Xcompiler', '/Zc:preprocessor',
+        '-Xcompiler', '/Zc:reversedRewrittenOperators-', # Forward operator fix to host compiler        
         '-Xcompiler', '/permissive',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '-DTHRUST_FORCE_COMPATIBILITY',
