@@ -3,9 +3,7 @@
  * Licensed under the BSD 3-Clause License. See LICENSE file in the project root for details.
  */
 
-#include <torch/types.h>
-#include <torch/csrc/utils/pybind.h>
-#include <pybind11/pybind11.h>
+#include <torch/extension.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <memory>
 #include <stdexcept>
@@ -118,16 +116,19 @@ public:
 		
         u = u.contiguous();
         f = f.contiguous();
-        torch::Tensor v_tensor = v.has_value() ? v.value().contiguous() : torch::Tensor();
-        torch::Tensor tof_tensor = tof.has_value() ? tof.value().contiguous() : torch::Tensor();
 
+        torch::Tensor v_tensor;
         if (has_v) {
             TORCH_CHECK(v.value().is_contiguous(), "Input 'v' must be contiguous.");
             TORCH_CHECK(v.value().scalar_type() == torch::kFloat32, "Input 'v' must be float32.");
+            v_tensor = v.value();
         }
+
+        torch::Tensor tof_tensor;
         if (tof.has_value()) {
             TORCH_CHECK(tof.value().is_contiguous(), "Input 'tof' must be contiguous.");
             TORCH_CHECK(tof.value().scalar_type() == torch::kFloat32, "Input 'tof' must be float32.");
+            tof_tensor = tof.value();
         }
 
         // Infer dimensions based on u
@@ -148,12 +149,12 @@ public:
         // Extract pointers directly
         void* d_u = u.data_ptr();
         void* d_f = f.data_ptr();
-        void* d_v = has_v ? v.value().data_ptr() : nullptr;
+        void* d_v = has_v ? v_tensor.data_ptr() : nullptr;
         
         // TOF Fallback Logic for Adjoint / Backward solvers
         void* d_tof = nullptr;
         if (is_backward) {
-            d_tof = tof.has_value() ? tof.value().data_ptr() : d_u;
+            d_tof = tof.has_value() ? tof_tensor.data_ptr() : d_u;
         }
 
         // Retrieve current PyTorch CUDA stream (ensures compatibility with torch.cuda.stream contexts)

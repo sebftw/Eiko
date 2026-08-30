@@ -208,14 +208,17 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
+        '/std:c++17',
         '/permissive',
         '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX',
         '/D_ENABLE_EXTENDED_ALIGNED_STORAGE'
     ])
     NVCC_ARGS.extend([
+        '-std=c++17',
         '-allow-unsupported-compiler', 
         '-D_WIN32=1', '-DUSE_CUDA=1',
+        '-Xcompiler', '/std:c++17',
         '-Xcompiler', '/Zc:preprocessor',
         '-Xcompiler', '/permissive',
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
@@ -396,4 +399,4 @@ def diagnose_build_failure(error: Exception, framework: str, framework_version: 
     print("```")
     print("="*75 + "\n")
     
-    raise RuntimeError(f"Eiko {framework} initialization failed due to compilation errors.") from None
+    raise RuntimeError(f"Eiko {framework} initialization failed due to compilation errors.") from error
