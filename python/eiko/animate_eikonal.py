@@ -3,7 +3,8 @@ import sys
 def animate_eikonal(u, v=1.0, color_map='gray', video_filename='', 
                     title='EIKONAL WAVEFRONT', pulse_width=80.0, 
                     speed=0.5, overlay=None, outline=None, 
-                    style='real', render_mode='slice'):
+                    style='real', render_mode='slice',
+                    extent=None):
     """
     ANIMATE_EIKONAL Visualizes Eikonal equation travel times as an animated wave.
     """
@@ -66,17 +67,42 @@ def animate_eikonal(u, v=1.0, color_map='gray', video_filename='',
         clim = [-30, 0]
         db_ref = 20 * np.log10(1.0 + 1e-12) # +1e-12 prevents log10(0)
 
+    has_extent = extent is not None
+    unit_suffix = ' [mm]' if has_extent else ''
+
     # Setup Render Objects
     if is_3d:
         # 3D Axes
         ax = fig.add_subplot(111, projection='3d')
         ax.set_title(title, fontsize=16, fontweight='bold')
-        ax.set_xlabel('X (Lateral)')
-        ax.set_ylabel('Y (Elevation)')
-        ax.set_zlabel('Z (Depth)')
+        
+        ax.set_xlabel(f'Lateral - X{unit_suffix}', fontsize=11, labelpad=10)
+        ax.set_ylabel(f'Elevation - Y{unit_suffix}', fontsize=11, labelpad=10)
+        ax.set_zlabel(f'Depth - Z{unit_suffix}', fontsize=11, labelpad=10)
         ax.invert_zaxis() # Ultrasound convention: Depth increases downwards
         
-        # We'll handle the 3D drawing inside the update loop, but prepare indices
+        # Fix inside-out tick directions by forcing ticks outward
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            axis._axinfo['tick']['inward_factor'] = 0.0
+            axis._axinfo['tick']['outward_factor'] = 0.3
+        
+        if len(extent) == 6:
+            xmin, xmax, ymin, ymax, zmin, zmax = extent
+            ax.set_xlim(xmin, xmax)
+            ax.set_ylim(ymin, ymax)
+            ax.set_zlim(zmax, zmin) # Inverted for depth
+            
+            # Enforce true 1:1:1 physical aspect ratio based on domain size
+            ax.set_box_aspect((xmax - xmin, ymax - ymin, abs(zmax - zmin)))
+            
+            lat_vals = np.linspace(xmin, xmax, Nx)
+            elev_vals = np.linspace(ymin, ymax, Ny)
+            depth_vals = np.linspace(zmin, zmax, Nz)
+        else:
+            lat_vals = np.arange(Nx)
+            elev_vals = np.arange(Ny)
+            depth_vals = np.arange(Nz)
+        
         sz, sy, sx = Nz//2, Ny//2, Nx//2
         iso_val = -6 if style.lower() == 'db' else 0.5
         
@@ -84,11 +110,17 @@ def animate_eikonal(u, v=1.0, color_map='gray', video_filename='',
         # 2D Rendering
         ax = fig.add_subplot(111)
         ax.set_title(title, fontsize=16, fontweight='bold', fontname='serif')
-        ax.set_xlabel('X (Lateral)', fontsize=14, fontname='serif')
-        ax.set_ylabel('Z (Depth)', fontsize=14, fontname='serif')
         
-        # Initialize empty image
-        im = ax.imshow(np.zeros((Ny, Nx)), vmin=clim[0], vmax=clim[1], cmap=color_map, aspect='equal')
+        ax.set_xlabel(f'Lateral - X{unit_suffix}', fontsize=14, fontname='serif')
+        ax.set_ylabel(f'Depth - Z{unit_suffix}', fontsize=14, fontname='serif')
+        
+        ax.tick_params(direction='out')
+        
+        if len(extent) >= 4:
+            xmin, xmax, ymin, ymax = extent[:4]
+            im = ax.imshow(np.zeros((Ny, Nx)), vmin=clim[0], vmax=clim[1], cmap=color_map, aspect='equal', extent=[xmin, xmax, ymax, ymin], origin='lower')
+        else:
+            im = ax.imshow(np.zeros((Ny, Nx)), vmin=clim[0], vmax=clim[1], cmap=color_map, aspect='equal')
         
         # In matplotlib, imshow puts (0,0) at top-left, which inherently matches 
         # the ultrasound convention (Depth going down).
@@ -131,15 +163,14 @@ def animate_eikonal(u, v=1.0, color_map='gray', video_filename='',
         elif style.lower() == 'db':
             final_img = 20 * np.log10(np.abs(img) + 1e-12) - db_ref
             
+        # Make zero/inactive amplitude regions transparent using a masked array
+        # final_img = np.ma.masked_where(np.abs(img) < 1e-5, final_img)
+            
         return final_img
 
     # time_steps = np.arange(0, maxv + pulse_width, speed)
     start_time = np.min(u_safe)
     time_steps = np.arange(start_time, maxv + pulse_width, speed)
-
-    # Note: Global references for 3D plot collections so they can be removed/updated
-    frame_objs = [] 
-
     
     def update(frame_idx):
         t = time_steps[frame_idx]
@@ -156,15 +187,14 @@ def animate_eikonal(u, v=1.0, color_map='gray', video_filename='',
             # Define levels to force contouring (20 steps is usually enough for smooth waves)
             levels = np.linspace(clim[0], clim[1], 20)
             if render_mode == 'slice':
-                # Re-draw the slices.
-                X, Y = np.meshgrid(np.arange(Nx), np.arange(Ny))
-                ax.contourf(X, Y, final_img[sz, :, :], zdir='z', offset=sz, cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
+                X_lat, Y_elev = np.meshgrid(lat_vals, elev_vals)
+                ax.contourf(X_lat, Y_elev, final_img[sz, :, :], zdir='z', offset=depth_vals[sz], cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
                 
-                Y, Z = np.meshgrid(np.arange(Ny), np.arange(Nz))
-                ax.contourf(final_img[:, :, sx], Y, Z, zdir='x', offset=sx, cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
+                Y_elev, Z_dep = np.meshgrid(elev_vals, depth_vals)
+                ax.contourf(final_img[:, :, sx], Y_elev, Z_dep, zdir='x', offset=lat_vals[sx], cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
                 
-                X, Z = np.meshgrid(np.arange(Nx), np.arange(Nz))
-                ax.contourf(X, final_img[:, sy, :], Z, zdir='y', offset=sy, cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
+                X_lat, Z_dep = np.meshgrid(lat_vals, depth_vals)
+                ax.contourf(X_lat, final_img[:, sy, :], Z_dep, zdir='y', offset=elev_vals[sy], cmap=color_map, vmin=clim[0], vmax=clim[1], levels=levels)
                 
             elif render_mode == 'isosurface' and HAS_SKIMAGE:
                 try:

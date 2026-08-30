@@ -19,8 +19,13 @@ aperture_x = floor(canvasWidth*0.2) : ceil(canvasWidth*0.8);
 aperture_z = floor(canvasDepth*0.2) : ceil(canvasDepth*0.8);
 
 % Create 2D apodization window (v_init) using the outer product of two Tukey windows
-tw_x = tukeywin(numel(aperture_x));
-tw_z = tukeywin(numel(aperture_z));
+tukey_fn = @(N, r) (N == 1) * 1 + (N > 1) * (...
+    (abs(linspace(-1, 1, N)') <= (1 - r)) .* 1 + ...
+    ((abs(linspace(-1, 1, N)') > (1 - r)) & (abs(linspace(-1, 1, N)') <= 1)) .* ...
+    (0.5 * (1 + cos(pi * (abs(linspace(-1, 1, N)') - (1 - r)) / r))) ...
+); % Same as tukeywin
+tw_x = tukey_fn(numel(aperture_x), 0.5);
+tw_z = tukey_fn(numel(aperture_z), 0.5);
 apod_2d = tw_z * tw_x'; % 2D weights for the matrix array
 
 % Calculate 1D firing delays for steering in the X direction

@@ -306,7 +306,7 @@ def compile_raw_nvcc_shared_lib(src_file: str, output_path: str, include_dirs: l
     if is_jit:
         target_out = output_path + f".{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp"
 
-    cmd = [nvcc_bin, "-shared", "-std=c++20", src_file, "-o", target_out]
+    cmd = [nvcc_bin, "-shared", "-std=c++17", src_file, "-o", target_out]
     cmd += NVCC_ARGS
     cmd += [f"-Xcompiler={arg}" for arg in cxx_pic]
     cmd += inc_flags
