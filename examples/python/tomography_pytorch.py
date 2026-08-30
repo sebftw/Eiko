@@ -72,11 +72,17 @@ loss_history = []
 f_history = []
 
 # Initialize standard PyTorch ADAM optimizer
-optimizer = torch.optim.Adam([m_guess], lr=learning_rate)
+optimizer = torch.optim.Adam([m_guess], lr=learning_rate, fused=True)
 
 # =========================================================================
 # 5. Pure Computation Loop (No Graphics, No D2H Transfers)
 # =========================================================================
+# Dummy run to warm the allocator and CUDA extension, matching the JAX jit warmup
+optimizer.zero_grad(set_to_none=True)
+loss = 0.5 * torch.mean((eiko(u_init, torch.exp(m_guess), dx=dx, msfm=msfm) - T_measured)**2)
+loss.backward()
+optimizer.zero_grad(set_to_none=True)   # discard, don't step
+
 print('Starting ADAM inversion (Pure GPU Computation)...')
 
 # Force the CPU to wait for the GPU's asynchronous queue to clear before starting the clock

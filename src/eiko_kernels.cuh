@@ -76,8 +76,8 @@ namespace py = pybind11;
 // for vectorized ld.global.v2 and ld.global.v4 instructions:
 template <int CHANNELS> struct CudaVec;
 template <> struct CudaVec<1> { using Type = union { float v; float f[1]; }; };
-template <> struct CudaVec<2> { using Type = union { float2 v; float f[2]; };; };
-template <> struct CudaVec<4> { using Type = union { float4 v; float f[4]; };; };
+template <> struct CudaVec<2> { using Type = union { float2 v; float f[2]; }; };
+template <> struct CudaVec<4> { using Type = union { float4 v; float f[4]; }; };
 
 constexpr float INFINITY_PLACEHOLDER = std::numeric_limits<float>::infinity();
 
@@ -615,7 +615,8 @@ __global__ void batched_fim_kernel_new(
 	int grid_width, int grid_height, int grid_depth, float dx,
 	int blocks_per_row, int blocks_per_col, int blocks_per_slice, int blocks_per_batch, bool broadcast_batch_f,
 	const void* __restrict__ d_tof, size_t pitch_tof_bytes,  // For time-of-flight (d_u) during a backwards pass.
-	void* __restrict__ d_v, size_t pitch_v_bytes  // For directional field in forward pass.
+	void* __restrict__ d_v, size_t pitch_v_bytes,  // For directional field in forward pass.
+	const float* __restrict__ d_sign_mode
 ) {
 	
 	constexpr int CHANNELS_V = BACKWARD_PASS ? 0 : CHANNELS_V_in;
@@ -775,9 +776,13 @@ __global__ void batched_fim_kernel_new(
 				if constexpr (BACKWARD_PASS) {
 					// In the backwards pass, do not use clamping for F (the residual). Set out-of-bounds values to 0 instead.
 					int global_row_f = (broadcast_batch_f ? 0 : batch_id * (grid_height * grid_depth)) + gz * grid_height + gy;
-					VecTypeF core_f = ((VecTypeF*)((char*)d_f + global_row_f * pitch_f_bytes))[gx];
-					for(int c = 0; c < CHANNELS_F; ++c)
-						my_f[iz][iy][ix][c] = core_f.f[c];
+                    VecTypeF core_f = ((VecTypeF*)((char*)d_f + global_row_f * pitch_f_bytes))[gx];
+                    for(int c = 0; c < CHANNELS_F; ++c) {
+						// If sign_mode is 1, we keep raw_f >= 0 and zero out negative values.
+						// If sign_mode is -1, raw_f * (-1) keeps negative values (making them positive for the check) 
+						// and zeros out positive values.
+						my_f[iz][iy][ix][c] = fmaxf(0.0f, core_f.f[c] * d_sign_mode[0]);
+					}
 				}
 			}
 			
@@ -938,7 +943,6 @@ __global__ void batched_fim_kernel_new(
 					if constexpr (CHANNELS_V > 0)
 						val_v = ((const VecTypeV*)((char*)d_v + global_load_row * pitch_v_bytes))[load_gx];
 				}
-				float* ptr = reinterpret_cast<float*>(&val);
 				
 				for (int c = 0; c < CHANNELS; ++c) {
 					float final_val = in_bounds ? val.f[c] : oob_val;
@@ -984,7 +988,7 @@ __global__ void batched_fim_kernel_new(
 						int nx = gx + dX[axis][dir];
 						int ny = gy + dY[axis][dir];
 						int nz = THREE_DIMENSIONAL ? gz + dZ[axis][dir] : 0;
-						if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
+						if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || (nz >= 0 && nz < grid_depth))) {
 							int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
 							return ((const VecType*)((const char*) d_tof + row * pitch_tof_bytes))[nx].f[ch];
 						}
@@ -995,7 +999,7 @@ __global__ void batched_fim_kernel_new(
 						int nx = gx + dX_diag[d];
 						int ny = gy + dY_diag[d];
 						int nz = THREE_DIMENSIONAL ? gz + dZ_diag[d] : 0;
-						if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
+						if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || (nz >= 0 && nz < grid_depth))) {
 							int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
 							return ((const VecType*)((const char*) d_tof + row * pitch_tof_bytes))[nx].f[ch];
 						}
@@ -1085,7 +1089,7 @@ __global__ void batched_fim_kernel_new(
 		
 		// Diagonal neighbors.
 		const int GOOD_LARGE_ITER_COUNT = max(max(max(SMEM_W,SMEM_H),SMEM_D), MAX_LOCAL_ITERS); // In the first iteration, we want information to propagate all the way from one side of the block-wide stencil to the other.
-		const int local_iters = s_iteration > 0 ? MAX_LOCAL_ITERS : GOOD_LARGE_ITER_COUNT;
+		const int local_iters = (s_iteration == 0) ? GOOD_LARGE_ITER_COUNT : MAX_LOCAL_ITERS;
 		int thread_converged = 1;
 		for (int iter = 0; iter < local_iters; iter++) {
 			int r = iter & 1;
@@ -1153,7 +1157,7 @@ __global__ void batched_fim_kernel_new(
 					for (int ch = 0; ch < CHANNELS; ch++) {
 						
 						// Update own register.
-						float calculated_u, diff;
+						float calculated_u;
 						VecTypeV calculated_v = {0};
 						bool updated;
 						if constexpr (!BACKWARD_PASS) {
@@ -1170,30 +1174,27 @@ __global__ void batched_fim_kernel_new(
                             // 3. updated = diff/(fabsf(calculated_u) + 1e-9f) > 1e-5f // Relative, i.e.: dx/(|u|+eps) > 0.001, where eps prevents division by zero.
                             // 4. updated = diff > fmaxf(1e-6f * dx, fabsf(1e-5f * calculated_u));  // Absolute and relative: (diff > 1e-6f * dx) && (diff > 1e-5f * |u|) (relative for large u, absolute for small u).
 							
-							diff = my_u[iz][iy][ix][ch] - calculated_u;
+							// diff = my_u[iz][iy][ix][ch] - calculated_u;
 							updated = calculated_u < my_u[iz][iy][ix][ch];  // Perfectly fine stopping criteria since everything decreases monotonically. This makes the code extremely robust and virtually deterministic (even if the path taken to the result is non-deterministic).
 							my_u[iz][iy][ix][ch] = fminf(my_u[iz][iy][ix][ch], calculated_u);
 						} else {
-							// For backward pass, where my_f acts as the residual map (R).
+							// For backward pass, where my_f acts as the residual map (R >= 0 after the sign split).
 							calculated_u = solve_adjoint<MSFM, THREE_DIMENSIONAL>(
 								fetch_card, fetch_diag, 
 								ch, my_weights[iz][iy][ix][ch], 
 								my_f[iz][iy][ix][min(ch, CHANNELS_F-1)]
 							);
 
-                            // Instead of: my_u[iz][iy][ix][ch] = calculated_u;
-                            diff = fabsf(my_u[iz][iy][ix][ch] - calculated_u);
-                            updated = diff > fmaxf(1e-5f * dx, fabsf(1e-6f * calculated_u)); // approximately 6 digits of accuracy
-
-                            // The backwared system has a spectral radius of 1, meaning numerical noise might bounce around making it appear non-convergent.
-                            // Dampening (under-relaxation), puts the spectral radius slightly below 1, ensuring convergence, without affecting the final output much.
-                            
-                            constexpr float omega = 0.8f; // Use a damping factor (omega between 0.8 and 0.95).
-                            calculated_u = omega * calculated_u + (1.0f - omega) * my_u[iz][iy][ix][ch];
-                            
-							my_u[iz][iy][ix][ch] = calculated_u;  // Lambda may fluctuate during the backwards pass.
-
-                            // FIXME: Implement another algorithm for the backwards pass. This algorithm is not well suited, unfortunately.
+							// With R >= 0 and all flux weights >= 0, the iteration is order-preserving
+							// and converges to the fixed point from below, starting at lambda = 0.
+							// The dependency graph is a DAG ordered by decreasing T (w_ij != 0 only when
+							// T_j > T_i), so the iteration matrix is nilpotent: no damping is needed.
+							// fmaxf is redundant in exact arithmetic but guards against a stale smem read
+							// producing a transient overestimate, which would otherwise stick.
+							updated = calculated_u > my_u[iz][iy][ix][ch];
+							my_u[iz][iy][ix][ch] = fmaxf(my_u[iz][iy][ix][ch], calculated_u);
+							
+							// TODO: If we flip some signs we can use the same criteria for both forward and backward passes.
 						}
 						
 						/*
@@ -1374,84 +1375,6 @@ __global__ void batched_fim_kernel_new(
 		job_idx = s_job_idx;
 		data_block_id = s_data_block_id;
 	}
-}
-
-// =========================================================
-// ADJOINT FINALIZATION KERNEL
-// Converts the raw FIM adjoint state (\tilde{\lambda}) into 
-// the true gradient (\lambda) by multiplying back the normalizer.
-// =========================================================
-template <bool MSFM = false, bool THREE_DIMENSIONAL = false, bool GATED_X = false, int CHANNELS = 1>
-__global__ void finalize_adjoint_kernel(
-    void* __restrict__ d_u, size_t pitch_u_bytes,
-    const void* __restrict__ d_tof, size_t pitch_tof_bytes,
-    int grid_width, int grid_height, int grid_depth, float dx, int batch_size) 
-{
-    using VecType = typename CudaVec<CHANNELS>::Type;
-
-    int gx = blockIdx.x * blockDim.x + threadIdx.x;
-    int gy = blockIdx.y * blockDim.y + threadIdx.y;
-    int gz_batch = blockIdx.z * blockDim.z + threadIdx.z; 
-
-    // gz_batch handles both the Z-dimension and the Batch dimension
-    if (gx >= grid_width || gy >= grid_height || gz_batch >= grid_depth * batch_size) return;
-
-    int batch_id = gz_batch / grid_depth;
-    int gz = gz_batch % grid_depth;
-
-    constexpr int dX[3][2] = {{-1, 1}, {0, 0}, {0, 0}};
-    constexpr int dY[3][2] = {{0, 0}, {-1, 1}, {0, 0}};
-    constexpr int dZ[3][2] = {{0, 0}, {0, 0}, {-1, 1}};
-    const int dX_diag[12] = {-1, 1, -1, 1,  -1, 1, -1, 1,   0, 0, 0, 0};
-    const int dY_diag[12] = {-1, -1, 1, 1,   0, 0, 0, 0,  -1, 1, -1, 1};
-    const int dZ_diag[12] = { 0, 0, 0, 0,   -1,-1, 1, 1,  -1,-1, 1, 1};
-
-    // Safe fetcher lambdas for the travel-time field (d_tof)
-    auto fetch_T = [&](int axis, int dir, int ch, float T_c) -> float {
-        int nx = gx + dX[axis][dir];
-        int ny = gy + dY[axis][dir];
-        int nz = THREE_DIMENSIONAL ? gz + dZ[axis][dir] : 0;
-        if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
-            int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
-            return ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[nx].f[ch];
-        }
-        return T_c; 
-    };
-
-    auto fetch_T_diag = [&](int d, int ch, float T_c) -> float {
-        int nx = gx + dX_diag[d];
-        int ny = gy + dY_diag[d];
-        int nz = THREE_DIMENSIONAL ? gz + dZ_diag[d] : 0;
-        if (nx >= 0 && nx < grid_width && ny >= 0 && ny < grid_height && (!THREE_DIMENSIONAL || nz < grid_depth)) {
-            int row = batch_id * (grid_height * grid_depth) + nz * grid_height + ny;
-            return ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[nx].f[ch];
-        }
-        return T_c; 
-    };
-
-    int row = batch_id * (grid_height * grid_depth) + gz * grid_height + gy;
-    
-    // Fetch the raw \tilde{\lambda} (u_val) and the travel-time (t_val)
-    VecType u_val = ((VecType*)((char*)d_u + row * pitch_u_bytes))[gx];
-    VecType t_val = ((const VecType*)((const char*)d_tof + row * pitch_tof_bytes))[gx];
-
-    #pragma unroll
-    for (int ch = 0; ch < CHANNELS; ++ch) {
-        float T_curr = t_val.f[ch];
-        // Recompute the exact normalizer used in the forward pass
-        AdjointWeights w = precompute_adjoint_weights<MSFM, THREE_DIMENSIONAL, GATED_X>(
-            [&](int a, int d, int c) { return fetch_T(a, d, c, T_curr); }, 
-            [&](int d, int c) { return fetch_T_diag(d, c, T_curr); }, 
-            ch, T_curr, dx
-        );
-
-        // Convert \tilde{\lambda} to \lambda
-        // Note: inv_normalizer is cleanly handled for source points (1.0f)
-        u_val.f[ch] = u_val.f[ch] / w.inv_normalizer;
-    }
-    
-    // Write back the corrected \lambda
-    ((VecType*)((char*)d_u + row * pitch_u_bytes))[gx] = u_val;
 }
 
 // Inverse beamforming kernel.

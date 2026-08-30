@@ -146,7 +146,6 @@ print('Starting ADAM inversion (Pure GPU Computation)...')
 opt_timer_start = time.perf_counter()
 
 for iter in range(num_iters):
-    print(iter)
     m_guess, opt_state, current_loss = update_step(
         m_guess, opt_state, u_init, T_measured, src_coords, dx, msfm
     )
