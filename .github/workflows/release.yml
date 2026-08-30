@@ -9,7 +9,7 @@ on:
 jobs:
   build_ubuntu_wheels:
     name: Ubuntu ${{ matrix.platform.os_version }} (Python:${{ matrix.python_version }}, Torch:${{ matrix.platform.torch }}, CUDA:${{ matrix.platform.cuda }})
-    if: true
+    if: false
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -325,8 +325,8 @@ jobs:
           # 12.6.0 provides a modern runtime for older GPUs (e.g., Pascal/Ampere)
           - { torch: '2.13.0', cuda: '12.6.3' }
           # 13.2.0 provides cutting-edge optimization for Blackwell/Hopper architectures
-          - { torch: '2.13.0', cuda: '13.0.0' }
-          - { torch: '2.13.0', cuda: '13.2.0' }
+          # - { torch: '2.13.0', cuda: '13.0.0' }
+          # - { torch: '2.13.0', cuda: '13.2.0' }
 
     steps:
       - name: Checkout code
@@ -619,12 +619,12 @@ jobs:
           name: wheels-ubuntu-standard-py${{ matrix.python-version }}
           path: dist/*.whl
 
-    # ==========================================
+  # ==========================================
   # 1. LINUX MATLAB BUILD (CONTAINERIZED)
   # ==========================================
   build_matlab_linux:
     name: MATLAB Build (Linux, CUDA 12.8)
-    if: true
+    if: false
     runs-on: ubuntu-22.04
     container:
       # Use the devel image so it includes nvcc and the compiler toolchain
@@ -672,7 +672,7 @@ jobs:
   build_matlab_windows:
     name: MATLAB Build (Windows, CUDA 12.8)
     runs-on: windows-latest
-    if: true
+    if: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
