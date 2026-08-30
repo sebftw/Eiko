@@ -45,7 +45,7 @@ src_coords = torch.tensor([
 ], device=device)
 
 # PyTorch requires batch first: [Batch, H, W]
-u_init = torch.full((4, N, N), 1e6, dtype=torch.float32, device=device)
+u_init = torch.full((4, N, N), float('inf'), dtype=torch.float32, device=device)
 
 # Seed the sources with 0.0
 for b in range(4):

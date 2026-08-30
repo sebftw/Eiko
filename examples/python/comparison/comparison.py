@@ -1,14 +1,23 @@
+import sys
 import time
 import torch
-import cupy as cp
-import cupyx.scipy.ndimage
-import skfmm
 import numpy as np
 import matplotlib.pyplot as plt
-
-import fteikpy
-import pykonal
 from eiko import eiko
+try:
+    import cupy as cp
+    import cupyx.scipy.ndimage
+    import skfmm
+    import fteikpy
+    import pykonal
+except ImportError as e:
+    print(f"Import Error: {e}")
+    print("\nMissing required dependencies. Please install them using the following commands:")
+    print("pip install cupy-cuda12x")
+    print("pip install scikit-fmm")
+    print("pip install fteikpy")
+    print("pip install pykonal")
+    sys.exit(1)
 
 MSFM = False  # Whether to enable MSFM for eiko (increases accuracy).
 
@@ -409,7 +418,6 @@ if __name__ == "__main__":
         fig, ax = plt.subplots(figsize=(10, 5.5))
         
         # 3. Use horizontal bars with a single cohesive, professional color
-        # (Multiple colors usually imply different data categories, which isn't the case here)
         bars = ax.barh(names, vals, color='#2980b9', edgecolor='none', height=0.6)
         
         # 4. Clean up the frame (despining)
@@ -439,7 +447,12 @@ if __name__ == "__main__":
                 color='#2c3e50'
             )
             
-        plt.tight_layout()
+        # 7. Add GPU name to the bottom right
+        fig.text(0.98, 0.02, f"{gpu_name}", ha='right', va='bottom', 
+                 fontsize=9, color='#7f8c8d', style='italic')
+            
+        # Adjust layout rect to leave a 4% margin at the bottom so the text isn't clipped
+        plt.tight_layout(rect=[0, 0.04, 1, 1]) 
         plt.savefig('fps_comparison.png', dpi=300) # 300 DPI for a crisp export
 
     # ------------------
