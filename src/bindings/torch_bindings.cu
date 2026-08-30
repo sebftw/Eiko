@@ -3,7 +3,9 @@
  * Licensed under the BSD 3-Clause License. See LICENSE file in the project root for details.
  */
 
-#include <torch/extension.h>
+#include <torch/types.h>
+#include <torch/csrc/utils/pybind.h>
+#include <pybind11/pybind11.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <memory>
 #include <stdexcept>
