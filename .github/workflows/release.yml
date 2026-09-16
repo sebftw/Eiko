@@ -29,7 +29,7 @@ jobs:
           - { torch: '2.14.0', cuda: '13.2.0', os_version: '24.04' }
 
         # Target active Python versions
-        python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+        python_version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13', '3.14']
   
         exclude:
           # ==========================================================
@@ -44,6 +44,8 @@ jobs:
             python_version: '3.12'
           - platform: { os_version: '20.04' }
             python_version: '3.13'
+          - platform: { os_version: '20.04' }
+            python_version: '3.14'
 
           # ==========================================================
           # 2. PYTORCH VS PYTHON VERSION COMPATIBILITY DROPS
@@ -51,6 +53,8 @@ jobs:
           # PyTorch 2.4 does not support Python 3.13
           - platform: { torch: '2.4.1' }
             python_version: '3.13'
+          - platform: { torch: '2.4.1' }
+            python_version: '3.14'
 
           # PyTorch 2.10+ explicitly drops Python 3.9 support
           - platform: { torch: '2.10.0' }
@@ -573,6 +577,50 @@ jobs:
           path: dist/*.whl
           
       - name: Clean 3.13 Workspace
+        # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        shell: pwsh
+        run: |
+          if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
+          Get-ChildItem -Filter "*.egg-info" -Directory | Remove-Item -Recurse -Force
+          if (Test-Path "dist") { Remove-Item -Recurse -Force "dist\*.whl" }
+
+
+      # --- PYTHON 3.14 BUILD ---
+      # Excluded for PyTorch 2.4.1
+      # Excluded for PyTorch 2.10 + CUDA 12.8 (missing binaries)
+      - name: Set up Python 3.14
+        # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          architecture: 'x64'
+          
+      - name: Build 3.13 Wheel
+        # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        env: *build_env
+        run: |
+          pip install --upgrade pip
+          pip install "setuptools>=61.0.0,<82" "build>=1.2.0" "validate-pyproject>=0.25" wheel ninja
+          pip install torch==${{ matrix.platform.torch }} --index-url https://download.pytorch.org/whl/${{ env.cu_version }}
+          # pip install "jax[cuda${{ env.cuda_major }}]" "pybind11>=2.12.0"
+          pip install "jax" "pybind11>=2.12.0"
+          
+          $env:LIB = "$env:LIB;${{ env.Python_ROOT_DIR }}\libs"
+          python -m build --wheel --no-isolation
+          pip uninstall torch jax -y
+
+      - name: Upload 3.14 Wheel
+        # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
+        if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-windows-pt${{ matrix.platform.torch }}-${{ env.cu_version }}-py3.14
+          path: dist/*.whl
+          
+      - name: Clean 3.14 Workspace
         # CHANGE: Swapped matrix.platform.cuda for env.cu_version matching your wheel download pattern
         if: matrix.platform.torch != '2.4.1' && !(matrix.platform.torch == '2.10.0' && matrix.platform.cuda == '12.8.1')
         shell: pwsh
