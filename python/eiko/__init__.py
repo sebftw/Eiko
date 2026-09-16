@@ -10,7 +10,7 @@ from pathlib import Path
 # ---------------------------------------------------------
 # This acts as the single source of truth for the package version.
 # It is placed at the very top so internal submodules can safely import it.
-__version__ = "0.8.7"
+__version__ = "0.9.0"
 
 # ---------------------------------------------------------
 # PATH & ENVIRONMENT INITIALIZATION
