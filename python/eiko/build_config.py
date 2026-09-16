@@ -208,16 +208,21 @@ IS_RELEASE_BUILD = bool(local_version)
 
 if sys.platform == "win32":
     CXX_ARGS.extend([
-        '/permissive',
-        '/EHsc', '/MD', '/DVERSION_INFO', '/DTHRUST_IGNORE_CUB_VERSION_CHECK', 
-        '/DTHRUST_FORCE_COMPATIBILITY', '/Zc:preprocessor', '/DNOMINMAX',
-        '/D_ENABLE_EXTENDED_ALIGNED_STORAGE'
+        # '/std:c++17', 
+        '/permissive-',     # CRITICAL: Replaces legacy /permissive with strict standard conformance
+        '/Zc:__cplusplus',  # CRITICAL: Forces MSVC to report __cplusplus=201703L instead of 199711L
+        '/EHsc', '/MD', '/DVERSION_INFO', 
+        '/DTHRUST_IGNORE_CUB_VERSION_CHECK', '/DTHRUST_FORCE_COMPATIBILITY', 
+        '/Zc:preprocessor', '/DNOMINMAX', '/D_ENABLE_EXTENDED_ALIGNED_STORAGE'
     ])
+
     NVCC_ARGS.extend([
+        # '-std=c++17', 
         '-allow-unsupported-compiler', 
         '-D_WIN32=1', '-DUSE_CUDA=1',
         '-Xcompiler', '/Zc:preprocessor',
-        '-Xcompiler', '/permissive',
+        '-Xcompiler', '/permissive-',    # Pass strict conformance to the host compiler
+        '-Xcompiler', '/Zc:__cplusplus', # Pass correct C++ version reporting to the host compiler
         '-DTHRUST_IGNORE_CUB_VERSION_CHECK', 
         '-DTHRUST_FORCE_COMPATIBILITY',
         '-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH', 

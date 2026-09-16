@@ -41,7 +41,7 @@ except ImportError as e:
     ) from e
 
 from torch.utils.cpp_extension import load
-from eiko import SRC_DIR, __version__
+from eiko import __version__
 
 # Import the centralized configuration and diagnostic engine
 from eiko.build_config import (
@@ -50,6 +50,7 @@ from eiko.build_config import (
     EXTRA_INCLUDE_PATHS, 
     BIN_CACHE_DIR, 
     cuda_home,
+    SRC_DIR,
     diagnose_build_failure
 )
 

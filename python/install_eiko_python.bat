@@ -28,13 +28,26 @@
 @echo off
 REM Windows Command Prompt Section
 set "SCRIPT_NAME=install_eiko_python_windows.ps1"
-if not exist "%SCRIPT_NAME%" (
+set "SCRIPT_PATH=%~dp0%SCRIPT_NAME%"
+
+if not exist "%SCRIPT_PATH%" (
     echo Installer not found locally. Downloading...
-    powershell -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_python_windows.ps1' -OutFile '%SCRIPT_NAME%'"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/sebftw/Eiko/main/python/install_eiko_python_windows.ps1' -OutFile '%SCRIPT_PATH%'"
 )
-powershell -ExecutionPolicy Bypass -Command ". .\%SCRIPT_NAME%"
+
+if not exist "%SCRIPT_PATH%" (
+    echo [!] Failed to download %SCRIPT_NAME%.
+    pause
+    exit /b 1
+)
+
+:: Run the script via -File with the full absolute path
+powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_PATH%"
+
 if %errorlevel% neq 0 (
-    echo [!] Windows Installation failed.
+    echo [!] Windows Installation failed with exit code %errorlevel%.
     pause
     exit /b %errorlevel%
 )
+
+endlocal

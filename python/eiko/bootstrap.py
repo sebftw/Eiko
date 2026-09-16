@@ -92,7 +92,7 @@ def fetch_precompiled_wheel(
 
     if not valid_builds:
         cuda_str = (", CUDA: " + cuda_version) if cuda_version else ""
-        print(f"[Eiko] No precompiled wheels matching OS: {os_name}, Python: {py_ver}, {backend_name}: {target_b_minor}{cuda_str} Falling back to JIT.")
+        print(f"[Eiko] No precompiled wheels matching OS: {os_name}, Python: {py_ver}, {backend_name}: {target_b_minor}{cuda_str}. Falling back to JIT.")
         return False
 
     # 3. Select Variant (CUDA Scoring)
