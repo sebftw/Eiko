@@ -2,8 +2,8 @@
 This directory contains a suite of examples demonstrating the capabilities of Eiko, the eikonal equation solver. They cover a wide range of applications, from simple visualization and validation to advanced tasks such as acoustic lens design and differentiable travel-time tomography.
 
 - [Prerequisites](#prerequisites)
-- [Example Scripts](#example-scripts)
 - [How to Run](#how-to-run)
+- [List of Examples](#list-of-examples)
 
 If this is your first time, try out the interactive Eiko scripts [`interactive_eiko.m`](matlab/interactive_eiko.m) (MATLAB) or [`interactive_eiko.py`](python/interactive_eiko.py) (Python).
 
@@ -14,12 +14,19 @@ If this is your first time, try out the interactive Eiko scripts [`interactive_e
 | <img alt="maze" src="https://github.com/user-attachments/assets/a2b65417-1edc-4a10-9cef-3bac17b2e106" width="100%" /> | <img alt="tomography_inversion" src="https://github.com/user-attachments/assets/f9b2edce-409c-4fc4-97c1-3f2f804fd172" width="100%" /> | <img alt="lens_design2_hd" src="https://github.com/user-attachments/assets/c0dd15a9-eb56-4a8b-b27c-02332e7dbf0d" width="100%" /> |
 
 ## Prerequisites
-To run the Python examples, you will need additional visualization libraries such as `matplotlib`. You can install Eiko with these dependencies (or add them to your current installation) by running:
+The **Python examples require additional visualization libraries** such as `matplotlib`. You can install these dependencies with:
 ```
 pip install eiko[examples]
 ```
 
-## Example Scripts
+## How to Run
+**MATLAB**: Navigate to the [`matlab/`](matlab/) directory and run the script directly.<br>
+**Python**: Navigate to the [`python/`](python/) directory and execute the script with Python. For instance:
+```
+python interactive_eiko.py
+```
+
+## List of Examples
 The scripts are located in the following subfolders.
 * `matlab/`: MATLAB **.m** example scripts.
 * `python/`: Python **.py** example scripts.
@@ -38,10 +45,4 @@ A brief description of each script:
 | [`tomography.m`](matlab/tomography.m)<br>[`tomography_torch.py`](python/tomography_torch.py)<br>[`tomography_jax.py`](python/tomography_jax.py) | Differentiable optimization for sound speed map recovery.  Includes an example using PyTorch, JAX, and the MATLAB Deep Learning Toolbox. |
 
 
-## How to Run
-**MATLAB**: Navigate to the [`matlab/`](matlab/) directory and run the script directly.<br>
-**Python**: Navigate to the [`python/`](python/) directory and execute the script directly. For example:
-```
-python time_of_flight.py
-```
 
