@@ -5,7 +5,9 @@ This directory contains a suite of examples demonstrating the capabilities of Ei
 - [Example Scripts](#example-scripts)
 - [How to Run](#how-to-run)
 
-| | | |
+If this is your first time, try out the interactive Eiko scripts [`interactive_eiko.m`](matlab/interactive_eiko.m) (MATLAB) or [`interactive_eiko.py`](python/interactive_eiko.py) (Python).
+
+| Example videos | | |
 | :---: | :---: | :---: |
 | <img alt="plane_wave1" src="https://github.com/user-attachments/assets/989bce3d-b3d7-4b4b-a735-e58d7e58524c" width="100%" /> | <img alt="aberrated_plane_wave" src="https://github.com/user-attachments/assets/0b0bec62-b80b-47a8-acee-268b71fab730" width="100%" /> | <img alt="plane_wave3" src="https://github.com/user-attachments/assets/796f7cc5-4363-48d6-964d-76cb251377f9" width="100%" /> |
 | <img alt="plane_wave3D" src="https://github.com/user-attachments/assets/e94ac0cd-5e3e-4e90-a5d9-80d783a8ca00" width="100%" /> | <img alt="plane_wave3D_aberrated" src="https://github.com/user-attachments/assets/37a75203-b599-4ec6-9598-0dc62346692b" width="100%" /> | <img alt="aberation_correction" src="https://github.com/user-attachments/assets/e92c6f26-8bf7-4a38-ba0d-7978ad017d34" width="100%" /> |
